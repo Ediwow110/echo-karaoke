@@ -1,0 +1,19 @@
+{
+  "version": 1,
+  "hooks": {
+    "sessionStart": [
+      {
+        "type": "command",
+        "bash": "echo 'Sauron Agent Guard active'",
+        "timeoutSec": 5
+      }
+    ],
+    "preToolUse": [
+      {
+        "type": "command",
+        "bash": ".claude/hooks/guard.sh",
+        "timeoutSec": 10
+      }
+    ]
+  }
+}

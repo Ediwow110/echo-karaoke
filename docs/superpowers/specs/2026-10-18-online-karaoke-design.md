@@ -82,6 +82,12 @@ Join outcomes are surfaced explicitly: joined, room not found, room ended.
    position atomically.
 4. All room clients receive the queue change via Realtime.
 
+**Search fallback:** song search requires a YouTube Data API v3 key configured in the
+edge function. Until a key is configured (or when the API returns an error), the app
+offers a paste-URL/ID fallback: the guest pastes a YouTube link or video ID, resolves
+its title and thumbnail, and adds it to the queue. The fallback keeps the app usable
+end to end without any API key; full search activates automatically once a key is set.
+
 ### 4.4 Playback and control
 1. Playback state (current song, position, playing/paused) lives in `rooms`.
 2. The host screen is the only device that produces audio/video.
@@ -147,14 +153,14 @@ Realtime publishes row changes for `queue_songs`, `rooms.playback_state`, and
   both users → search → add song → queue updates on the host screen → skip.
 - Manual: real phone scanning the real QR code against the deployed app.
 
-## 9. Decisions to confirm
-
-Recommended defaults are stated so implementation is unambiguous; confirm or override.
+## 9. Confirmed decisions
 
 - **Hosting:** Vercel for the SPA, Supabase for Postgres/Realtime/Edge Functions.
 - **Display names:** free text, trimmed and length-limited, with a generated fallback
   ("Guest 42") when empty. No moderation system in MVP.
 - **Queue reordering:** guests may reorder or remove only the songs they added; the host
   may reorder or remove any song.
-- **Rate limiting:** cap guest song additions (for example 5 per minute per member) to
-  protect the shared YouTube API quota.
+- **Rate limiting:** cap guest song additions at 5 per minute per member to protect the
+  shared YouTube API quota.
+- **YouTube search:** Data API v3 via edge function when a key is configured; paste
+  URL/ID fallback when it is not, or on API errors.
