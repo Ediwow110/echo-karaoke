@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { createEdgeApi } from '../../src/lib/edgeApi';
 
 declare const process: { env: Record<string, string | undefined> };
 
@@ -220,5 +221,36 @@ describe.skipIf(!runsLocally)('Edge Function room authorization', () => {
     expect(endedRead.body.status).toBe('ended');
     expect(endedRead.body.queue).toBeUndefined();
     expect(endedRead.body.roster).toBeUndefined();
+  });
+});
+describe.skipIf(!runsLocally)('typed edge client against the local stack', () => {
+  it('creates a room and reads it back through the client wrapper', async () => {
+    const session = await anonymousSession();
+    const client = createEdgeApi({
+      url: BASE_URL,
+      anonKey: ANON_KEY,
+      getAccessToken: async () => session,
+    });
+
+    const created = await client.invoke<{
+      roomId: string;
+      roomCode: string;
+      guestToken: string;
+      hostToken: string;
+    }>('create-room', { displayName: 'Client Host' });
+
+    expect(created.roomId).toHaveLength(36);
+
+    const live = await client.invoke<{ status: string; roster: unknown[] }>(
+      'guest-room-read',
+      { roomId: created.roomId },
+      { guestToken: created.guestToken },
+    );
+    expect(live.status).toBe('live');
+    expect(live.roster).toHaveLength(1);
+
+    await expect(
+      client.invoke('guest-room-read', { roomId: created.roomId }),
+    ).rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
   });
 });
