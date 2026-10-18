@@ -8,6 +8,10 @@ import { buildJoinUrl } from '../features/rooms/roomUrl';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
+import PlaybackControls from '../features/playback/PlaybackControls';
+import YouTubePlayer from '../features/playback/YouTubePlayer';
+import { youtubePlayerFactory } from '../features/playback/youtubeIframe';
+import { reportPlaybackPosition } from '../features/playback/playbackApi';
 
 export default function HostRoomPage() {
   const params = useParams<{ roomId: string }>();
@@ -37,6 +41,16 @@ export default function HostRoomPage() {
       cancelled = true;
     };
   }, [joinUrl]);
+
+  async function runPlayback(action: 'play' | 'pause' | 'next'): Promise<void> {
+    const { sendPlaybackCommand } = await import('../features/playback/playbackApi');
+    try {
+      await sendPlaybackCommand(api, roomId, action);
+      await refresh();
+    } catch {
+      // The player retries on the next invalidation.
+    }
+  }
 
   async function runCommand(action: 'lock' | 'unlock' | 'end' | 'clear_queue'): Promise<void> {
     setCommandError(null);
@@ -98,6 +112,24 @@ export default function HostRoomPage() {
             <p className="quiet-note">Guests scan the code or open the link on any phone. No account is needed.</p>
           </div>
         </div>
+      </section>
+
+      <YouTubePlayer
+        playback={data.playback}
+        onEnded={() => { void runPlayback('next'); }}
+        onProgress={(seconds) => {
+          void reportPlaybackPosition(api, roomId, seconds).catch(() => undefined);
+        }}
+        playerFactory={youtubePlayerFactory}
+      />
+
+      <section className="panel" aria-labelledby="playback-heading">
+        <h2 id="playback-heading">Playback</h2>
+        <PlaybackControls
+          roomId={roomId}
+          playback={data.playback}
+          onChanged={() => { void refresh(); }}
+        />
       </section>
 
       <ParticipantRoster roster={roster} />

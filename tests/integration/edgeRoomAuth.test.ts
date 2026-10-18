@@ -425,3 +425,98 @@ describe.skipIf(!runsLocally)('youtube search authorization', () => {
     expect(withoutKey.body.results).toEqual([]);
   });
 });
+describe.skipIf(!runsLocally)('playback authorization', () => {
+  it('plays, pauses and skips through the room pass and blocks locked guests', async () => {
+    const hostSession = await anonymousSession();
+    const guestSession = await anonymousSession();
+
+    const created = await callFunction('create-room', {
+      session: hostSession,
+      body: { displayName: 'Player Host' },
+    });
+    const roomId = created.body.roomId as string;
+    const code = created.body.roomCode as string;
+    const hostToken = created.body.hostToken as string;
+
+    await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: created.body.guestToken as string,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+
+    const joined = await callFunction('join-room', {
+      session: guestSession,
+      body: { code, displayName: 'Player Guest' },
+    });
+    const guestToken = joined.body.guestToken as string;
+
+    const noToken = await callFunction('playback-command', {
+      session: guestSession,
+      body: { roomId, action: 'play' },
+    });
+    expect(noToken.status).toBe(401);
+
+    const played = await callFunction('playback-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, action: 'play' },
+    });
+    expect(played.status).toBe(200);
+    const playback = played.body.playback as { isPlaying: boolean; currentVideoId: string };
+    expect(playback.isPlaying).toBe(true);
+    expect(playback.currentVideoId).toBe('dQw4w9WgXcQ');
+
+    await callFunction('host-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'lock' },
+    });
+
+    const locked = await callFunction('playback-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, action: 'pause' },
+    });
+    expect(locked.status).toBe(403);
+    expect((locked.body.error as { code: string }).code).toBe('GUEST_CONTROLS_LOCKED');
+
+    const hostPause = await callFunction('playback-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'pause' },
+    });
+    expect(hostPause.status).toBe(200);
+    expect((hostPause.body.playback as { isPlaying: boolean }).isPlaying).toBe(false);
+
+    const reported = await callFunction('playback-report', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, positionSeconds: 33 },
+    });
+    expect(reported.status).toBe(200);
+    expect(reported.body.positionSeconds).toBe(33);
+
+    const guestReport = await callFunction('playback-report', {
+      session: guestSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: guestToken,
+      body: { roomId, positionSeconds: 33 },
+    });
+    expect(guestReport.status).toBe(401);
+
+    const skipped = await callFunction('playback-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'next' },
+    });
+    expect(skipped.status).toBe(200);
+    expect((skipped.body.playback as { currentVideoId: string | null }).currentVideoId).toBeNull();
+  });
+});

@@ -6,6 +6,8 @@ export type EdgeFunctionName =
   | 'host-command'
   | 'queue-command'
   | 'youtube-search'
+  | 'playback-command'
+  | 'playback-report'
   | 'touch-member';
 
 export type RoomTokens = {

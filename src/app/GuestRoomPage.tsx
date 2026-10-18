@@ -4,6 +4,7 @@ import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
 import SongSearch from '../features/queue/SongSearch';
+import PlaybackControls from '../features/playback/PlaybackControls';
 
 export default function GuestRoomPage() {
   const params = useParams<{ roomId: string }>();
@@ -70,9 +71,12 @@ export default function GuestRoomPage() {
 
       <section className="panel" aria-labelledby="remote-heading">
         <h2 id="remote-heading">Your remote</h2>
-        <p className="empty-state">
-          Playback controls arrive with the next task. For now this page shows the live queue and who is in the room.
-        </p>
+        <PlaybackControls
+          roomId={roomId}
+          playback={data.playback}
+          disabled={data.room?.guestControlLocked === true}
+          onChanged={() => { void refresh(); }}
+        />
       </section>
     </main>
   );

@@ -40,6 +40,7 @@ export type RoomView = {
   queue?: QueueEntry[];
   playback?: {
     currentSongId: string | null;
+    currentVideoId: string | null;
     positionSeconds: number;
     isPlaying: boolean;
     updatedAt: string | null;
