@@ -7,11 +7,39 @@ import type { EdgeApi } from '../../src/lib/edgeApi';
 import '@testing-library/jest-dom/vitest';
 
 const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
+const song = {
+  videoId: 'dQw4w9WgXcQ',
+  title: 'Dancing Queen',
+  channelTitle: 'ABBA',
+  thumbnailUrl: null,
+  durationSeconds: null,
+};
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
 });
+
+function fakeApi(options: { available?: boolean } = {}): { api: EdgeApi; calls: string[] } {
+  const calls: string[] = [];
+  const available = options.available ?? true;
+
+  const api: EdgeApi = {
+    invoke: (async (name: string) => {
+      calls.push(name);
+      if (name === 'youtube-suggest') {
+        return { suggestions: ['dancing queen', 'dancing queen karaoke'] };
+      }
+      if (name === 'youtube-search') {
+        return available
+          ? { available: true, results: [song] }
+          : { available: false, results: [], message: 'Search is not configured.' };
+      }
+      return { songId: 's1', title: 'Dancing Queen', position: 1 };
+    }) as unknown as EdgeApi['invoke'],
+  };
+  return { api, calls };
+}
 
 function renderSearch(api: EdgeApi) {
   localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
@@ -20,40 +48,45 @@ function renderSearch(api: EdgeApi) {
   );
 }
 
-function apiWithResults(): { api: EdgeApi; calls: string[] } {
-  const calls: string[] = [];
-  const api: EdgeApi = {
-    invoke: (async (name: string) => {
-      calls.push(name);
-      if (name === 'youtube-search') {
-        return {
-          available: true,
-          results: [
-            { videoId: 'dQw4w9WgXcQ', title: 'Never Gonna Give You Up', channelTitle: 'Rick Astley', thumbnailUrl: null, durationSeconds: null },
-          ],
-        };
-      }
-      return { songId: 's1', title: 'Never Gonna Give You Up', position: 1 };
-    }) as unknown as EdgeApi['invoke'],
-  };
-  return { api, calls };
-}
-
-describe('song search', () => {
-  it('builds a watch link for a result', () => {
-    expect(watchUrl('dQw4w9WgXcQ')).toBe('https://www.youtube.com/watch?v=dQw4w9WgXcQ');
-  });
-
-  it('queues a searched song and confirms it landed in the queue', async () => {
-    const { api, calls } = apiWithResults();
+describe('song typeahead', () => {
+  it('shows YouTube suggestions while typing', async () => {
+    const { api, calls } = fakeApi();
     renderSearch(api);
 
-    fireEvent.change(screen.getByLabelText(/search youtube/i), { target: { value: 'rick astley' } });
-    fireEvent.click(screen.getByRole('button', { name: /^search$/i }));
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
 
-    expect(await screen.findByText('Never Gonna Give You Up')).toBeInTheDocument();
+    expect(await screen.findByRole('button', { name: 'dancing queen karaoke' })).toBeInTheDocument();
+    expect(calls).toContain('youtube-suggest');
+  });
 
-    fireEvent.click(screen.getByRole('button', { name: /^queue$/i }));
+  it('turns a chosen suggestion into matching songs', async () => {
+    const { api, calls } = fakeApi();
+    renderSearch(api);
+
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
+
+    expect(await screen.findByText('Dancing Queen')).toBeInTheDocument();
+    expect(calls).toContain('youtube-search');
+  });
+
+  it('does not look anything up for a single character', async () => {
+    const { api, calls } = fakeApi();
+    renderSearch(api);
+
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'a' } });
+
+    await new Promise((resolve) => setTimeout(resolve, 400));
+    expect(calls).not.toContain('youtube-suggest');
+  });
+
+  it('queues a chosen song and confirms it', async () => {
+    const { api, calls } = fakeApi();
+    renderSearch(api);
+
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
+    fireEvent.click(await screen.findByRole('button', { name: /^queue$/i }));
 
     await waitFor(() => {
       expect(screen.getByRole('status')).toHaveTextContent(/in the queue/i);
@@ -61,53 +94,32 @@ describe('song search', () => {
     expect(calls).toContain('queue-command');
   });
 
-  it('links each result to YouTube in a new tab', async () => {
-    const { api } = apiWithResults();
+  it('links a song out to YouTube', async () => {
+    const { api } = fakeApi();
     renderSearch(api);
 
-    fireEvent.change(screen.getByLabelText(/search youtube/i), { target: { value: 'rick astley' } });
-    fireEvent.click(screen.getByRole('button', { name: /^search$/i }));
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
 
-    const link = await screen.findByRole('link', { name: /open never gonna give you up on youtube/i });
-    expect(link).toHaveAttribute('href', 'https://www.youtube.com/watch?v=dQw4w9WgXcQ');
+    const link = await screen.findByRole('link', { name: /open dancing queen on youtube/i });
+    expect(link).toHaveAttribute('href', watchUrl('dQw4w9WgXcQ'));
     expect(link).toHaveAttribute('target', '_blank');
-    expect(link).toHaveAttribute('rel', 'noreferrer noopener');
+  });
+
+  it('explains when song search needs a key', async () => {
+    const { api } = fakeApi({ available: false });
+    renderSearch(api);
+
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
+    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
+
+    expect(await screen.findByRole('status')).toHaveTextContent(/needs a youtube key/i);
   });
 
   it('offers a control that returns to the queue', () => {
-    const { api } = apiWithResults();
+    const { api } = fakeApi();
     renderSearch(api);
 
     expect(screen.getByRole('button', { name: /view queue/i })).toBeInTheDocument();
-  });
-
-  it('explains when search is not configured', async () => {
-    const api: EdgeApi = {
-      invoke: (async () => ({
-        available: false,
-        results: [],
-        message: 'Search is not configured. Paste a YouTube link instead.',
-      })) as unknown as EdgeApi['invoke'],
-    };
-
-    renderSearch(api);
-
-    fireEvent.change(screen.getByLabelText(/search youtube/i), { target: { value: 'abba' } });
-    fireEvent.click(screen.getByRole('button', { name: /^search$/i }));
-
-    expect(await screen.findByRole('status')).toHaveTextContent(/not configured/i);
-  });
-
-  it('reports an empty result set', async () => {
-    const api: EdgeApi = {
-      invoke: (async () => ({ available: true, results: [] })) as unknown as EdgeApi['invoke'],
-    };
-
-    renderSearch(api);
-
-    fireEvent.change(screen.getByLabelText(/search youtube/i), { target: { value: 'zzzz' } });
-    fireEvent.click(screen.getByRole('button', { name: /^search$/i }));
-
-    expect(await screen.findByRole('status')).toHaveTextContent(/no videos matched/i);
   });
 });

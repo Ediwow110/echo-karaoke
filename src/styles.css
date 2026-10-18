@@ -135,6 +135,12 @@ h1 em { color: var(--forest); font-family: 'Playfair Display', Georgia, serif; f
 .search-results { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .search-result { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e4e0d5; border-radius: 12px; background: #fffdf7; }
 .search-result .action-button { min-width: 84px; min-height: 40px; margin-left: auto; }
+
+.suggest-list { display: grid; gap: 6px; margin: 0; padding: 0; list-style: none; }
+.suggest-item { width: 100%; padding: 10px 12px; border: 1px solid #e4e0d5; border-radius: 10px; background: #fffdf7; color: var(--ink); font: inherit; font-size: 14px; text-align: left; cursor: pointer; }
+.suggest-item:hover:not(:disabled) { background: #eef0e6; }
+.suggest-item:disabled { opacity: .5; cursor: not-allowed; }
+
 .youtube-link { flex: none; padding: 6px 10px; border: 1px solid #dcd8cf; border-radius: 999px; color: #8a4b2a; font-family: 'DM Mono', monospace; font-size: 10px; letter-spacing: .08em; text-decoration: none; text-transform: uppercase; }
 .youtube-link:hover { background: #f7ece5; }
 

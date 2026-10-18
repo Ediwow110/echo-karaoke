@@ -606,3 +606,44 @@ describe.skipIf(!runsLocally)('votes and heartbeat', () => {
     expect((lockedVote.body.error as { code: string }).code).toBe('GUEST_CONTROLS_LOCKED');
   });
 });
+describe.skipIf(!runsLocally)('youtube suggestions', () => {
+  it('requires a session and a room pass, and rejects very short terms', async () => {
+    const session = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session,
+      body: { displayName: 'Typing Host' },
+    });
+    const roomId = created.body.roomId as string;
+    const guestToken = created.body.guestToken as string;
+
+    const noToken = await callFunction('youtube-suggest', {
+      session,
+      body: { roomId, query: 'dancing queen' },
+    });
+    expect(noToken.status).toBe(401);
+
+    const tooShort = await callFunction('youtube-suggest', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, query: 'a' },
+    });
+    expect(tooShort.status).toBe(400);
+
+    const suggestions = await callFunction('youtube-suggest', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, query: 'dancing queen' },
+    });
+    expect(suggestions.status).toBe(200);
+    const list = suggestions.body.suggestions as string[];
+    expect(Array.isArray(list)).toBe(true);
+    expect(list.length).toBeGreaterThan(0);
+    expect(list.length).toBeLessThanOrEqual(10);
+    for (const item of list) {
+      expect(typeof item).toBe('string');
+      expect(item.length).toBeGreaterThan(0);
+    }
+  });
+});

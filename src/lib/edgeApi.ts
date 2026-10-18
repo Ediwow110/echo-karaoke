@@ -6,6 +6,7 @@ export type EdgeFunctionName =
   | 'host-command'
   | 'queue-command'
   | 'youtube-search'
+  | 'youtube-suggest'
   | 'playback-command'
   | 'playback-report'
   | 'vote-command'

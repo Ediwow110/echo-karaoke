@@ -142,3 +142,25 @@ export function mapSearchResponse(payload: unknown): SearchResult[] {
 }
 
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
+export const MAX_SUGGESTIONS = 10;
+
+// YouTube's public autocomplete returns [query, [suggestion, ...], ...].
+export function parseSuggestions(payload: unknown): string[] {
+  if (!Array.isArray(payload) || payload.length < 2) {
+    return [];
+  }
+  const items = payload[1];
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  const out: string[] = [];
+  for (const item of items) {
+    if (typeof item !== 'string') continue;
+    const value = item.trim().slice(0, 100);
+    if (value.length === 0 || out.includes(value)) continue;
+    out.push(value);
+    if (out.length === MAX_SUGGESTIONS) break;
+  }
+  return out;
+}

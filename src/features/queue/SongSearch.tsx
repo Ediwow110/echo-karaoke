@@ -1,11 +1,13 @@
-import { useState, type FormEvent } from 'react';
+import { useCallback, useState } from 'react';
 import { RoomApiError } from '../../lib/edgeApi';
 import { useRoomApi } from '../../app/RoomApiProvider';
 import { loadGuestToken } from '../rooms/tokenStore';
 import { addSong } from './queueApi';
 import { scrollToQueue } from './queueAnchor';
+import { useTypeahead } from './useTypeahead';
 import type { SearchResult } from '../../types/search';
 
+type SuggestResponse = { suggestions: string[] };
 type SearchResponse = { available: boolean; results: SearchResult[]; message?: string };
 
 type Props = {
@@ -20,46 +22,59 @@ export function watchUrl(videoId: string): string {
 
 export default function SongSearch({ roomId, disabled = false, onAdded }: Props) {
   const api = useRoomApi();
-  const [query, setQuery] = useState('');
   const [results, setResults] = useState<SearchResult[]>([]);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
-  const [busy, setBusy] = useState(false);
   const [addingId, setAddingId] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
 
-  async function handleSearch(event: FormEvent<HTMLFormElement>): Promise<void> {
-    event.preventDefault();
-    setError(null);
-    setMessage(null);
-    setResults([]);
+  const loadSuggestions = useCallback(
+    async (query: string): Promise<string[]> => {
+      const guestToken = loadGuestToken(roomId);
+      if (guestToken === null) {
+        return [];
+      }
+      const response = await api.invoke<SuggestResponse>('youtube-suggest', { roomId, query }, { guestToken });
+      return response.suggestions;
+    },
+    [api, roomId],
+  );
 
-    const guestToken = loadGuestToken(roomId);
-    if (guestToken === null) {
-      setError('This browser has no guest pass for the room.');
-      return;
-    }
+  const typeahead = useTypeahead(loadSuggestions);
 
-    setBusy(true);
-    try {
-      const response = await api.invoke<SearchResponse>(
-        'youtube-search',
-        { roomId, query },
-        { guestToken },
-      );
-      if (response.available === false) {
-        setMessage(response.message ?? 'Search is not configured. Paste a YouTube link instead.');
+  // Picking a term runs the video search and shows the matching songs.
+  const chooseTerm = useCallback(
+    async (term: string): Promise<void> => {
+      typeahead.setQuery(term);
+      setError(null);
+      setMessage(null);
+      setResults([]);
+
+      const guestToken = loadGuestToken(roomId);
+      if (guestToken === null) {
+        setError('This browser has no guest pass for the room.');
         return;
       }
-      setResults(response.results);
-      if (response.results.length === 0) {
-        setMessage('No videos matched that search.');
+
+      setSearching(true);
+      try {
+        const response = await api.invoke<SearchResponse>('youtube-search', { roomId, query: term }, { guestToken });
+        if (response.available === false) {
+          setMessage('Song search needs a YouTube key. Add songs with the box below meanwhile.');
+          return;
+        }
+        setResults(response.results);
+        if (response.results.length === 0) {
+          setMessage('No songs matched that.');
+        }
+      } catch (caught) {
+        setError(caught instanceof Error ? caught.message : 'The lookup failed.');
+      } finally {
+        setSearching(false);
       }
-    } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The search failed.');
-    } finally {
-      setBusy(false);
-    }
-  }
+    },
+    [api, roomId, typeahead],
+  );
 
   async function handleAdd(videoId: string): Promise<void> {
     setAddingId(videoId);
@@ -68,7 +83,7 @@ export default function SongSearch({ roomId, disabled = false, onAdded }: Props)
       const song = await addSong(api, roomId, videoId);
       setMessage(song.title + ' is in the queue');
       setResults([]);
-      setQuery('');
+      typeahead.setQuery('');
       onAdded?.();
       scrollToQueue();
     } catch (caught) {
@@ -84,33 +99,59 @@ export default function SongSearch({ roomId, disabled = false, onAdded }: Props)
 
   return (
     <div className="search-block">
-      <form className="entry-card" onSubmit={handleSearch} aria-label="Song search form">
-        <label htmlFor="song-search">Search YouTube</label>
+      <div className="entry-card">
+        <label htmlFor="song-search">Find a song on YouTube</label>
         <input
           id="song-search"
           name="song-search"
-          value={query}
-          onChange={(event) => setQuery(event.target.value)}
-          placeholder="Song or artist"
+          value={typeahead.query}
+          onChange={(event) => typeahead.setQuery(event.target.value)}
+          placeholder="Start typing a song or artist"
           autoComplete="off"
           maxLength={100}
           disabled={disabled}
+          role="combobox"
+          aria-expanded={typeahead.suggestions.length > 0}
+          aria-controls="song-suggestions"
+          aria-autocomplete="list"
         />
         <div className="control-row">
-          <button className="action-button action-secondary" type="submit" disabled={disabled || busy || query.trim().length === 0}>
-            <span>{busy ? 'Searching' : 'Search'}</span>
+          <button
+            className="action-button action-secondary"
+            type="button"
+            onClick={() => void chooseTerm(typeahead.query.trim())}
+            disabled={disabled || searching || typeahead.query.trim().length < 2}
+          >
+            <span>{searching ? 'Looking' : 'Show songs'}</span>
           </button>
           <button className="action-button action-secondary" type="button" onClick={() => scrollToQueue()}>
             <span>View queue</span>
           </button>
         </div>
-      </form>
+      </div>
 
       {error !== null ? <p className="form-error" role="alert">{error}</p> : null}
       {message !== null ? <p className="quiet-note" role="status">{message}</p> : null}
 
+      {typeahead.suggestions.length > 0 ? (
+        <ul className="suggest-list" id="song-suggestions" aria-label="Song suggestions">
+          {typeahead.suggestions.map((suggestion) => (
+            <li key={suggestion}>
+              <button
+                className="suggest-item"
+                type="button"
+                onClick={() => void chooseTerm(suggestion)}
+                disabled={disabled}
+              >
+                {suggestion}
+              </button>
+            </li>
+          ))}
+        </ul>
+      ) : null}
+
       {results.length > 0 ? (
-        <ul className="search-results" aria-label="Search results">
+        <ul className="search-results" aria-label="Songs">
           {results.map((result) => (
             <li key={result.videoId} className="search-result">
               {result.thumbnailUrl !== null ? (
