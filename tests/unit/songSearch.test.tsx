@@ -28,7 +28,7 @@ function fakeApi(options: { available?: boolean } = {}): { api: EdgeApi; calls: 
     invoke: (async (name: string) => {
       calls.push(name);
       if (name === 'youtube-suggest') {
-        return { suggestions: ['dancing queen', 'dancing queen karaoke'] };
+        return { suggestions: ['dancing queen karaoke', 'dancing queen abba'] };
       }
       if (name === 'youtube-search') {
         return available
@@ -48,44 +48,27 @@ function renderSearch(api: EdgeApi) {
   );
 }
 
-describe('song typeahead', () => {
-  it('shows YouTube suggestions while typing', async () => {
+async function type(value: string) {
+  fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value } });
+}
+
+describe('typing for songs', () => {
+  it('shows songs from YouTube as the singer types', async () => {
     const { api, calls } = fakeApi();
     renderSearch(api);
 
-    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
-
-    expect(await screen.findByRole('button', { name: 'dancing queen karaoke' })).toBeInTheDocument();
-    expect(calls).toContain('youtube-suggest');
-  });
-
-  it('turns a chosen suggestion into matching songs', async () => {
-    const { api, calls } = fakeApi();
-    renderSearch(api);
-
-    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
-    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
+    await type('dancing');
 
     expect(await screen.findByText('Dancing Queen')).toBeInTheDocument();
     expect(calls).toContain('youtube-search');
+    expect(calls).toContain('youtube-suggest');
   });
 
-  it('does not look anything up for a single character', async () => {
+  it('queues a song found by typing', async () => {
     const { api, calls } = fakeApi();
     renderSearch(api);
 
-    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'a' } });
-
-    await new Promise((resolve) => setTimeout(resolve, 400));
-    expect(calls).not.toContain('youtube-suggest');
-  });
-
-  it('queues a chosen song and confirms it', async () => {
-    const { api, calls } = fakeApi();
-    renderSearch(api);
-
-    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
-    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
+    await type('dancing');
     fireEvent.click(await screen.findByRole('button', { name: /^queue$/i }));
 
     await waitFor(() => {
@@ -98,22 +81,33 @@ describe('song typeahead', () => {
     const { api } = fakeApi();
     renderSearch(api);
 
-    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
-    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
+    await type('dancing');
 
     const link = await screen.findByRole('link', { name: /open dancing queen on youtube/i });
     expect(link).toHaveAttribute('href', watchUrl('dQw4w9WgXcQ'));
     expect(link).toHaveAttribute('target', '_blank');
+    expect(link).toHaveAttribute('rel', 'noreferrer noopener');
   });
 
-  it('explains when song search needs a key', async () => {
+  it('falls back to YouTube suggestions and explains the missing key', async () => {
     const { api } = fakeApi({ available: false });
     renderSearch(api);
 
-    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing' } });
-    fireEvent.click(await screen.findByRole('button', { name: 'dancing queen' }));
+    await type('dancing');
 
-    expect(await screen.findByRole('status')).toHaveTextContent(/needs a youtube key/i);
+    expect(await screen.findByRole('button', { name: 'dancing queen karaoke' })).toBeInTheDocument();
+    expect(screen.getByText(/need a data api key/i)).toBeInTheDocument();
+  });
+
+  it('does not call YouTube for a single character', async () => {
+    const { api, calls } = fakeApi();
+    renderSearch(api);
+
+    await type('a');
+    await new Promise((resolve) => setTimeout(resolve, 450));
+
+    expect(calls).not.toContain('youtube-search');
+    expect(calls).not.toContain('youtube-suggest');
   });
 
   it('offers a control that returns to the queue', () => {
