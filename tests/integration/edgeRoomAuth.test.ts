@@ -254,3 +254,117 @@ describe.skipIf(!runsLocally)('typed edge client against the local stack', () =>
     ).rejects.toMatchObject({ code: 'UNAUTHORIZED', status: 401 });
   });
 });
+describe.skipIf(!runsLocally)('queue command authorization', () => {
+  it('adds a song with server-resolved metadata and rejects bad input', async () => {
+    const hostSession = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session: hostSession,
+      body: { displayName: 'Queue Host' },
+    });
+    const roomId = created.body.roomId as string;
+    const hostGuestToken = created.body.guestToken as string;
+
+    const added = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: hostGuestToken,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+    expect(added.status).toBe(201);
+    expect(added.body.position).toBe(1);
+    expect(typeof added.body.title).toBe('string');
+    expect((added.body.title as string).length).toBeGreaterThan(0);
+
+    const noToken = await callFunction('queue-command', {
+      session: hostSession,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+    expect(noToken.status).toBe(401);
+
+    const badId = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: hostGuestToken,
+      body: { roomId, action: 'add', videoId: 'too-short' },
+    });
+    expect(badId.status).toBe(400);
+
+    const unknownVideo = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: hostGuestToken,
+      body: { roomId, action: 'add', videoId: 'aaaaaaaaaaa' },
+    });
+    expect(unknownVideo.status).toBe(422);
+    expect((unknownVideo.body.error as { code: string }).code).toBe('METADATA_UNAVAILABLE');
+  });
+
+  it('keeps song ownership and the guest lock enforced on the server', async () => {
+    const hostSession = await anonymousSession();
+    const guestSession = await anonymousSession();
+
+    const created = await callFunction('create-room', {
+      session: hostSession,
+      body: { displayName: 'Owner Host' },
+    });
+    const roomId = created.body.roomId as string;
+    const code = created.body.roomCode as string;
+    const hostToken = created.body.hostToken as string;
+
+    const joined = await callFunction('join-room', {
+      session: guestSession,
+      body: { code, displayName: 'Singer Two' },
+    });
+    const guestToken = joined.body.guestToken as string;
+
+    const added = await callFunction('queue-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+    expect(added.status).toBe(201);
+    const songId = added.body.songId as string;
+
+    const hostOwnership = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: created.body.guestToken as string,
+      body: { roomId, action: 'remove', songId },
+    });
+    expect(hostOwnership.status).toBe(403);
+
+    await callFunction('host-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'lock' },
+    });
+
+    const lockedAdd = await callFunction('queue-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+    expect(lockedAdd.status).toBe(403);
+    expect((lockedAdd.body.error as { code: string }).code).toBe('GUEST_CONTROLS_LOCKED');
+
+    const hostAdd = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+    expect(hostAdd.status).toBe(201);
+
+    const hostRemove = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'remove', songId },
+    });
+    expect(hostRemove.status).toBe(200);
+    expect(hostRemove.body.removed).toBe(true);
+  });
+});

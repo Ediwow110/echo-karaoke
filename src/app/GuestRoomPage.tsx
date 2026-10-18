@@ -2,11 +2,12 @@ import { useParams } from 'react-router-dom';
 import { useRoomData } from '../features/rooms/useRoomData';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
+import PasteSongForm from '../features/queue/PasteSongForm';
 
 export default function GuestRoomPage() {
   const params = useParams<{ roomId: string }>();
   const roomId = params.roomId ?? '';
-  const { data, error, loading } = useRoomData(roomId, 'guest');
+  const { data, error, loading, refresh } = useRoomData(roomId, 'guest');
 
   if (loading) {
     return <main className="room-shell"><p role="status">Loading the room</p></main>;
@@ -49,12 +50,22 @@ export default function GuestRoomPage() {
       </header>
 
       <ParticipantRoster roster={roster} />
+
+      <section className="panel" aria-labelledby="add-heading">
+        <h2 id="add-heading">Add a song</h2>
+        <PasteSongForm
+          roomId={roomId}
+          disabled={data.room?.guestControlLocked === true}
+          onAdded={() => { void refresh(); }}
+        />
+      </section>
+
       <QueueList queue={queue} />
 
       <section className="panel" aria-labelledby="remote-heading">
         <h2 id="remote-heading">Your remote</h2>
         <p className="empty-state">
-          Song search and playback controls arrive with the next task. For now this page shows the live queue and who is in the room.
+          Playback controls arrive with the next task. For now this page shows the live queue and who is in the room.
         </p>
       </section>
     </main>

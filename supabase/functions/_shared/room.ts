@@ -12,6 +12,9 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
   ROOM_ENDED: { status: 409, message: 'This room has ended' },
   GUEST_CONTROLS_LOCKED: { status: 403, message: 'The host locked guest controls' },
   VALIDATION_ERROR: { status: 400, message: 'The request is invalid' },
+  RATE_LIMITED: { status: 429, message: 'Slow down: five songs per minute' },
+  FORBIDDEN: { status: 403, message: 'That action is not allowed for this room' },
+  METADATA_UNAVAILABLE: { status: 422, message: 'That video could not be read' },
 };
 
 export class HttpError extends Error {

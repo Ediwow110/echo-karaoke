@@ -4,6 +4,7 @@ export type EdgeFunctionName =
   | 'guest-room-read'
   | 'host-room-read'
   | 'host-command'
+  | 'queue-command'
   | 'touch-member';
 
 export type RoomTokens = {

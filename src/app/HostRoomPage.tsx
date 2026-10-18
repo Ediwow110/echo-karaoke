@@ -7,6 +7,7 @@ import { sendHostCommand } from '../features/rooms/roomApi';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
+import PasteSongForm from '../features/queue/PasteSongForm';
 
 export default function HostRoomPage() {
   const params = useParams<{ roomId: string }>();
@@ -100,6 +101,12 @@ export default function HostRoomPage() {
       </section>
 
       <ParticipantRoster roster={roster} />
+
+      <section className="panel" aria-labelledby="host-add-heading">
+        <h2 id="host-add-heading">Add a song as host</h2>
+        <PasteSongForm roomId={roomId} onAdded={() => { void refresh(); }} />
+      </section>
+
       <QueueList queue={queue} />
 
       <section className="panel" aria-labelledby="controls-heading">
