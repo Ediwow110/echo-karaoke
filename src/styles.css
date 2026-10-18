@@ -121,6 +121,11 @@ h1 em { color: var(--forest); font-family: 'Playfair Display', Georgia, serif; f
 .playback-controls .action-button:disabled { opacity: .45; cursor: not-allowed; }
 
 
+
+.remove-button { min-height: 40px; padding: 0 10px; border: 1px solid #e0d5cc; border-radius: 999px; background: transparent; color: #8a4b2a; font-family: 'DM Mono', monospace; font-size: 11px; cursor: pointer; }
+.remove-button:hover:not(:disabled) { background: #f7ece5; }
+.remove-button:disabled { opacity: .45; cursor: not-allowed; }
+
 .vote-button { display: inline-flex; align-items: center; gap: 6px; min-width: 56px; min-height: 40px; margin-left: auto; padding: 0 10px; border: 1px solid #dcd8cf; border-radius: 999px; background: #fffdf7; color: var(--forest); font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; }
 .vote-button:hover:not(:disabled) { background: #eef0e6; }
 .vote-button:disabled { opacity: .45; cursor: not-allowed; }

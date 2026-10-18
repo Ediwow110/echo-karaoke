@@ -4,6 +4,7 @@ import QRCode from 'qrcode';
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import { sendHostCommand } from '../features/rooms/roomApi';
+import { removeSong } from '../features/queue/queueApi';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
@@ -139,7 +140,12 @@ export default function HostRoomPage() {
         <PasteSongForm roomId={roomId} onAdded={() => { void refresh(); }} />
       </section>
 
-      <QueueList queue={queue} />
+      <QueueList
+        queue={queue}
+        onRemove={(songId) => {
+          void removeSong(api, roomId, songId).then(() => refresh()).catch(() => undefined);
+        }}
+      />
 
       <section className="panel" aria-labelledby="controls-heading">
         <h2 id="controls-heading">Host controls</h2>

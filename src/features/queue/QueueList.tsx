@@ -4,9 +4,19 @@ type Props = {
   queue: QueueEntry[];
   onVote?: (songId: string) => void;
   votingDisabled?: boolean;
+  onRemove?: (songId: string) => void;
+  canRemove?: (song: QueueEntry) => boolean;
+  removingDisabled?: boolean;
 };
 
-export default function QueueList({ queue, onVote, votingDisabled = false }: Props) {
+export default function QueueList({
+  queue,
+  onVote,
+  votingDisabled = false,
+  onRemove,
+  canRemove,
+  removingDisabled = false,
+}: Props) {
   if (queue.length === 0) {
     return (
       <section className="panel" aria-labelledby="queue-heading">
@@ -30,6 +40,17 @@ export default function QueueList({ queue, onVote, votingDisabled = false }: Pro
               <span className="queue-title">{song.title}</span>
               <span className="queue-meta">{song.channelTitle ?? 'YouTube'} · added by {song.addedBy}</span>
             </span>
+            {onRemove !== undefined && (canRemove === undefined || canRemove(song)) ? (
+              <button
+                className="remove-button"
+                type="button"
+                onClick={() => onRemove(song.songId)}
+                disabled={removingDisabled}
+                aria-label={'Remove ' + song.title}
+              >
+                Remove
+              </button>
+            ) : null}
             {onVote !== undefined ? (
               <button
                 className="vote-button"

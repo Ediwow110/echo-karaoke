@@ -7,6 +7,7 @@ import PasteSongForm from '../features/queue/PasteSongForm';
 import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
 import { toggleVote } from '../features/queue/voteApi';
+import { removeSong } from '../features/queue/queueApi';
 import { useRoomApi } from './RoomApiProvider';
 
 export default function GuestRoomPage() {
@@ -15,6 +16,16 @@ export default function GuestRoomPage() {
   const api = useRoomApi();
   const { data, error, loading, refresh } = useRoomData(roomId, 'guest');
   const [voteError, setVoteError] = useState<string | null>(null);
+
+  async function handleRemove(songId: string): Promise<void> {
+    setVoteError(null);
+    try {
+      await removeSong(api, roomId, songId);
+      await refresh();
+    } catch (caught) {
+      setVoteError(caught instanceof Error ? caught.message : 'That song could not be removed.');
+    }
+  }
 
   async function handleVote(songId: string): Promise<void> {
     setVoteError(null);
@@ -86,6 +97,9 @@ export default function GuestRoomPage() {
         queue={queue}
         onVote={(songId) => { void handleVote(songId); }}
         votingDisabled={data.room?.guestControlLocked === true}
+        onRemove={(songId) => { void handleRemove(songId); }}
+        canRemove={(song) => song.memberId === data.viewer?.memberId}
+        removingDisabled={data.room?.guestControlLocked === true}
       />
       {voteError !== null ? <p className="form-error" role="alert">{voteError}</p> : null}
 
