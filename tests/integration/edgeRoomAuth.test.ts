@@ -368,3 +368,60 @@ describe.skipIf(!runsLocally)('queue command authorization', () => {
     expect(hostRemove.body.removed).toBe(true);
   });
 });
+describe.skipIf(!runsLocally)('youtube search authorization', () => {
+  it('requires a session and a room pass before searching', async () => {
+    const noSession = await callFunction('youtube-search', {
+      body: { roomId: '3a1ee27f-a539-4190-9250-bdc14ff631e0', query: 'abba' },
+    });
+    expect(noSession.status).toBe(401);
+
+    const session = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session,
+      body: { displayName: 'Search Host' },
+    });
+    const roomId = created.body.roomId as string;
+
+    const noToken = await callFunction('youtube-search', {
+      session,
+      body: { roomId, query: 'abba' },
+    });
+    expect(noToken.status).toBe(401);
+
+    const badToken = await callFunction('youtube-search', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: 'x'.repeat(43),
+      body: { roomId, query: 'abba' },
+    });
+    expect(badToken.status).toBe(401);
+  });
+
+  it('reports search as unavailable without a YouTube key and rejects empty queries', async () => {
+    const session = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session,
+      body: { displayName: 'Search Host Two' },
+    });
+    const roomId = created.body.roomId as string;
+    const guestToken = created.body.guestToken as string;
+
+    const empty = await callFunction('youtube-search', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, query: '   ' },
+    });
+    expect(empty.status).toBe(400);
+
+    const withoutKey = await callFunction('youtube-search', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, query: 'abba' },
+    });
+    expect(withoutKey.status).toBe(200);
+    expect(withoutKey.body.available).toBe(false);
+    expect(withoutKey.body.results).toEqual([]);
+  });
+});

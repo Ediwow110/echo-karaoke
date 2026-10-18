@@ -3,6 +3,7 @@ import { useRoomData } from '../features/rooms/useRoomData';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
+import SongSearch from '../features/queue/SongSearch';
 
 export default function GuestRoomPage() {
   const params = useParams<{ roomId: string }>();
@@ -53,6 +54,11 @@ export default function GuestRoomPage() {
 
       <section className="panel" aria-labelledby="add-heading">
         <h2 id="add-heading">Add a song</h2>
+        <SongSearch
+          roomId={roomId}
+          disabled={data.room?.guestControlLocked === true}
+          onAdded={() => { void refresh(); }}
+        />
         <PasteSongForm
           roomId={roomId}
           disabled={data.room?.guestControlLocked === true}

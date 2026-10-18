@@ -63,3 +63,82 @@ export async function fetchVideoMetadata(
     durationSeconds: null,
   };
 }
+
+export type SearchResult = {
+  videoId: string;
+  title: string;
+  channelTitle: string | null;
+  thumbnailUrl: string | null;
+  durationSeconds: number | null;
+};
+
+type Thumbnail = { url?: unknown };
+type SearchItem = {
+  id?: { videoId?: unknown };
+  snippet?: {
+    title?: unknown;
+    channelTitle?: unknown;
+    thumbnails?: { medium?: Thumbnail; default?: Thumbnail; high?: Thumbnail };
+  };
+};
+
+const MAX_RESULTS = 10;
+
+function text(value: unknown, limit: number): string | null {
+  return typeof value === 'string' && value.trim().length > 0 ? value.trim().slice(0, limit) : null;
+}
+
+function decodeEntities(value: string): string {
+  return value
+    .replace(/&amp;/g, '&')
+    .replace(/&quot;/g, '"')
+    .replace(/&#39;/g, "'")
+    .replace(/&lt;/g, '<')
+    .replace(/&gt;/g, '>');
+}
+
+export function mapSearchResponse(payload: unknown): SearchResult[] {
+  if (payload === null || typeof payload !== 'object') {
+    return [];
+  }
+
+  const items = (payload as { items?: unknown }).items;
+  if (!Array.isArray(items)) {
+    return [];
+  }
+
+  const mapped: SearchResult[] = [];
+  for (const raw of items) {
+    const item = raw as SearchItem | null;
+    const videoId = item?.id?.videoId;
+    if (typeof videoId !== 'string' || !VIDEO_ID_PATTERN.test(videoId)) {
+      continue;
+    }
+    const title = text(item?.snippet?.title, 500);
+    if (title === null) {
+      continue;
+    }
+
+    const thumbnails = item?.snippet?.thumbnails;
+    const thumbnail =
+      text(thumbnails?.medium?.url, 500) ??
+      text(thumbnails?.high?.url, 500) ??
+      text(thumbnails?.default?.url, 500);
+
+    mapped.push({
+      videoId,
+      title: decodeEntities(title),
+      channelTitle: text(item?.snippet?.channelTitle, 200),
+      thumbnailUrl: thumbnail,
+      durationSeconds: null,
+    });
+
+    if (mapped.length === MAX_RESULTS) {
+      break;
+    }
+  }
+
+  return mapped;
+}
+
+const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
