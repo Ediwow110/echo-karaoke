@@ -9,6 +9,7 @@ import { buildJoinUrl } from '../features/rooms/roomUrl';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
+import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
 import YouTubePlayer from '../features/playback/YouTubePlayer';
 import { youtubePlayerFactory } from '../features/playback/youtubeIframe';
@@ -137,6 +138,7 @@ export default function HostRoomPage() {
 
       <section className="panel" aria-labelledby="host-add-heading">
         <h2 id="host-add-heading">Add a song as host</h2>
+        <SongSearch roomId={roomId} onAdded={() => { void refresh(); }} />
         <PasteSongForm roomId={roomId} onAdded={() => { void refresh(); }} />
       </section>
 

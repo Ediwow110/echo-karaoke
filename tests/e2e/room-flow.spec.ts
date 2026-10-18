@@ -57,7 +57,7 @@ test('a guest adds a song and the host sees it queued', async ({ browser }) => {
   await guest.getByLabel(/paste a youtube link/i).fill('https://youtu.be/dQw4w9WgXcQ');
   await guest.getByRole('button', { name: /add to queue/i }).click();
 
-  await expect(guest.getByRole('status')).toContainText(/added/i, { timeout: 20000 });
+  await expect(guest.getByRole('status')).toContainText(/in the queue/i, { timeout: 20000 });
   await expect(host.getByText(/never gonna give you up/i)).toBeVisible({ timeout: 20000 });
 
   await hostContext.close();
@@ -97,4 +97,46 @@ test('an unknown room code reports that the room does not exist', async ({ page 
   await page.getByRole('button', { name: /join room/i }).click();
 
   await expect(page.getByRole('alert')).toContainText(/no room uses that code/i);
+});
+test('the host can search, add a song and land on the queue', async ({ page }) => {
+  await createRoom(page, 'Host Eve');
+
+  // Both add paths are offered on the host screen: search and paste.
+  await expect(page.getByLabel(/search youtube/i)).toBeVisible();
+  await expect(page.getByLabel(/paste a youtube link/i)).toBeVisible();
+  await expect(page.getByRole('button', { name: /view queue/i })).toBeVisible();
+
+  await page.getByLabel(/paste a youtube link/i).fill('https://youtu.be/dQw4w9WgXcQ');
+  await page.getByRole('button', { name: /add to queue/i }).click();
+
+  await expect(page.getByRole('status')).toContainText(/in the queue/i, { timeout: 20000 });
+
+  // The queue is reachable and now holds the song.
+  await page.getByRole('button', { name: /view queue/i }).click();
+  const queue = page.locator('#song-queue');
+  await expect(queue).toBeVisible();
+  await expect(queue.getByText(/never gonna give you up/i)).toBeVisible({ timeout: 20000 });
+});
+
+test('the wireless remote offers search and the shared queue', async ({ browser }) => {
+  const hostContext = await browser.newContext();
+  const guestContext = await browser.newContext();
+  const host = await hostContext.newPage();
+  const guest = await guestContext.newPage();
+
+  await createRoom(host, 'Host Fay');
+  const code = await readRoomCode(host);
+
+  await guest.goto('/join/' + code);
+  await guest.getByLabel(/your name/i).fill('Guest Gil');
+  await guest.getByRole('button', { name: /join room/i }).click();
+  await expect(guest.getByRole('heading', { name: 'Guest Gil' })).toBeVisible();
+
+  // The remote can search YouTube and reach the shared queue.
+  await expect(guest.getByLabel(/search youtube/i)).toBeVisible();
+  await expect(guest.getByRole('button', { name: /view queue/i })).toBeVisible();
+  await expect(guest.locator('#song-queue')).toBeVisible();
+
+  await hostContext.close();
+  await guestContext.close();
 });

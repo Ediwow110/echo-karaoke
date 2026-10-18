@@ -2,6 +2,7 @@ import { useState, type FormEvent } from 'react';
 import { RoomApiError } from '../../lib/edgeApi';
 import { parseYouTubeVideoId } from './youtubeVideo';
 import { addSong } from './queueApi';
+import { scrollToQueue } from './queueAnchor';
 import { useRoomApi } from '../../app/RoomApiProvider';
 
 type Props = {
@@ -43,8 +44,9 @@ export default function PasteSongForm({ roomId, disabled = false, onAdded }: Pro
     try {
       const song = await addSong(api, roomId, videoId);
       setValue('');
-      setNotice('Added ' + song.title);
+      setNotice(song.title + ' is in the queue');
       onAdded?.();
+      scrollToQueue();
     } catch (caught) {
       setError(describeError(caught));
     } finally {

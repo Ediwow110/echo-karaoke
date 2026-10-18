@@ -1,4 +1,5 @@
 import type { QueueEntry } from '../rooms/useRoomData';
+import { QUEUE_ELEMENT_ID } from './queueAnchor';
 
 type Props = {
   queue: QueueEntry[];
@@ -19,7 +20,7 @@ export default function QueueList({
 }: Props) {
   if (queue.length === 0) {
     return (
-      <section className="panel" aria-labelledby="queue-heading">
+      <section className="panel" id={QUEUE_ELEMENT_ID} aria-labelledby="queue-heading">
         <h2 id="queue-heading">Up next</h2>
         <p className="empty-state">No songs yet. Search for a track or paste a YouTube link to start the queue.</p>
       </section>
@@ -27,7 +28,7 @@ export default function QueueList({
   }
 
   return (
-    <section className="panel" aria-labelledby="queue-heading">
+    <section className="panel" id={QUEUE_ELEMENT_ID} aria-labelledby="queue-heading">
       <h2 id="queue-heading">Up next</h2>
       <ol className="queue">
         {queue.map((song) => (
