@@ -1,6 +1,12 @@
 import type { QueueEntry } from '../rooms/useRoomData';
 
-export default function QueueList({ queue }: { queue: QueueEntry[] }) {
+type Props = {
+  queue: QueueEntry[];
+  onVote?: (songId: string) => void;
+  votingDisabled?: boolean;
+};
+
+export default function QueueList({ queue, onVote, votingDisabled = false }: Props) {
   if (queue.length === 0) {
     return (
       <section className="panel" aria-labelledby="queue-heading">
@@ -24,7 +30,20 @@ export default function QueueList({ queue }: { queue: QueueEntry[] }) {
               <span className="queue-title">{song.title}</span>
               <span className="queue-meta">{song.channelTitle ?? 'YouTube'} · added by {song.addedBy}</span>
             </span>
-            <span className="queue-votes" aria-label={song.voteCount + ' votes'}>{song.voteCount}</span>
+            {onVote !== undefined ? (
+              <button
+                className="vote-button"
+                type="button"
+                onClick={() => onVote(song.songId)}
+                disabled={votingDisabled}
+                aria-label={'Vote for ' + song.title + ', ' + song.voteCount + ' votes'}
+              >
+                <span aria-hidden="true">▲</span>
+                <span className="vote-count">{song.voteCount}</span>
+              </button>
+            ) : (
+              <span className="queue-votes" aria-label={song.voteCount + ' votes'}>{song.voteCount}</span>
+            )}
           </li>
         ))}
       </ol>

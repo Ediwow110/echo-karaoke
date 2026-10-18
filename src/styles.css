@@ -120,6 +120,12 @@ h1 em { color: var(--forest); font-family: 'Playfair Display', Georgia, serif; f
 .playback-controls .action-button { min-width: 96px; }
 .playback-controls .action-button:disabled { opacity: .45; cursor: not-allowed; }
 
+
+.vote-button { display: inline-flex; align-items: center; gap: 6px; min-width: 56px; min-height: 40px; margin-left: auto; padding: 0 10px; border: 1px solid #dcd8cf; border-radius: 999px; background: #fffdf7; color: var(--forest); font-family: 'DM Mono', monospace; font-size: 12px; cursor: pointer; }
+.vote-button:hover:not(:disabled) { background: #eef0e6; }
+.vote-button:disabled { opacity: .45; cursor: not-allowed; }
+.vote-count { font-variant-numeric: tabular-nums; }
+
 .search-block { display: grid; gap: 12px; }
 .search-results { display: grid; gap: 10px; margin: 0; padding: 0; list-style: none; }
 .search-result { display: flex; align-items: center; gap: 12px; padding: 10px 12px; border: 1px solid #e4e0d5; border-radius: 12px; background: #fffdf7; }

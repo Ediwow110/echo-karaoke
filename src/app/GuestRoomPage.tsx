@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { useParams } from 'react-router-dom';
 import { useRoomData } from '../features/rooms/useRoomData';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
@@ -5,11 +6,25 @@ import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
 import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
+import { toggleVote } from '../features/queue/voteApi';
+import { useRoomApi } from './RoomApiProvider';
 
 export default function GuestRoomPage() {
   const params = useParams<{ roomId: string }>();
   const roomId = params.roomId ?? '';
+  const api = useRoomApi();
   const { data, error, loading, refresh } = useRoomData(roomId, 'guest');
+  const [voteError, setVoteError] = useState<string | null>(null);
+
+  async function handleVote(songId: string): Promise<void> {
+    setVoteError(null);
+    try {
+      await toggleVote(api, roomId, songId);
+      await refresh();
+    } catch (caught) {
+      setVoteError(caught instanceof Error ? caught.message : 'That vote failed.');
+    }
+  }
 
   if (loading) {
     return <main className="room-shell"><p role="status">Loading the room</p></main>;
@@ -67,7 +82,12 @@ export default function GuestRoomPage() {
         />
       </section>
 
-      <QueueList queue={queue} />
+      <QueueList
+        queue={queue}
+        onVote={(songId) => { void handleVote(songId); }}
+        votingDisabled={data.room?.guestControlLocked === true}
+      />
+      {voteError !== null ? <p className="form-error" role="alert">{voteError}</p> : null}
 
       <section className="panel" aria-labelledby="remote-heading">
         <h2 id="remote-heading">Your remote</h2>

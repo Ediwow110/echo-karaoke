@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { RoomApiError } from '../../lib/edgeApi';
-import { readRoomAsGuest, readRoomAsHost } from './roomApi';
+import { readRoomAsGuest, readRoomAsHost, touchRoomMember } from './roomApi';
 import { useRoomApi } from '../../app/RoomApiProvider';
 
 export type RosterEntry = {
@@ -65,6 +65,7 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
 
   const refresh = useCallback(async () => {
     try {
+      await touchRoomMember(api, roomId, role);
       const view = role === 'host'
         ? await readRoomAsHost<RoomView>(api, roomId)
         : await readRoomAsGuest<RoomView>(api, roomId);

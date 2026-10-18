@@ -72,6 +72,23 @@ export async function readRoomAsHost<T>(api: EdgeApi, roomId: string): Promise<T
   return api.invoke<T>('host-room-read', { roomId }, { hostToken });
 }
 
+export async function touchRoomMember(
+  api: EdgeApi,
+  roomId: string,
+  role: 'guest' | 'host',
+): Promise<void> {
+  const guestToken = loadGuestToken(roomId);
+  if (guestToken === null) {
+    return;
+  }
+  try {
+    await api.invoke('touch-member', { roomId }, { guestToken });
+  } catch {
+    // A heartbeat is best effort; the read that follows reports real failures.
+  }
+  void role;
+}
+
 export async function sendHostCommand<T>(
   api: EdgeApi,
   roomId: string,

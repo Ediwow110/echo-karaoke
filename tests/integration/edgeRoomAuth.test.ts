@@ -520,3 +520,89 @@ describe.skipIf(!runsLocally)('playback authorization', () => {
     expect((skipped.body.playback as { currentVideoId: string | null }).currentVideoId).toBeNull();
   });
 });
+describe.skipIf(!runsLocally)('votes and heartbeat', () => {
+  it('toggles a vote and refreshes the roster heartbeat', async () => {
+    const hostSession = await anonymousSession();
+    const guestSession = await anonymousSession();
+
+    const created = await callFunction('create-room', {
+      session: hostSession,
+      body: { displayName: 'Vote Host' },
+    });
+    const roomId = created.body.roomId as string;
+    const code = created.body.roomCode as string;
+    const hostToken = created.body.hostToken as string;
+
+    const added = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: created.body.guestToken as string,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+    const songId = added.body.songId as string;
+
+    const joined = await callFunction('join-room', {
+      session: guestSession,
+      body: { code, displayName: 'Voter' },
+    });
+    const guestToken = joined.body.guestToken as string;
+
+    const noToken = await callFunction('vote-command', {
+      session: guestSession,
+      body: { roomId, songId },
+    });
+    expect(noToken.status).toBe(401);
+
+    const voted = await callFunction('vote-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, songId },
+    });
+    expect(voted.status).toBe(200);
+    expect(voted.body.voteCount).toBe(1);
+    expect(voted.body.votedByViewer).toBe(true);
+
+    const unvoted = await callFunction('vote-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, songId },
+    });
+    expect(unvoted.body.voteCount).toBe(0);
+    expect(unvoted.body.votedByViewer).toBe(false);
+
+    const heartbeat = await callFunction('touch-member', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId },
+    });
+    expect(heartbeat.status).toBe(200);
+    expect(typeof heartbeat.body.memberId).toBe('string');
+
+    const badHeartbeat = await callFunction('touch-member', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: 'x'.repeat(43),
+      body: { roomId },
+    });
+    expect(badHeartbeat.status).toBe(401);
+
+    await callFunction('host-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'lock' },
+    });
+
+    const lockedVote = await callFunction('vote-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, songId },
+    });
+    expect(lockedVote.status).toBe(403);
+    expect((lockedVote.body.error as { code: string }).code).toBe('GUEST_CONTROLS_LOCKED');
+  });
+});

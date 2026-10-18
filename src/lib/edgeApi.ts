@@ -8,6 +8,7 @@ export type EdgeFunctionName =
   | 'youtube-search'
   | 'playback-command'
   | 'playback-report'
+  | 'vote-command'
   | 'touch-member';
 
 export type RoomTokens = {
