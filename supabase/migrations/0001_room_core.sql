@@ -131,6 +131,14 @@ grant select, insert, update, delete on table public.votes to service_role;
 grant select, insert, update, delete on table public.room_events to service_role;
 grant usage on sequence public.room_events_id_seq to service_role;
 
+-- Keep the server role to the operations these functions actually use.
+revoke truncate, references, trigger on table public.rooms from service_role;
+revoke truncate, references, trigger on table public.members from service_role;
+revoke truncate, references, trigger on table public.queue_songs from service_role;
+revoke truncate, references, trigger on table public.votes from service_role;
+revoke truncate, references, trigger on table public.room_events from service_role;
+
+
 create or replace function private.digest_token(p_token text)
 returns bytea
 language sql
