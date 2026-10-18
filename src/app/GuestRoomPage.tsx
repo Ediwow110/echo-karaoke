@@ -38,7 +38,7 @@ export default function GuestRoomPage() {
   }
 
   if (loading) {
-    return <main className="room-shell room-remote"><p role="status">Loading the room</p></main>;
+    return <main className="room-shell"><p role="status">Loading the room</p></main>;
   }
 
   if (error !== null) {
@@ -63,6 +63,7 @@ export default function GuestRoomPage() {
 
   const roster = data.roster ?? [];
   const queue = data.queue ?? [];
+  const locked = data.room?.guestControlLocked === true;
 
   return (
     <main className="room-shell">
@@ -72,46 +73,44 @@ export default function GuestRoomPage() {
           <h1>{data.viewer?.displayName ?? 'Guest'}</h1>
           <p className="quiet-note">Room code {data.room?.code ?? ''}</p>
         </div>
-        {data.room?.guestControlLocked === true ? (
+        {locked ? (
           <p className="lock-banner" role="status">Guest controls are locked by the host</p>
         ) : null}
       </header>
 
-      <ParticipantRoster roster={roster} />
+      <div className="room-workspace">
+        <div className="room-main">
+          <section className="panel" aria-labelledby="add-heading">
+            <h2 id="add-heading">Add a song</h2>
+            <SongSearch roomId={roomId} disabled={locked} onAdded={() => { void refresh(); }} />
+            <PasteSongForm roomId={roomId} disabled={locked} onAdded={() => { void refresh(); }} />
+          </section>
 
-      <section className="panel" aria-labelledby="add-heading">
-        <h2 id="add-heading">Add a song</h2>
-        <SongSearch
-          roomId={roomId}
-          disabled={data.room?.guestControlLocked === true}
-          onAdded={() => { void refresh(); }}
-        />
-        <PasteSongForm
-          roomId={roomId}
-          disabled={data.room?.guestControlLocked === true}
-          onAdded={() => { void refresh(); }}
-        />
-      </section>
+          <QueueList
+            queue={queue}
+            onVote={(songId) => { void handleVote(songId); }}
+            votingDisabled={locked}
+            onRemove={(songId) => { void handleRemove(songId); }}
+            canRemove={(song) => song.memberId === data.viewer?.memberId}
+            removingDisabled={locked}
+          />
+          {voteError !== null ? <p className="form-error" role="alert">{voteError}</p> : null}
+        </div>
 
-      <QueueList
-        queue={queue}
-        onVote={(songId) => { void handleVote(songId); }}
-        votingDisabled={data.room?.guestControlLocked === true}
-        onRemove={(songId) => { void handleRemove(songId); }}
-        canRemove={(song) => song.memberId === data.viewer?.memberId}
-        removingDisabled={data.room?.guestControlLocked === true}
-      />
-      {voteError !== null ? <p className="form-error" role="alert">{voteError}</p> : null}
+        <aside className="room-aside">
+          <ParticipantRoster roster={roster} />
 
-      <section className="panel" aria-labelledby="remote-heading">
-        <h2 id="remote-heading">Your remote</h2>
-        <PlaybackControls
-          roomId={roomId}
-          playback={data.playback}
-          disabled={data.room?.guestControlLocked === true}
-          onChanged={() => { void refresh(); }}
-        />
-      </section>
+          <section className="panel" aria-labelledby="remote-heading">
+            <h2 id="remote-heading">Your remote</h2>
+            <PlaybackControls
+              roomId={roomId}
+              playback={data.playback}
+              disabled={locked}
+              onChanged={() => { void refresh(); }}
+            />
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }

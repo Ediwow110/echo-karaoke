@@ -24,8 +24,9 @@ test('the room uses the wide screen with player and tools side by side', async (
   expect(asideBox).not.toBeNull();
   expect(playerBox).not.toBeNull();
 
-  // The shell actually spans the wide viewport instead of a narrow column.
-  expect(shellBox!.width).toBeGreaterThan(1400);
+  // Full bleed like YouTube: the shell is the viewport minus slim gutters only.
+  expect(shellBox!.width).toBeGreaterThan(1520);
+  expect(shellBox!.x).toBeLessThan(30);
 
   // Tools sit beside the player, not stacked far below it.
   expect(asideBox!.x).toBeGreaterThan(mainBox!.x + mainBox!.width - 8);
