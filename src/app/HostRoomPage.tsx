@@ -11,7 +11,7 @@ import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
 import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
-import YouTubePlayer from '../features/playback/YouTubePlayer';
+import YouTubePlayer, { type PlayerViewMode } from '../features/playback/YouTubePlayer';
 import { youtubePlayerFactory } from '../features/playback/youtubeIframe';
 import { reportPlaybackPosition } from '../features/playback/playbackApi';
 
@@ -22,6 +22,7 @@ export default function HostRoomPage() {
   const { data, error, loading, refresh } = useRoomData(roomId, 'host');
   const [qrSvg, setQrSvg] = useState<string>('');
   const [commandError, setCommandError] = useState<string | null>(null);
+  const [viewMode, setViewMode] = useState<PlayerViewMode>('normal');
 
   const code = data?.room?.code ?? '';
   const joinUrl = code.length > 0 ? buildJoinUrl(window.location.origin, code) : '';
@@ -92,7 +93,7 @@ export default function HostRoomPage() {
   const queue = data.queue ?? [];
 
   return (
-    <main className="room-shell">
+    <main className={'room-shell' + (viewMode === 'theater' ? ' room-theater' : '')}>
       <header className="room-header">
         <div>
           <p className="eyebrow">HOST SCREEN</p>
@@ -104,69 +105,77 @@ export default function HostRoomPage() {
         ) : null}
       </header>
 
-      <section className="panel join-panel" aria-labelledby="join-heading">
-        <h2 id="join-heading">Invite your singers</h2>
-        <div className="join-grid">
-          <div className="qr-frame" aria-label="QR code for joining this room" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-          <div>
-            <p className="join-code">{code}</p>
-            <p className="join-url">{joinUrl}</p>
-            <p className="quiet-note">Guests scan the code or open the link on any phone. No account is needed.</p>
-          </div>
+      <div className="room-workspace">
+        <div className="room-main">
+          <YouTubePlayer
+            playback={data.playback}
+            mode={viewMode}
+            onModeChange={setViewMode}
+            onEnded={() => { void runPlayback('next'); }}
+            onProgress={(seconds) => {
+              void reportPlaybackPosition(api, roomId, seconds).catch(() => undefined);
+            }}
+            playerFactory={youtubePlayerFactory}
+          />
+
+          <section className="panel" aria-labelledby="playback-heading">
+            <h2 id="playback-heading">Playback</h2>
+            <PlaybackControls
+              roomId={roomId}
+              playback={data.playback}
+              onChanged={() => { void refresh(); }}
+            />
+          </section>
+
+          <QueueList
+            queue={queue}
+            onRemove={(songId) => {
+              void removeSong(api, roomId, songId).then(() => refresh()).catch(() => undefined);
+            }}
+          />
         </div>
-      </section>
 
-      <YouTubePlayer
-        playback={data.playback}
-        onEnded={() => { void runPlayback('next'); }}
-        onProgress={(seconds) => {
-          void reportPlaybackPosition(api, roomId, seconds).catch(() => undefined);
-        }}
-        playerFactory={youtubePlayerFactory}
-      />
+        <aside className="room-aside">
+          <section className="panel join-panel" aria-labelledby="join-heading">
+            <h2 id="join-heading">Invite your singers</h2>
+            <div className="join-grid">
+              <div className="qr-frame" aria-label="QR code for joining this room" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+              <div>
+                <p className="join-code">{code}</p>
+                <p className="join-url">{joinUrl}</p>
+                <p className="quiet-note">Guests scan the code or open the link on any phone. No account is needed.</p>
+              </div>
+            </div>
+          </section>
 
-      <section className="panel" aria-labelledby="playback-heading">
-        <h2 id="playback-heading">Playback</h2>
-        <PlaybackControls
-          roomId={roomId}
-          playback={data.playback}
-          onChanged={() => { void refresh(); }}
-        />
-      </section>
+          <ParticipantRoster roster={roster} />
 
-      <ParticipantRoster roster={roster} />
+          <section className="panel" aria-labelledby="host-add-heading">
+            <h2 id="host-add-heading">Add a song as host</h2>
+            <SongSearch roomId={roomId} onAdded={() => { void refresh(); }} />
+            <PasteSongForm roomId={roomId} onAdded={() => { void refresh(); }} />
+          </section>
 
-      <section className="panel" aria-labelledby="host-add-heading">
-        <h2 id="host-add-heading">Add a song as host</h2>
-        <SongSearch roomId={roomId} onAdded={() => { void refresh(); }} />
-        <PasteSongForm roomId={roomId} onAdded={() => { void refresh(); }} />
-      </section>
-
-      <QueueList
-        queue={queue}
-        onRemove={(songId) => {
-          void removeSong(api, roomId, songId).then(() => refresh()).catch(() => undefined);
-        }}
-      />
-
-      <section className="panel" aria-labelledby="controls-heading">
-        <h2 id="controls-heading">Host controls</h2>
-        <div className="control-row">
-          <button className="action-button action-secondary" type="button" onClick={() => void runCommand('lock')}>
-            Lock guest controls
-          </button>
-          <button className="action-button action-secondary" type="button" onClick={() => void runCommand('unlock')}>
-            Unlock guest controls
-          </button>
-          <button className="action-button action-secondary" type="button" onClick={() => void runCommand('clear_queue')}>
-            Clear queue
-          </button>
-          <button className="action-button action-primary" type="button" onClick={() => void runCommand('end')}>
-            End room
-          </button>
-        </div>
-        {commandError !== null ? <p className="form-error" role="alert">{commandError}</p> : null}
-      </section>
+          <section className="panel" aria-labelledby="controls-heading">
+            <h2 id="controls-heading">Host controls</h2>
+            <div className="control-row">
+              <button className="action-button action-secondary" type="button" onClick={() => void runCommand('lock')}>
+                Lock guest controls
+              </button>
+              <button className="action-button action-secondary" type="button" onClick={() => void runCommand('unlock')}>
+                Unlock guest controls
+              </button>
+              <button className="action-button action-secondary" type="button" onClick={() => void runCommand('clear_queue')}>
+                Clear queue
+              </button>
+              <button className="action-button action-primary" type="button" onClick={() => void runCommand('end')}>
+                End room
+              </button>
+            </div>
+            {commandError !== null ? <p className="form-error" role="alert">{commandError}</p> : null}
+          </section>
+        </aside>
+      </div>
     </main>
   );
 }

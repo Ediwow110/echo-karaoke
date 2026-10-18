@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import YouTubePlayer, { type PlayerFactory, type PlayerHandle } from '../../src/features/playback/YouTubePlayer';
 import '@testing-library/jest-dom/vitest';
@@ -98,5 +98,75 @@ describe('host player', () => {
 
     await new Promise((resolve) => setTimeout(resolve, 20));
     expect(onProgress).not.toHaveBeenCalled();
+  });
+});
+describe('player viewing modes', () => {
+  it('offers normal, theater and fullscreen controls', () => {
+    const { factory } = fakeFactory();
+
+    render(createElement(YouTubePlayer, { playback, onEnded: () => {}, playerFactory: factory }));
+
+    expect(screen.getByRole('button', { name: 'Normal' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Theater' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Fullscreen' })).toBeInTheDocument();
+  });
+
+  it('asks the page to switch into theater mode', () => {
+    const onModeChange = vi.fn();
+    const { factory } = fakeFactory();
+
+    render(createElement(YouTubePlayer, {
+      playback, onEnded: () => {}, playerFactory: factory, mode: 'normal', onModeChange,
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Theater' }));
+
+    expect(onModeChange).toHaveBeenCalledWith('theater');
+  });
+
+  it('asks the page to return to normal mode', () => {
+    const onModeChange = vi.fn();
+    const { factory } = fakeFactory();
+
+    render(createElement(YouTubePlayer, {
+      playback, onEnded: () => {}, playerFactory: factory, mode: 'theater', onModeChange,
+    }));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Normal' }));
+
+    expect(onModeChange).toHaveBeenCalledWith('normal');
+  });
+
+  it('marks the active mode as pressed', () => {
+    const { factory } = fakeFactory();
+
+    render(createElement(YouTubePlayer, {
+      playback, onEnded: () => {}, playerFactory: factory, mode: 'theater', onModeChange: () => {},
+    }));
+
+    expect(screen.getByRole('button', { name: 'Theater' })).toHaveAttribute('aria-pressed', 'true');
+    expect(screen.getByRole('button', { name: 'Normal' })).toHaveAttribute('aria-pressed', 'false');
+  });
+
+  it('takes the stage fullscreen and reports exiting', async () => {
+    const { factory } = fakeFactory();
+
+    render(createElement(YouTubePlayer, { playback, onEnded: () => {}, playerFactory: factory }));
+
+    const panel = screen.getByLabelText(/karaoke player/i) as HTMLElement;
+    const requestFullscreen = vi.fn().mockResolvedValue(undefined);
+    panel.requestFullscreen = requestFullscreen as unknown as typeof panel.requestFullscreen;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Fullscreen' }));
+
+    await waitFor(() => expect(requestFullscreen).toHaveBeenCalledTimes(1));
+
+    fireEvent(document, new Event('fullscreenchange'));
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: panel });
+    fireEvent(document, new Event('fullscreenchange'));
+
+    expect(await screen.findByRole('button', { name: 'Exit fullscreen' })).toBeInTheDocument();
+
+    Object.defineProperty(document, 'fullscreenElement', { configurable: true, value: null });
   });
 });

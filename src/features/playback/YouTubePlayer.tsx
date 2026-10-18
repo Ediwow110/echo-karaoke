@@ -10,19 +10,25 @@ export type PlayerHandle = {
 
 export type PlayerFactory = (element: HTMLElement, onEnded: () => void) => PlayerHandle;
 
+export type PlayerViewMode = 'normal' | 'theater';
+
 type Props = {
   playback: PlaybackState | undefined;
   onEnded: () => void;
   onProgress?: (seconds: number) => void;
   playerFactory?: PlayerFactory;
+  mode?: PlayerViewMode;
+  onModeChange?: (mode: PlayerViewMode) => void;
 };
 
-export default function YouTubePlayer({ playback, onEnded, onProgress, playerFactory }: Props) {
+export default function YouTubePlayer({ playback, onEnded, onProgress, playerFactory, mode = 'normal', onModeChange }: Props) {
+  const panelRef = useRef<HTMLElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<PlayerHandle | null>(null);
   const [needsTap, setNeedsTap] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [ready, setReady] = useState(false);
+  const [isFullscreen, setIsFullscreen] = useState(false);
 
   useEffect(() => {
     if (hostRef.current === null || playerFactory === undefined) {
@@ -82,14 +88,66 @@ export default function YouTubePlayer({ playback, onEnded, onProgress, playerFac
     return () => clearInterval(timer);
   }, [onProgress]);
 
+  useEffect(() => {
+    function syncFullscreen(): void {
+      setIsFullscreen(document.fullscreenElement !== null && document.fullscreenElement !== undefined);
+    }
+    document.addEventListener('fullscreenchange', syncFullscreen);
+    return () => document.removeEventListener('fullscreenchange', syncFullscreen);
+  }, []);
+
+  async function toggleFullscreen(): Promise<void> {
+    // Fullscreen the whole panel so the view controls stay reachable on screen.
+    const panel = panelRef.current;
+    if (panel === null) {
+      return;
+    }
+    try {
+      if (document.fullscreenElement !== null && document.fullscreenElement !== undefined) {
+        await document.exitFullscreen();
+      } else {
+        await panel.requestFullscreen();
+      }
+    } catch {
+      // Browsers refuse fullscreen without a user gesture or in embedded frames.
+    }
+  }
+
   return (
-    <section className="player-panel" aria-label="Karaoke player">
-      <div className="player-stage">
+    <section ref={panelRef} className={'player-panel' + (mode === 'theater' ? ' player-theater' : '')} aria-label="Karaoke player">
+      <div className="player-stage" data-mode={mode}>
         {videoId === null ? (
           <p className="empty-state">Add a song to start the night.</p>
         ) : (
           <div className="player-host" ref={hostRef} data-video-id={videoId} />
         )}
+      </div>
+
+      <div className="player-modes" role="group" aria-label="Player view">
+        <button
+          className="mode-button"
+          type="button"
+          aria-pressed={mode === 'normal'}
+          onClick={() => onModeChange?.('normal')}
+        >
+          Normal
+        </button>
+        <button
+          className="mode-button"
+          type="button"
+          aria-pressed={mode === 'theater'}
+          onClick={() => onModeChange?.('theater')}
+        >
+          Theater
+        </button>
+        <button
+          className="mode-button"
+          type="button"
+          aria-pressed={isFullscreen}
+          onClick={() => void toggleFullscreen()}
+        >
+          {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
+        </button>
       </div>
 
       {needsTap ? (
