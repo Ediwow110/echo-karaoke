@@ -1,4 +1,4 @@
-﻿declare const require: (specifier: string) => { readFileSync(path: string, encoding: 'utf8'): string };
+declare const require: (specifier: string) => { readFileSync(path: string, encoding: 'utf8'): string };
 declare const process: { cwd(): string };
 import { describe, expect, it } from 'vitest';
 
@@ -36,6 +36,14 @@ describe('landing page CSS', () => {
 
     const paper = color('paper');
     const muted = color('muted');
+    const ink = color('ink');
+    const bodyStart = css.indexOf('.hero-description {');
+    expect(bodyStart).toBeGreaterThanOrEqual(0);
+    const bodyEnd = css.indexOf('}', bodyStart);
+    const bodyText = css.slice(bodyStart, bodyEnd).split('color: ')[1]?.split(';')[0];
+    expect(bodyText).toMatch(/^#[0-9a-fA-F]{6}$/);
     expect(contrast(muted, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(ink, paper)).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(bodyText!, paper)).toBeGreaterThanOrEqual(4.5);
   });
 });
