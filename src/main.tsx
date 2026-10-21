@@ -3,7 +3,7 @@ import { createRoot } from 'react-dom/client';
 import App from './app/App';
 import { RoomApiProvider } from './app/RoomApiProvider';
 import { createEdgeApi } from './lib/edgeApi';
-import { ensureAnonymousSession, getSupabaseClient, readPublicConfig } from './lib/supabase';
+import { readPublicConfig } from './lib/publicConfig';
 import './styles.css';
 
 const rootElement = document.getElementById('root');
@@ -15,13 +15,38 @@ if (!rootElement) {
 const root = createRoot(rootElement);
 const env = import.meta.env as unknown as Record<string, string | undefined>;
 
+/**
+ * The database client is the single heaviest dependency in the app and the
+ * landing screen never talks to it, so it loads on demand instead of sitting
+ * in the entry chunk that every visitor downloads first.
+ */
+async function accessToken(): Promise<string> {
+  const { ensureAnonymousSession, getSupabaseClient } = await import('./lib/supabase');
+  return ensureAnonymousSession(getSupabaseClient(env));
+}
+
+/**
+ * Pulls the session bundle in while the browser is idle so that joining a
+ * room never waits on a second download. Visitors who leave straight away
+ * never trigger it at all.
+ */
+function warmSessionBundle(): void {
+  const start = (): void => {
+    void import('./lib/supabase').catch(() => undefined);
+  };
+  if (typeof window.requestIdleCallback === 'function') {
+    window.requestIdleCallback(start, { timeout: 3000 });
+  } else {
+    globalThis.setTimeout(start, 1200);
+  }
+}
+
 try {
   const config = readPublicConfig(env);
-  const supabase = getSupabaseClient(env);
   const api = createEdgeApi({
     url: config.url,
     anonKey: config.anonKey,
-    getAccessToken: () => ensureAnonymousSession(supabase),
+    getAccessToken: accessToken,
   });
 
   root.render(
@@ -31,6 +56,8 @@ try {
       </RoomApiProvider>
     </StrictMode>,
   );
+
+  warmSessionBundle();
 } catch (error) {
   root.render(
     <main className="config-error">

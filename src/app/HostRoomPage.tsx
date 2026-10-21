@@ -13,7 +13,7 @@ import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
 import YouTubePlayer, { type PlayerViewMode } from '../features/playback/YouTubePlayer';
 import { youtubePlayerFactory } from '../features/playback/youtubeIframe';
-import { reportPlaybackPosition } from '../features/playback/playbackApi';
+import { reportPlaybackPosition, sendPlaybackCommand } from '../features/playback/playbackApi';
 
 export default function HostRoomPage() {
   const params = useParams<{ roomId: string }>();
@@ -46,7 +46,6 @@ export default function HostRoomPage() {
   }, [joinUrl]);
 
   async function runPlayback(action: 'play' | 'pause' | 'next'): Promise<void> {
-    const { sendPlaybackCommand } = await import('../features/playback/playbackApi');
     try {
       await sendPlaybackCommand(api, roomId, action);
       await refresh();
@@ -66,7 +65,7 @@ export default function HostRoomPage() {
   }
 
   if (loading) {
-    return <main className="room-shell"><p role="status">Loading the room</p></main>;
+    return <main className="room-shell"><p className="loading-state" role="status">Loading the room</p></main>;
   }
 
   if (error !== null) {

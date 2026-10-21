@@ -78,7 +78,7 @@ export default function HomePage() {
           <p className="hero-description">Pick a song. Pass the mic. Make a night of it.<br className="desktop-break" /> Your people are already halfway there.</p>
 
           <div className="entry-forms">
-            <form className="entry-card" onSubmit={handleCreate} aria-label="Create a room">
+            <form className="entry-card" onSubmit={handleCreate} aria-label="Create a room" aria-busy={busy === 'create'}>
               <label htmlFor="create-name">Host name</label>
               <input
                 id="create-name"
@@ -90,11 +90,11 @@ export default function HomePage() {
                 maxLength={32}
               />
               <button className="action-button action-primary" type="submit" disabled={busy !== null}>
-                <span>Create room</span><span className="button-arrow" aria-hidden="true">↗</span>
+                <span>{busy === 'create' ? 'Creating room' : 'Create room'}</span><span className="button-arrow" aria-hidden="true">↗</span>
               </button>
             </form>
 
-            <form className="entry-card" onSubmit={handleJoin} aria-label="Join a room">
+            <form className="entry-card" onSubmit={handleJoin} aria-label="Join a room" aria-busy={busy === 'join'}>
               <label htmlFor="join-code">Room code</label>
               <input
                 id="join-code"
@@ -117,7 +117,7 @@ export default function HomePage() {
                 maxLength={32}
               />
               <button className="action-button action-secondary" type="submit" disabled={busy !== null}>
-                <span>Join room</span><span className="button-arrow" aria-hidden="true">→</span>
+                <span>{busy === 'join' ? 'Joining room' : 'Join room'}</span><span className="button-arrow" aria-hidden="true">→</span>
               </button>
             </form>
           </div>

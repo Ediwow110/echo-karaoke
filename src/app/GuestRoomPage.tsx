@@ -38,7 +38,7 @@ export default function GuestRoomPage() {
   }
 
   if (loading) {
-    return <main className="room-shell"><p role="status">Loading the room</p></main>;
+    return <main className="room-shell"><p className="loading-state" role="status">Loading the room</p></main>;
   }
 
   if (error !== null) {
