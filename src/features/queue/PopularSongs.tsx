@@ -70,7 +70,7 @@ export default function PopularSongs({ roomId, onAdded }: PopularSongsProps) {
       <div className="flex items-center justify-between gap-3">
         <h3 className="font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-3">Popular now</h3>
       </div>
-      <ul className="-mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <ul className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {songs.map((song) => (
           <li key={song.videoId} className="w-[10.5rem] shrink-0">
             <button

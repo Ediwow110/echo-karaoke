@@ -215,6 +215,15 @@
     background-color: var(--color-surface-2);
     animation: skeleton-pulse 1.6s ease-in-out infinite;
   }
+
+  /* A rail of cards scrolls by touch, so the bar itself only adds noise. */
+  .no-scrollbar {
+    scrollbar-width: none;
+  }
+
+  .no-scrollbar::-webkit-scrollbar {
+    display: none;
+  }
 }
 
 /* ---------------------------------------------------------------------------
