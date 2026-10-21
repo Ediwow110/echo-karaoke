@@ -138,8 +138,8 @@ export default function GuestRoomPage() {
         </aside>
       </div>
 
-      <div className="fixed inset-x-0 bottom-0 z-40 border-t border-line bg-graphite/95 backdrop-blur">
-        <div className="mx-auto flex max-w-[1400px] items-center justify-center gap-3 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+      <div className="pointer-events-none fixed inset-x-0 bottom-0 z-40 px-4 pb-[max(0.75rem,env(safe-area-inset-bottom))] pt-3">
+        <div className="pointer-events-auto mx-auto flex w-fit items-center gap-3 rounded-panel border border-line bg-graphite/95 px-4 py-2 backdrop-blur">
           <PlaybackControls
             roomId={roomId}
             playback={data.playback}

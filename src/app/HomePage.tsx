@@ -165,10 +165,10 @@ export default function HomePage() {
               width={1600}
               height={2000}
               fetchPriority="high"
-              className="aspect-[4/5] w-full object-cover"
+              className="aspect-[4/5] w-full object-cover grayscale"
             />
-            <span aria-hidden="true" className="absolute inset-0 bg-signal/25 mix-blend-color" />
-            <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,11,14,0.1),rgba(10,11,14,0.92))]" />
+            <span aria-hidden="true" className="absolute inset-0 bg-signal/85 mix-blend-color" />
+            <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,11,14,0.05),rgba(10,11,14,0.92))]" />
           </div>
 
           <ul className="mt-4 grid gap-3 sm:grid-cols-3">
@@ -185,22 +185,26 @@ export default function HomePage() {
 
       <section id="how" className="border-t border-line bg-graphite-soft">
         <div className="mx-auto max-w-[1400px] px-4 py-14 sm:px-6 lg:py-20">
-          <h2 className="font-display text-[clamp(1.75rem,3.4vw,2.25rem)] font-semibold tracking-tight">
-            The host owns the screen. The guests own the queue.
-          </h2>
-          <div className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
-            <p className="max-w-[52ch] text-[0.9375rem] leading-relaxed text-ink-2">
-              The host screen plays the music and shows the queue. Every guest searches YouTube from their own phone, votes for the next track and holds the remote. No account, no install, one room code.
-            </p>
-            <div className="overflow-hidden rounded-panel border border-line">
+          <div className="grid gap-8 lg:grid-cols-[0.85fr_1.15fr] lg:items-center">
+            <div>
+              <h2 className="font-display text-[clamp(1.75rem,3.4vw,2.25rem)] font-semibold tracking-tight">
+                The host owns the screen. The guests own the queue.
+              </h2>
+              <p className="mt-4 max-w-[52ch] text-[0.9375rem] leading-relaxed text-ink-2">
+                The host screen plays the music and shows the queue. Every guest searches YouTube from their own phone, votes for the next track and holds the remote. No account, no install, one room code.
+              </p>
+            </div>
+            <div className="relative overflow-hidden rounded-panel border border-line">
               <img
                 src="/images/singer-stage.jpg"
                 alt="A singer on stage under blue light"
                 width={1600}
                 height={1067}
                 loading="lazy"
-                className="aspect-[3/2] w-full object-cover"
+                className="aspect-[3/2] w-full object-cover grayscale"
               />
+              <span aria-hidden="true" className="absolute inset-0 bg-signal/85 mix-blend-color" />
+              <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,11,14,0.05),rgba(10,11,14,0.7))]" />
             </div>
           </div>
         </div>

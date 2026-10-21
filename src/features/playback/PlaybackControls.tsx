@@ -44,12 +44,18 @@ export default function PlaybackControls({ roomId, playback, disabled = false, s
 
   return (
     <div className="flex flex-col gap-2">
+      <span className={['flex items-center gap-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-3', shape === 'dock' ? 'justify-center' : ''].join(' ')}>
+        <span
+          aria-hidden="true"
+          className={['size-2 rounded-full', isPlaying ? 'animate-presence-pulse bg-live' : 'bg-ink-3'].join(' ')}
+        />
+        {isPlaying ? 'Playing' : 'Paused'}
+      </span>
       <div className={shape === 'dock' ? 'flex items-center justify-center gap-3' : 'flex flex-wrap items-center gap-2'}>
         <TransportButton
           shape={shape}
           label="Play"
           icon={<PlayIcon size={20} weight="fill" />}
-          active={isPlaying}
           disabled={disabled || busy || isPlaying}
           onClick={() => void run('play')}
         />
@@ -57,7 +63,6 @@ export default function PlaybackControls({ roomId, playback, disabled = false, s
           shape={shape}
           label="Pause"
           icon={<PauseIcon size={20} weight="fill" />}
-          active={!isPlaying}
           disabled={disabled || busy || !isPlaying}
           onClick={() => void run('pause')}
         />

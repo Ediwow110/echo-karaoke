@@ -14,8 +14,9 @@ export default function App() {
     <BrowserRouter>
       <Suspense
         fallback={
-          <main className="room-shell">
-            <p className="loading-state" role="status">Loading</p>
+          <main className="min-h-dvh bg-graphite px-4 py-6 text-ink">
+            <div className="skeleton h-14 w-full rounded-panel" />
+            <div className="skeleton mt-4 h-64 w-full rounded-panel" />
           </main>
         }
       >

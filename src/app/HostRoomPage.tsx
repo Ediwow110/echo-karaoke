@@ -186,11 +186,11 @@ export default function HostRoomPage() {
 
         <aside className="flex flex-col gap-4">
           <Panel title="Invite your singers" icon={<QrCodeIcon size={18} weight="duotone" />}>
-            <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
-              <div className="w-[11rem] shrink-0 rounded-media bg-white p-2.5" aria-label="QR code for joining this room" dangerouslySetInnerHTML={{ __html: qrSvg }} />
-              <div className="min-w-0">
-                <p className="font-mono text-lg tracking-[0.1em] text-signal">{groupCode(code)}</p>
-                <p className="mt-1 break-all text-[0.8125rem] text-ink-3">{joinUrl}</p>
+            <p className="font-mono text-xl tracking-[0.12em] text-signal">{groupCode(code)}</p>
+            <div className="mt-4 flex items-start gap-4">
+              <div className="w-[10rem] shrink-0 rounded-media bg-white p-2.5 [&>svg]:h-auto [&>svg]:w-full" aria-label="QR code for joining this room" dangerouslySetInnerHTML={{ __html: qrSvg }} />
+              <div className="min-w-0 flex-1">
+                <p className="break-all text-[0.8125rem] text-ink-3">{joinUrl}</p>
                 <Button
                   variant="secondary"
                   size="sm"
