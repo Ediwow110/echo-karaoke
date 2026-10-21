@@ -35,10 +35,18 @@ function renderGuest(api: EdgeApi) {
       { api, children: createElement(MemoryRouter, {
         initialEntries: ['/room/' + roomId],
         children: createElement(Routes, {
-          children: createElement(Route, {
-            path: '/room/:roomId',
-            element: createElement(GuestRoomPage),
-          }),
+          children: [
+            createElement(Route, {
+              key: 'room',
+              path: '/room/:roomId',
+              element: createElement(GuestRoomPage),
+            }),
+            createElement(Route, {
+              key: 'home',
+              path: '/',
+              element: createElement('p', null, 'Back at the start'),
+            }),
+          ],
         }),
       }) },
     ),
@@ -109,5 +117,18 @@ describe('guest room page', () => {
     fireEvent.click(screen.getByRole('button', { name: /add to queue/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/youtube link/i);
+  });
+
+  it('lets a guest leave the room and drops the pass', async () => {
+    const api: EdgeApi = {
+      invoke: (async () => liveRoom()) as unknown as EdgeApi['invoke'],
+    };
+
+    renderGuest(api);
+
+    fireEvent.click(await screen.findByRole('button', { name: /leave room/i }));
+
+    expect(await screen.findByText('Back at the start')).toBeInTheDocument();
+    expect(localStorage.getItem('karaoke.guest.' + roomId)).toBeNull();
   });
 });

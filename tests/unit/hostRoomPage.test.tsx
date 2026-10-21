@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import HostRoomPage from '../../src/app/HostRoomPage';
@@ -27,6 +27,7 @@ const liveRoom = {
 
 function renderHost() {
   localStorage.setItem('karaoke.host.' + roomId, 'host-pass');
+  localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
   const api: EdgeApi = {
     invoke: (async () => liveRoom) as unknown as EdgeApi['invoke'],
   };
@@ -40,7 +41,12 @@ function renderHost() {
           { initialEntries: ['/room/' + roomId + '/host'] },
           createElement(
             Routes,
-            { children: createElement(Route, { path: '/room/:roomId/host', element: createElement(HostRoomPage) }) },
+            {
+              children: [
+                createElement(Route, { key: 'host', path: '/room/:roomId/host', element: createElement(HostRoomPage) }),
+                createElement(Route, { key: 'home', path: '/', element: createElement('p', null, 'Back at the start') }),
+              ],
+            },
           ),
         ),
       },
@@ -60,5 +66,13 @@ describe('host console', () => {
     expect(await screen.findByRole('button', { name: /^lock$/i })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /clear queue/i })).toBeInTheDocument();
     expect(await screen.findByRole('button', { name: /end room/i })).toBeInTheDocument();
+  });
+
+  it('lets the host walk away and keeps the room open', async () => {
+    renderHost();
+    fireEvent.click(await screen.findByRole('button', { name: /leave room/i }));
+
+    expect(await screen.findByText('Back at the start')).toBeInTheDocument();
+    expect(localStorage.getItem('karaoke.host.' + roomId)).toBe('host-pass');
   });
 });

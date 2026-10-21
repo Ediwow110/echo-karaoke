@@ -6,6 +6,7 @@ export type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   active?: boolean;
   tone?: 'default' | 'signal' | 'danger';
   size?: 'md' | 'lg';
+  placement?: 'top' | 'bottom';
 };
 
 const tones = {
@@ -25,11 +26,12 @@ export default function IconButton({
   active = false,
   tone = 'default',
   size = 'md',
+  placement = 'top',
   className = '',
   ...rest
 }: IconButtonProps) {
   return (
-    <span className="tooltip inline-flex" data-tooltip={label}>
+    <span className={['tooltip inline-flex', placement === 'bottom' ? 'tooltip-below' : ''].join(' ')} data-tooltip={label}>
       <button
         {...rest}
         type="button"

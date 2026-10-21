@@ -1,6 +1,6 @@
 import { useState } from 'react';
-import { useParams } from 'react-router-dom';
-import { MagnifyingGlassIcon, MusicNoteIcon } from '@phosphor-icons/react';
+import { useNavigate, useParams } from 'react-router-dom';
+import { MagnifyingGlassIcon, MusicNoteIcon, SignOutIcon } from '@phosphor-icons/react';
 import { useRoomData } from '../features/rooms/useRoomData';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
@@ -10,15 +10,22 @@ import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
 import { toggleVote } from '../features/queue/voteApi';
 import { removeSong } from '../features/queue/queueApi';
+import { clearGuestToken } from '../features/rooms/tokenStore';
 import { useRoomApi } from './RoomApiProvider';
-import { Chip, LockBanner, Panel } from '../ui';
+import { Chip, IconButton, LockBanner, Panel } from '../ui';
 
 export default function GuestRoomPage() {
   const params = useParams<{ roomId: string }>();
   const roomId = params.roomId ?? '';
   const api = useRoomApi();
+  const navigate = useNavigate();
   const { data, error, loading, refresh } = useRoomData(roomId, 'guest');
   const [voteError, setVoteError] = useState<string | null>(null);
+
+  function handleLeave(): void {
+    clearGuestToken(roomId);
+    navigate('/');
+  }
 
   async function handleRemove(songId: string): Promise<void> {
     setVoteError(null);
@@ -90,6 +97,7 @@ export default function GuestRoomPage() {
             </h1>
           </div>
           <Chip>{data.room?.code ?? ''}</Chip>
+          <IconButton icon={<SignOutIcon size={18} weight="regular" />} label="Leave room" placement="bottom" onClick={handleLeave} />
         </div>
         {locked ? <LockBanner text="Guest controls are locked by the host" /> : null}
       </header>

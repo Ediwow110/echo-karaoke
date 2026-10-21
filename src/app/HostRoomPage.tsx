@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { useParams } from 'react-router-dom';
+import { useNavigate, useParams } from 'react-router-dom';
 import QRCode from 'qrcode';
 import {
   CopyIcon,
@@ -10,6 +10,7 @@ import {
   MusicNoteIcon,
   PowerIcon,
   QrCodeIcon,
+  SignOutIcon,
   TrashIcon,
 } from '@phosphor-icons/react';
 import { useRoomData } from '../features/rooms/useRoomData';
@@ -27,7 +28,7 @@ import YouTubePlayer, { type PlayerViewMode } from '../features/playback/YouTube
 import PlayerChrome from '../features/playback/PlayerChrome';
 import { youtubePlayerFactory } from '../features/playback/youtubeIframe';
 import { reportPlaybackPosition, sendPlaybackCommand } from '../features/playback/playbackApi';
-import { Button, Chip, LockBanner, Panel } from '../ui';
+import { Button, Chip, IconButton, LockBanner, Panel } from '../ui';
 
 // The code is read aloud, so it groups into blocks of four.
 function groupCode(code: string): string {
@@ -38,6 +39,7 @@ export default function HostRoomPage() {
   const params = useParams<{ roomId: string }>();
   const roomId = params.roomId ?? '';
   const api = useRoomApi();
+  const navigate = useNavigate();
   const { data, error, loading, refresh } = useRoomData(roomId, 'host');
   const [qrSvg, setQrSvg] = useState<string>('');
   const [commandError, setCommandError] = useState<string | null>(null);
@@ -151,6 +153,7 @@ export default function HostRoomPage() {
             >
               {locked ? 'Unlock controls' : 'Lock controls'}
             </Button>
+            <IconButton icon={<SignOutIcon size={18} weight="regular" />} label="Leave room" placement="bottom" onClick={() => navigate('/')} />
           </div>
         </div>
         {locked ? <LockBanner text="Guest controls are locked" /> : null}
