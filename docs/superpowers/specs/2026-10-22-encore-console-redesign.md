@@ -345,13 +345,24 @@ graphite gradient at the bottom, so both photographs read as one system.
 
 ## 10. Performance
 
-- `@phosphor-icons/react` is tree shaken. The room screens are already lazy routes, and
-  the icons follow them.
+Measured on the production build after the redesign:
+
+| Asset | Before | After |
+|---|---|---|
+| Entry JavaScript | 269.62 kB, 86.09 kB gzip | 307.96 kB, 95.59 kB gzip |
+| Stylesheet | 29.88 kB, 6.64 kB gzip | 32.54 kB, 7.03 kB gzip |
+| Preloaded fonts | 85.1 kB | 62.1 kB |
+
+- The entry bundle grows by 9.5 kB gzip because Phosphor ships the path data for all six
+  weights of every icon it imports. Tree shaking keeps the set to the ten icons the
+  landing screen needs, and a per icon import produces the same bytes.
+- The font payload drops by 23 kB on the first load. The Playfair files are gone and
+  Space Grotesk takes their place.
+- `@phosphor-icons/react` stays in the room chunks, which are already lazy.
 - Space Grotesk ships as two self-hosted woff2 files, latin and latin ext, preloaded like
   the existing families.
-- The Playfair font files and the CSS artwork are deleted, so the payload drops.
-- The hero photograph is the largest paint, so it is preloaded and given fixed dimensions
-  to avoid layout shift.
+- The hero photograph is the largest paint, so it carries `fetchPriority="high"` and fixed
+  dimensions to avoid layout shift.
 - Target budgets: Largest Contentful Paint under 2.5 seconds, Interaction to Next Paint
   under 200 milliseconds, Cumulative Layout Shift under 0.1.
 

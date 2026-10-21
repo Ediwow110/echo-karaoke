@@ -1,12 +1,18 @@
 # Encore Console Redesign Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [x]`) syntax for tracking.
 
 **Goal:** Replace the Encore frontend with a graphite and cobalt console design where every action carries an icon beside its word.
 
 **Architecture:** A Tailwind v4 token layer in `src/styles.css` holds the whole design system. A new `src/ui` folder holds the shared primitives that own their Tailwind class strings. The four screens are rebuilt on those primitives. The data layer, edge functions and routes do not change.
 
 **Tech Stack:** React 19, Vite 8, Tailwind v4, Phosphor Icons 2.1, TypeScript 7, Vitest, Playwright.
+
+**Status:** All seven tasks are complete and committed on `feature/online-karaoke`. The
+suite holds 145 passing unit tests, the typecheck is clean and the production build
+succeeds. The verification pass fixed four things: the QR frame overflowed the invite
+card, the pause button carried a false active state, the application shell fallback used
+retired class names, and the queue row was too cramped on a phone.
 
 ## Global Constraints
 
@@ -62,7 +68,7 @@
 - Consumes: nothing.
 - Produces: CSS custom properties `--color-*`, `--font-*`, `--radius-*`, `--duration-*`, `--ease-console`, the keyframes `console-in`, `queue-in`, `presence-pulse`, `skeleton-pulse`, the helper classes `.tooltip`, `.skeleton`, and the utilities that Tailwind generates from the theme.
 
-- [ ] **Step 1: Write the failing design contract tests**
+- [x] **Step 1: Write the failing design contract tests**
 
 Replace `tests/unit/styles.test.ts` with:
 
@@ -223,12 +229,12 @@ describe('console design system', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 Run: `npx vitest run tests/unit/styles.test.ts tests/unit/consoleDesign.test.ts`
 Expected: FAIL, because the current stylesheet still declares `--gold`, Playfair and the old class vocabulary.
 
-- [ ] **Step 3: Rewrite the stylesheet**
+- [x] **Step 3: Rewrite the stylesheet**
 
 Replace `src/styles.css` with:
 
@@ -464,7 +470,7 @@ Replace `src/styles.css` with:
 }
 ```
 
-- [ ] **Step 4: Update the document shell**
+- [x] **Step 4: Update the document shell**
 
 In `index.html`, replace the theme color and the preload block with:
 
@@ -477,7 +483,7 @@ In `index.html`, replace the theme color and the preload block with:
     <link rel="preload" href="/fonts/dm-mono-500-latin.woff2" as="font" type="font/woff2" crossorigin />
 ```
 
-- [ ] **Step 5: Delete the retired typeface**
+- [x] **Step 5: Delete the retired typeface**
 
 Run:
 
@@ -485,17 +491,17 @@ Run:
 git rm public/fonts/playfair-latin.woff2 public/fonts/playfair-latin-ext.woff2 public/fonts/playfair-italic-latin.woff2 public/fonts/playfair-italic-latin-ext.woff2 public/fonts/playfairdisplay-OFL.txt
 ```
 
-- [ ] **Step 6: Run the tests and watch them pass**
+- [x] **Step 6: Run the tests and watch them pass**
 
 Run: `npx vitest run tests/unit/styles.test.ts tests/unit/consoleDesign.test.ts`
 Expected: PASS, 22 tests.
 
-- [ ] **Step 7: Confirm the theme compiles**
+- [x] **Step 7: Confirm the theme compiles**
 
 Run: `npm run build`
 Expected: the build succeeds. If a `duration-(--duration-fast)` shorthand fails to compile, replace it with the literal `duration-[140ms]` in the component that uses it.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/styles.css index.html tests/unit/styles.test.ts tests/unit/consoleDesign.test.ts tests/unit/premiumDesign.test.ts public/fonts
@@ -533,7 +539,7 @@ git commit -m "feat: replace the stylesheet with the console token layer"
   - `RosterRow(props: RosterRowProps)` with `name: string`, `online: boolean`, `isHost?: boolean`.
   - `LockBanner(props: { text: string })`.
 
-- [ ] **Step 1: Write the failing primitive tests**
+- [x] **Step 1: Write the failing primitive tests**
 
 Create `tests/unit/uiPrimitives.test.tsx`:
 
@@ -608,12 +614,12 @@ describe('ui primitives', () => {
 });
 ```
 
-- [ ] **Step 2: Run the tests and watch them fail**
+- [x] **Step 2: Run the tests and watch them fail**
 
 Run: `npx vitest run tests/unit/uiPrimitives.test.tsx`
 Expected: FAIL with a module resolution error for `../../src/ui`.
 
-- [ ] **Step 3: Write the primitives**
+- [x] **Step 3: Write the primitives**
 
 Create `src/ui/Button.tsx`:
 
@@ -1058,17 +1064,17 @@ export { default as TransportButton } from './TransportButton';
 export type { TransportButtonProps } from './TransportButton';
 ```
 
-- [ ] **Step 4: Run the tests and watch them pass**
+- [x] **Step 4: Run the tests and watch them pass**
 
 Run: `npx vitest run tests/unit/uiPrimitives.test.tsx`
 Expected: PASS, 9 tests.
 
-- [ ] **Step 5: Typecheck**
+- [x] **Step 5: Typecheck**
 
 Run: `npx tsc --noEmit`
 Expected: no errors. If `duration-(--duration-fast)` fails to typecheck, it is a class string and typecheck stays quiet. Confirm the build compiles it.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/ui tests/unit/uiPrimitives.test.tsx package.json package-lock.json
@@ -1087,7 +1093,7 @@ git commit -m "feat: add the console icon layer and shared primitives"
 - Consumes: `Button`, `Field` from `src/ui`, the room API helpers `createRoom` and `joinRoom` (unchanged).
 - Produces: the landing screen at `/`.
 
-- [ ] **Step 1: Write the failing landing test**
+- [x] **Step 1: Write the failing landing test**
 
 Create `tests/unit/homePage.test.tsx`:
 
@@ -1151,12 +1157,12 @@ describe('landing page', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `npx vitest run tests/unit/homePage.test.tsx`
 Expected: FAIL, because the current page has no "Start a room" button and no hero image.
 
-- [ ] **Step 3: Rewrite the landing screen**
+- [x] **Step 3: Rewrite the landing screen**
 
 Replace `src/app/HomePage.tsx` with:
 
@@ -1380,12 +1386,12 @@ export default function HomePage() {
 }
 ```
 
-- [ ] **Step 4: Run the test and watch it pass**
+- [x] **Step 4: Run the test and watch it pass**
 
 Run: `npx vitest run tests/unit/homePage.test.tsx`
 Expected: PASS, 5 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/HomePage.tsx tests/unit/homePage.test.tsx
@@ -1404,7 +1410,7 @@ git commit -m "feat: rebuild the landing screen on the console primitives"
 - Consumes: `Button`, `Field`, `MicrophoneStageIcon`, the room API helper `joinRoom` (unchanged).
 - Produces: the join screen at `/join/:roomCode`.
 
-- [ ] **Step 1: Write the failing join test**
+- [x] **Step 1: Write the failing join test**
 
 Create `tests/unit/joinRoomPage.test.tsx`:
 
@@ -1461,12 +1467,12 @@ describe('join screen', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `npx vitest run tests/unit/joinRoomPage.test.tsx`
 Expected: FAIL, because the current screen has no "Join a room" button and no room code display.
 
-- [ ] **Step 3: Rewrite the join screen**
+- [x] **Step 3: Rewrite the join screen**
 
 Replace `src/app/JoinRoomPage.tsx` with:
 
@@ -1576,12 +1582,12 @@ export default function JoinRoomPage() {
 }
 ```
 
-- [ ] **Step 4: Run the test and watch it pass**
+- [x] **Step 4: Run the test and watch it pass**
 
 Run: `npx vitest run tests/unit/joinRoomPage.test.tsx`
 Expected: PASS, 3 tests.
 
-- [ ] **Step 5: Commit**
+- [x] **Step 5: Commit**
 
 ```bash
 git add src/app/JoinRoomPage.tsx tests/unit/joinRoomPage.test.tsx
@@ -1605,7 +1611,7 @@ git commit -m "feat: rebuild the join screen on the console primitives"
 - Consumes: `QueueRow`, `RosterRow`, `TransportButton`, `Panel`, `Chip`, `LockBanner`, `Button`, `Field` from `src/ui`.
 - Produces: `PlaybackControls` gains the prop `shape?: 'dock' | 'bar'` and `QueueList` keeps its current props.
 
-- [ ] **Step 1: Update the playback control test**
+- [x] **Step 1: Update the playback control test**
 
 In `tests/unit/playbackControls.test.tsx`, replace the render helper with one that accepts a shape, and add a case for the dock shape:
 
@@ -1643,12 +1649,12 @@ Add at the end of the describe block:
   });
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `npx vitest run tests/unit/playbackControls.test.tsx`
 Expected: FAIL, because `PlaybackControls` has no `shape` prop.
 
-- [ ] **Step 3: Rewrite the playback controls**
+- [x] **Step 3: Rewrite the playback controls**
 
 Replace `src/features/playback/PlaybackControls.tsx` with:
 
@@ -1734,7 +1740,7 @@ export default function PlaybackControls({ roomId, playback, disabled = false, s
 }
 ```
 
-- [ ] **Step 4: Rewrite the queue list and the roster**
+- [x] **Step 4: Rewrite the queue list and the roster**
 
 Replace `src/features/queue/QueueList.tsx` with:
 
@@ -1824,7 +1830,7 @@ export default function ParticipantRoster({ roster }: { roster: RosterEntry[] })
 }
 ```
 
-- [ ] **Step 5: Restyle the search and the paste form**
+- [x] **Step 5: Restyle the search and the paste form**
 
 Replace the return block of `src/features/queue/SongSearch.tsx` with the block below and add the two imports. Keep every function, the state and the `watchUrl` export exactly as they are.
 
@@ -2022,7 +2028,7 @@ export default function PasteSongForm({ roomId, disabled = false, onAdded }: Pro
 }
 ```
 
-- [ ] **Step 6: Rebuild the guest screen**
+- [x] **Step 6: Rebuild the guest screen**
 
 Replace `src/app/GuestRoomPage.tsx` with:
 
@@ -2182,12 +2188,12 @@ export default function GuestRoomPage() {
 }
 ```
 
-- [ ] **Step 7: Run the affected tests**
+- [x] **Step 7: Run the affected tests**
 
 Run: `npx vitest run tests/unit/playbackControls.test.tsx tests/unit/queueList.test.tsx tests/unit/songSearch.test.tsx tests/unit/guestRoomPage.test.tsx tests/unit/queueRemove.test.tsx`
 Expected: PASS with no test changes outside the playback control test.
 
-- [ ] **Step 8: Commit**
+- [x] **Step 8: Commit**
 
 ```bash
 git add src/app/GuestRoomPage.tsx src/features/queue/QueueList.tsx src/features/rooms/ParticipantRoster.tsx src/features/playback/PlaybackControls.tsx src/features/queue/SongSearch.tsx src/features/queue/PasteSongForm.tsx tests/unit/playbackControls.test.tsx
@@ -2207,7 +2213,7 @@ git commit -m "feat: rebuild the guest remote on the console primitives"
 - Consumes: `Button`, `Chip`, `IconButton`, `LockBanner`, `Panel` from `src/ui`, `PlaybackControls` with `shape="bar"`.
 - Produces: the host console at `/room/:roomId/host`.
 
-- [ ] **Step 1: Write the failing host test**
+- [x] **Step 1: Write the failing host test**
 
 Create `tests/unit/hostRoomPage.test.tsx`:
 
@@ -2276,12 +2282,12 @@ describe('host console', () => {
 });
 ```
 
-- [ ] **Step 2: Run the test and watch it fail**
+- [x] **Step 2: Run the test and watch it fail**
 
 Run: `npx vitest run tests/unit/hostRoomPage.test.tsx`
 Expected: FAIL, because the current host screen has no "Copy link" button and no "Lock" button with that name.
 
-- [ ] **Step 3: Restyle the player**
+- [x] **Step 3: Restyle the player**
 
 In `src/features/playback/YouTubePlayer.tsx`, replace the returned markup with:
 
@@ -2332,7 +2338,7 @@ import { ArrowsOutIcon, CornersInIcon, CornersOutIcon, PlayIcon } from '@phospho
 import { Button, IconButton } from '../../ui';
 ```
 
-- [ ] **Step 4: Rebuild the host screen**
+- [x] **Step 4: Rebuild the host screen**
 
 Replace `src/app/HostRoomPage.tsx` with:
 
@@ -2575,12 +2581,12 @@ export default function HostRoomPage() {
 }
 ```
 
-- [ ] **Step 5: Run the host and player tests**
+- [x] **Step 5: Run the host and player tests**
 
 Run: `npx vitest run tests/unit/hostRoomPage.test.tsx tests/unit/youtubePlayer.test.tsx`
 Expected: PASS with no test changes.
 
-- [ ] **Step 6: Commit**
+- [x] **Step 6: Commit**
 
 ```bash
 git add src/app/HostRoomPage.tsx src/features/playback/YouTubePlayer.tsx tests/unit/hostRoomPage.test.tsx
@@ -2598,17 +2604,17 @@ git commit -m "feat: rebuild the host console on the console primitives"
 - Consumes: every screen from Tasks 3 to 6.
 - Produces: screenshots and a clean build.
 
-- [ ] **Step 1: Run the whole suite**
+- [x] **Step 1: Run the whole suite**
 
 Run: `npm test`
 Expected: PASS with no failing test.
 
-- [ ] **Step 2: Typecheck and build**
+- [x] **Step 2: Typecheck and build**
 
 Run: `npx tsc --noEmit` then `npm run build`
 Expected: both pass with no error.
 
-- [ ] **Step 3: Start the local stack and the dev server**
+- [x] **Step 3: Start the local stack and the dev server**
 
 Run the Supabase stack in the background:
 
@@ -2622,7 +2628,7 @@ Then start the dev server:
 npm run dev
 ```
 
-- [ ] **Step 4: Capture the screens**
+- [x] **Step 4: Capture the screens**
 
 Use the Playwright MCP browser tools against the dev server. Open these routes and capture a screenshot at 1440 by 900 and at 390 by 844:
 
@@ -2635,7 +2641,7 @@ Use the Playwright MCP browser tools against the dev server. Open these routes a
 
 Create a room through the home screen to get a real room id, then open the guest and host routes with it.
 
-- [ ] **Step 5: Check the details**
+- [x] **Step 5: Check the details**
 
 For every screenshot check:
 - No horizontal overflow at 390 pixels wide.
@@ -2645,11 +2651,11 @@ For every screenshot check:
 - No serif type remains anywhere.
 - The queue rows show the thumbnail, the title, the attribution, the vote count and the remove control.
 
-- [ ] **Step 6: Fix what the pass found**
+- [x] **Step 6: Fix what the pass found**
 
 Change the smallest file that holds the problem, then re-run `npm test`, `npx tsc --noEmit` and `npm run build`, then re-capture the affected screenshot.
 
-- [ ] **Step 7: Commit the fixes**
+- [x] **Step 7: Commit the fixes**
 
 ```bash
 git add -A
