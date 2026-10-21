@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import PopularSongs from '../../src/features/queue/PopularSongs';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
@@ -55,5 +55,28 @@ describe('popular songs', () => {
     await waitFor(() => {
       expect(container.querySelector('[data-suggestions]')).toBeNull();
     });
+  });
+
+  it('explains a song that could not be queued', async () => {
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'youtube-popular') {
+          return { available: true, results: [song] };
+        }
+        throw new Error('That is five songs this minute. Wait a moment.');
+      }) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    render(
+      createElement(RoomApiProvider, {
+        api,
+        children: createElement(PopularSongs, { roomId }),
+      }),
+    );
+
+    const button = await screen.findByRole('button', { name: /queue dancing queen/i });
+    fireEvent.click(button);
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/five songs this minute/i);
   });
 });

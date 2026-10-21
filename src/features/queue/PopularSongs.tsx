@@ -25,6 +25,7 @@ export default function PopularSongs({ roomId, onAdded }: PopularSongsProps) {
   const api = useRoomApi();
   const [songs, setSongs] = useState<SearchResult[]>([]);
   const [queued, setQueued] = useState<string | null>(null);
+  const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -51,11 +52,12 @@ export default function PopularSongs({ roomId, onAdded }: PopularSongsProps) {
 
   async function queue(videoId: string): Promise<void> {
     setQueued(videoId);
+    setError(null);
     try {
       await addSong(api, roomId, videoId);
       onAdded?.();
-    } catch {
-      // The notice in the search panel explains a failure.
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'That song could not be added.');
     } finally {
       setQueued(null);
     }
@@ -99,6 +101,11 @@ export default function PopularSongs({ roomId, onAdded }: PopularSongsProps) {
           </li>
         ))}
       </ul>
+      {error === null ? null : (
+        <p role="alert" className="rounded-media border-l-2 border-danger bg-danger/10 px-3 py-2 text-[0.8125rem] text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

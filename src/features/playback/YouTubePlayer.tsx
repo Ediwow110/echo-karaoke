@@ -212,9 +212,9 @@ export default function YouTubePlayer({ playback, onEnded, onProgress, playerFac
         ) : null}
 
         <div className="absolute right-3 top-3 flex items-center gap-2" role="group" aria-label="Player view">
-          <IconButton icon={<CornersOutIcon size={18} weight="regular" />} label="Theater" active={mode === 'theater'} onClick={() => onModeChange?.('theater')} />
-          <IconButton icon={<CornersInIcon size={18} weight="regular" />} label="Normal" active={mode === 'normal'} onClick={() => onModeChange?.('normal')} />
-          <IconButton icon={<ArrowsOutIcon size={18} weight="regular" />} label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} active={isFullscreen} onClick={() => void toggleFullscreen()} />
+          <IconButton icon={<CornersOutIcon size={18} weight="regular" />} label="Theater" toggle active={mode === 'theater'} onClick={() => onModeChange?.('theater')} />
+          <IconButton icon={<CornersInIcon size={18} weight="regular" />} label="Normal" toggle active={mode === 'normal'} onClick={() => onModeChange?.('normal')} />
+          <IconButton icon={<ArrowsOutIcon size={18} weight="regular" />} label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} toggle active={isFullscreen} onClick={() => void toggleFullscreen()} />
         </div>
 
         {overlay}

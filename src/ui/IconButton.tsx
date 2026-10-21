@@ -4,6 +4,7 @@ export type IconButtonProps = ButtonHTMLAttributes<HTMLButtonElement> & {
   icon: ReactNode;
   label: string;
   active?: boolean;
+  toggle?: boolean;
   tone?: 'default' | 'signal' | 'danger';
   size?: 'md' | 'lg';
   placement?: 'top' | 'bottom';
@@ -24,6 +25,7 @@ export default function IconButton({
   icon,
   label,
   active = false,
+  toggle = false,
   tone = 'default',
   size = 'md',
   placement = 'top',
@@ -36,7 +38,7 @@ export default function IconButton({
         {...rest}
         type="button"
         aria-label={label}
-        aria-pressed={active}
+        aria-pressed={toggle === true ? active : undefined}
         className={[
           'grid place-items-center rounded-full',
           'transition-[transform,background-color,border-color] duration-(--duration-fast) ease-(--ease-console)',
