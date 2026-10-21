@@ -8,11 +8,15 @@ afterEach(() => {
   cleanup();
 });
 
-function fakeFactory() {
+function fakeFactory(state = 1) {
   const calls: string[] = [];
   let ended: (() => void) | null = null;
+  let created = 0;
+  let currentState = state;
 
   const factory: PlayerFactory = (element, onEnded) => {
+    created += 1;
+    calls.push('create');
     ended = onEnded;
     element.setAttribute('data-player-host', 'ready');
     const handle: PlayerHandle = {
@@ -20,11 +24,19 @@ function fakeFactory() {
       play: () => calls.push('play'),
       pause: () => calls.push('pause'),
       getCurrentTime: () => 7,
+      getState: () => currentState,
+      destroy: () => calls.push('destroy'),
     };
     return handle;
   };
 
-  return { factory, calls, fireEnded: () => ended?.() };
+  return {
+    factory,
+    calls,
+    created: () => created,
+    setState: (value: number) => { currentState = value; },
+    fireEnded: () => ended?.(),
+  };
 }
 
 const playback = {
@@ -47,8 +59,54 @@ describe('host player', () => {
     });
   });
 
-  it('pauses when the room is paused', async () => {
-    const { factory, calls } = fakeFactory();
+  it('keeps one player when the room repolls with a new callback', async () => {
+    const { factory, calls, created } = fakeFactory();
+
+    const { rerender } = render(
+      createElement(YouTubePlayer, { playback, onEnded: () => {}, playerFactory: factory }),
+    );
+
+    await waitFor(() => {
+      expect(calls).toContain('load:dQw4w9WgXcQ');
+    });
+
+    rerender(createElement(YouTubePlayer, { playback, onEnded: () => {}, playerFactory: factory }));
+    rerender(createElement(YouTubePlayer, { playback, onEnded: () => {}, playerFactory: factory }));
+
+    expect(created()).toBe(1);
+    expect(calls.filter((call) => call === 'destroy').length).toBe(0);
+  });
+
+  it('calls the latest callback when a song ends', async () => {
+    const { factory, fireEnded } = fakeFactory();
+    const first = vi.fn();
+    const second = vi.fn();
+
+    const { rerender } = render(
+      createElement(YouTubePlayer, { playback, onEnded: first, playerFactory: factory }),
+    );
+
+    rerender(createElement(YouTubePlayer, { playback, onEnded: second, playerFactory: factory }));
+
+    fireEnded();
+
+    expect(first).not.toHaveBeenCalled();
+    expect(second).toHaveBeenCalled();
+  });
+
+  it('asks the host to tap when the picture will not start', async () => {
+    const { factory, setState } = fakeFactory(5);
+
+    render(createElement(YouTubePlayer, { playback, onEnded: () => {}, playerFactory: factory }));
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /tap to start audio/i })).toBeInTheDocument();
+    }, { timeout: 4000 });
+
+    setState(1);
+  });
+
+  it('pauses when the room is paused', async () => {    const { factory, calls } = fakeFactory();
 
     render(createElement(YouTubePlayer, {
       playback: { ...playback, isPlaying: false },

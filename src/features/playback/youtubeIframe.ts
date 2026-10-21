@@ -5,6 +5,7 @@ type YouTubePlayerLike = {
   playVideo(): void;
   pauseVideo(): void;
   getCurrentTime(): number;
+  getPlayerState(): number;
   destroy(): void;
 };
 
@@ -20,7 +21,7 @@ function loadApi(): Promise<YouTubeApi> {
     return apiPromise;
   }
 
-  apiPromise = new Promise<YouTubeApi>((resolve, reject) => {
+  apiPromise = new Promise((resolve, reject) => {
     const existing = (window as unknown as { YT?: YouTubeApi }).YT;
     if (existing !== undefined) {
       resolve(existing);
@@ -48,20 +49,45 @@ function loadApi(): Promise<YouTubeApi> {
 
 export const youtubePlayerFactory: PlayerFactory = (element, onEnded) => {
   let player: YouTubePlayerLike | null = null;
+  let ready = false;
+  let state = -1;
+  let pendingVideoId: string | null = null;
+  let wantsPlay = false;
 
+  // The YouTube player hands over its controls a moment after it is built, so
+  // a song that arrives early waits in the queue instead of being dropped.
   const handle: PlayerHandle = {
     load(videoId: string) {
-      if (player === null) return;
-      player.loadVideoById(videoId);
+      if (!ready) {
+        pendingVideoId = videoId;
+        return;
+      }
+      player?.loadVideoById(videoId);
     },
     play() {
+      wantsPlay = true;
+      if (!ready) return;
       player?.playVideo();
     },
     pause() {
+      wantsPlay = false;
+      if (!ready) return;
       player?.pauseVideo();
     },
     getCurrentTime() {
-      return player?.getCurrentTime() ?? 0;
+      if (!ready || player === null) return 0;
+      return player.getCurrentTime();
+    },
+    getState() {
+      if (!ready || player === null || typeof player.getPlayerState !== 'function') {
+        return state;
+      }
+      return player.getPlayerState();
+    },
+    destroy() {
+      player?.destroy();
+      player = null;
+      ready = false;
     },
   };
 
@@ -72,7 +98,18 @@ export const youtubePlayerFactory: PlayerFactory = (element, onEnded) => {
         width: '100%',
         playerVars: { autoplay: 1, playsinline: 1, rel: 0 },
         events: {
+          onReady: () => {
+            ready = true;
+            if (pendingVideoId !== null) {
+              player?.loadVideoById(pendingVideoId);
+              pendingVideoId = null;
+            }
+            if (wantsPlay) {
+              player?.playVideo();
+            }
+          },
           onStateChange: (event: { data: number }) => {
+            state = event.data;
             if (player !== null && event.data === api.PlayerState.ENDED) {
               onEnded();
             }
