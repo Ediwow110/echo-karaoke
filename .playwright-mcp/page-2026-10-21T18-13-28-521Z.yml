@@ -1,3 +1,0 @@
-- main [ref=f24e3]:
-  - heading "Encore needs configuration" [level=1] [ref=f24e4]
-  - paragraph [ref=f24e5]: Supabase is not configured. Set VITE_SUPABASE_URL and VITE_SUPABASE_ANON_KEY in your environment.
