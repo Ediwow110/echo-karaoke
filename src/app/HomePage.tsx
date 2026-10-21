@@ -1,30 +1,26 @@
 import { useState, type FormEvent } from 'react';
 import { useNavigate } from 'react-router-dom';
+import {
+  BroadcastIcon,
+  KeyIcon,
+  ListIcon,
+  MicrophoneStageIcon,
+  MusicNoteIcon,
+  QrCodeIcon,
+} from '@phosphor-icons/react';
 import { useRoomApi } from './RoomApiProvider';
 import { createRoom, joinRoom } from '../features/rooms/roomApi';
-
-const notes = ['No accounts', 'One shared queue', 'All voices welcome'];
-
-function NoteMark() {
-  return (
-    <svg aria-hidden="true" className="note-mark" viewBox="0 0 36 36" fill="none">
-      <path d="M22.7 6v18.1a5.2 5.2 0 1 1-2.8-4.6V11l12-2.7v12.4a5.2 5.2 0 1 1-2.8-4.6V5l-6.4 1Z" fill="currentColor" />
-      <path d="M5 18h5m-2.5-2.5v5" stroke="currentColor" strokeLinecap="round" strokeWidth="1.6" />
-    </svg>
-  );
-}
-
-function SoundLines() {
-  return (
-    <svg aria-hidden="true" className="sound-lines" viewBox="0 0 220 122" fill="none">
-      <path d="M8 62h18l10-29 13 59 14-79 14 98 14-74 12 53 13-70 14 53 12-35 11 25h22" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" />
-    </svg>
-  );
-}
+import { Button, Field } from '../ui';
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Try again.';
 }
+
+const steps = [
+  { icon: BroadcastIcon, label: 'Start', note: 'Open a room on the big screen' },
+  { icon: QrCodeIcon, label: 'Invite', note: 'Send the code or the link' },
+  { icon: MusicNoteIcon, label: 'Sing', note: 'Queue a song from any phone' },
+];
 
 export default function HomePage() {
   const api = useRoomApi();
@@ -62,43 +58,69 @@ export default function HomePage() {
   }
 
   return (
-    <main className="home-shell">
-      <header className="topbar">
-        <a className="wordmark" href="/" aria-label="Encore home">
-          <span className="wordmark-icon"><NoteMark /></span>
-          <span>encore<span className="wordmark-period">.</span></span>
-        </a>
-        <span className="topbar-note">A little louder, together</span>
+    <main className="min-h-dvh bg-graphite text-ink">
+      <header className="sticky top-0 z-40 border-b border-line bg-graphite/85 backdrop-blur">
+        <div className="mx-auto flex h-16 max-w-[1400px] items-center justify-between px-4 sm:px-6">
+          <a href="/" className="flex items-center gap-2.5">
+            <span className="grid size-9 place-items-center rounded-media bg-signal-fill text-white">
+              <MicrophoneStageIcon size={20} weight="fill" aria-hidden="true" />
+            </span>
+            <span className="font-display text-xl font-bold tracking-tight">encore</span>
+          </a>
+          <a href="#how" className="inline-flex items-center gap-2 text-[0.875rem] text-ink-2 transition-colors hover:text-ink">
+            <ListIcon size={18} weight="duotone" aria-hidden="true" />
+            How it works
+          </a>
+        </div>
       </header>
 
-      <section className="hero" aria-labelledby="hero-title">
-        <div className="hero-copy">
-          <p className="eyebrow"><span className="eyebrow-dot" aria-hidden="true" /> YOUR LIVING ROOM, FRONT ROW</p>
-          <h1 id="hero-title">Every song<br />deserves an <em>encore.</em></h1>
-          <p className="hero-description">Pick a song. Pass the mic. Make a night of it.<br className="desktop-break" /> Your people are already halfway there.</p>
+      <section className="mx-auto grid max-w-[1400px] gap-10 px-4 pb-16 pt-12 sm:px-6 lg:grid-cols-[1.05fr_0.95fr] lg:items-center lg:gap-16 lg:pb-24 lg:pt-20">
+        <div className="max-w-[42rem]">
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.18em] text-signal">Live on YouTube</p>
+          <h1 className="mt-4 font-display text-[clamp(2.75rem,7vw,5.5rem)] font-semibold leading-[1.02] tracking-[-0.03em]">
+            One room. Every voice.
+          </h1>
+          <p className="mt-5 max-w-[46ch] text-[0.9375rem] leading-relaxed text-ink-2">
+            Open a room, send the code, and everyone sings from their own phone. One shared queue, one screen for the music.
+          </p>
 
-          <div className="entry-forms">
-            <form className="entry-card" onSubmit={handleCreate} aria-label="Create a room" aria-busy={busy === 'create'}>
-              <label htmlFor="create-name">Host name</label>
-              <input
+          <div className="mt-8 grid gap-4 sm:grid-cols-2">
+            <form onSubmit={handleCreate} className="rounded-panel border border-line bg-surface p-6" aria-label="Start a room">
+              <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
+                <BroadcastIcon size={22} weight="duotone" aria-hidden="true" />
+              </span>
+              <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Start a room</h2>
+              <p className="mt-1 text-[0.8125rem] text-ink-3">You host on the big screen.</p>
+              <Field
                 id="create-name"
-                name="create-name"
+                label="Host name"
                 value={createName}
                 onChange={(event) => setCreateName(event.target.value)}
                 placeholder="Ana"
                 autoComplete="nickname"
                 maxLength={32}
               />
-              <button className="action-button action-primary" type="submit" disabled={busy !== null}>
-                <span>{busy === 'create' ? 'Creating room' : 'Create room'}</span><span className="button-arrow" aria-hidden="true">↗</span>
-              </button>
+              <Button
+                type="submit"
+                variant="primary"
+                size="lg"
+                className="mt-4 w-full"
+                icon={<BroadcastIcon size={18} weight="duotone" />}
+                busy={busy === 'create'}
+              >
+                {busy === 'create' ? 'Starting the room' : 'Start a room'}
+              </Button>
             </form>
 
-            <form className="entry-card" onSubmit={handleJoin} aria-label="Join a room" aria-busy={busy === 'join'}>
-              <label htmlFor="join-code">Room code</label>
-              <input
+            <form onSubmit={handleJoin} className="rounded-panel border border-line bg-surface p-6" aria-label="Join a room">
+              <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
+                <KeyIcon size={22} weight="duotone" aria-hidden="true" />
+              </span>
+              <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Join a room</h2>
+              <p className="mt-1 text-[0.8125rem] text-ink-3">Type the code the host shared.</p>
+              <Field
                 id="join-code"
-                name="join-code"
+                label="Room code"
                 value={joinCode}
                 onChange={(event) => setJoinCode(event.target.value)}
                 placeholder="ABCD EFGH JKMN PQRS"
@@ -106,42 +128,89 @@ export default function HomePage() {
                 spellCheck={false}
                 maxLength={24}
               />
-              <label htmlFor="join-name">Guest name</label>
-              <input
+              <Field
                 id="join-name"
-                name="join-name"
+                label="Guest name"
                 value={joinName}
                 onChange={(event) => setJoinName(event.target.value)}
                 placeholder="Sam"
                 autoComplete="nickname"
                 maxLength={32}
               />
-              <button className="action-button action-secondary" type="submit" disabled={busy !== null}>
-                <span>{busy === 'join' ? 'Joining room' : 'Join room'}</span><span className="button-arrow" aria-hidden="true">→</span>
-              </button>
+              <Button
+                type="submit"
+                variant="secondary"
+                size="lg"
+                className="mt-4 w-full"
+                icon={<KeyIcon size={18} weight="duotone" />}
+                busy={busy === 'join'}
+              >
+                {busy === 'join' ? 'Joining the room' : 'Join a room'}
+              </Button>
             </form>
           </div>
 
-          {error !== null ? <p className="form-error" role="alert">{error}</p> : null}
-          <p className="quiet-note">No sign-up. Just show up.</p>
+          {error === null ? null : (
+            <p role="alert" className="mt-4 rounded-media border-l-2 border-danger bg-danger/10 px-3.5 py-2.5 text-[0.875rem] text-danger">
+              {error}
+            </p>
+          )}
         </div>
 
-        <div className="hero-art" aria-label="An illustrated microphone and sound waves" role="img">
-          <div className="art-stamp"><span>LIVE</span><span className="stamp-star" aria-hidden="true" /></div>
-          <div className="art-sun" />
-          <div className="art-floor" />
-          <div className="microphone"><span className="mic-grille" /><span className="mic-neck" /><span className="mic-base" /></div>
-          <SoundLines />
-          <span className="art-caption">ONE MORE SONG</span>
-          <span className="art-number">01 / 01</span>
+        <div className="lg:pl-4">
+          <div className="relative overflow-hidden rounded-panel border border-line">
+            <img
+              src="/images/hero-microphone.jpg"
+              alt="A vintage chrome microphone on a lit stage"
+              width={1600}
+              height={2000}
+              fetchPriority="high"
+              className="aspect-[4/5] w-full object-cover"
+            />
+            <span aria-hidden="true" className="absolute inset-0 bg-signal/25 mix-blend-color" />
+            <span aria-hidden="true" className="absolute inset-0 bg-[linear-gradient(180deg,rgba(10,11,14,0.1),rgba(10,11,14,0.92))]" />
+          </div>
+
+          <ul className="mt-4 grid gap-3 sm:grid-cols-3">
+            {steps.map((step) => (
+              <li key={step.label} className="rounded-panel border border-line bg-surface p-4">
+                <step.icon size={22} weight="duotone" className="text-signal" aria-hidden="true" />
+                <p className="mt-3 font-display text-[0.9375rem] font-semibold">{step.label}</p>
+                <p className="mt-1 text-[0.8125rem] leading-relaxed text-ink-3">{step.note}</p>
+              </li>
+            ))}
+          </ul>
         </div>
       </section>
 
-      <footer className="bottomline">
-        <p>GOOD SONGS. QUESTIONABLE HIGH NOTES.</p>
-        <ul aria-label="How Encore works">
-          {notes.map((note) => <li key={note}>{note}</li>)}
-        </ul>
+      <section id="how" className="border-t border-line bg-graphite-soft">
+        <div className="mx-auto max-w-[1400px] px-4 py-14 sm:px-6 lg:py-20">
+          <h2 className="font-display text-[clamp(1.75rem,3.4vw,2.25rem)] font-semibold tracking-tight">
+            The host owns the screen. The guests own the queue.
+          </h2>
+          <div className="mt-8 grid gap-8 lg:grid-cols-[0.9fr_1.1fr] lg:items-center">
+            <p className="max-w-[52ch] text-[0.9375rem] leading-relaxed text-ink-2">
+              The host screen plays the music and shows the queue. Every guest searches YouTube from their own phone, votes for the next track and holds the remote. No account, no install, one room code.
+            </p>
+            <div className="overflow-hidden rounded-panel border border-line">
+              <img
+                src="/images/singer-stage.jpg"
+                alt="A singer on stage under blue light"
+                width={1600}
+                height={1067}
+                loading="lazy"
+                className="aspect-[3/2] w-full object-cover"
+              />
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <footer className="border-t border-line">
+        <div className="mx-auto flex max-w-[1400px] flex-wrap items-center justify-between gap-4 px-4 py-8 text-[0.8125rem] text-ink-3 sm:px-6">
+          <p>Encore. A shared stage for songs worth singing together.</p>
+          <p className="font-mono text-[0.6875rem] uppercase tracking-[0.14em]">No accounts. No install. One code.</p>
+        </div>
       </footer>
     </main>
   );
