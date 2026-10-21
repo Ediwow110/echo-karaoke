@@ -13,7 +13,7 @@ afterEach(() => {
   localStorage.clear();
 });
 
-function renderControls(api: EdgeApi, playback: { isPlaying: boolean }, disabled = false) {
+function renderControls(api: EdgeApi, playback: { isPlaying: boolean }, disabled = false, shape: 'dock' | 'bar' = 'bar') {
   localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
   return render(
     createElement(RoomApiProvider, {
@@ -28,6 +28,7 @@ function renderControls(api: EdgeApi, playback: { isPlaying: boolean }, disabled
           updatedAt: null,
         },
         disabled,
+        shape,
       }),
     }),
   );
@@ -95,5 +96,12 @@ describe('playback controls', () => {
     fireEvent.click(screen.getByRole('button', { name: /^play$/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/locked/i);
+  });
+
+  it('keeps the dock shape on one line with round buttons', () => {
+    const api: EdgeApi = { invoke: (async () => ({})) as unknown as EdgeApi['invoke'] };
+    const { container } = renderControls(api, { isPlaying: false }, false, 'dock');
+    expect(container.querySelectorAll('button')).toHaveLength(3);
+    expect(screen.getByRole('button', { name: /^play$/i }).className).toContain('rounded-full');
   });
 });

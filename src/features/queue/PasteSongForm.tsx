@@ -1,9 +1,11 @@
 import { useState, type FormEvent } from 'react';
+import { LinkIcon, PlusIcon } from '@phosphor-icons/react';
 import { RoomApiError } from '../../lib/edgeApi';
 import { parseYouTubeVideoId } from './youtubeVideo';
 import { addSong } from './queueApi';
 import { scrollToQueue } from './queueAnchor';
 import { useRoomApi } from '../../app/RoomApiProvider';
+import { Button, Field } from '../../ui';
 
 type Props = {
   roomId: string;
@@ -55,23 +57,33 @@ export default function PasteSongForm({ roomId, disabled = false, onAdded }: Pro
   }
 
   return (
-    <form className="entry-card" onSubmit={handleSubmit} aria-label="Add a song by link">
-      <label htmlFor="song-link">Paste a YouTube link</label>
-      <input
+    <form onSubmit={handleSubmit} aria-label="Add a song by link">
+      <Field
         id="song-link"
-        name="song-link"
+        label="Paste a YouTube link"
         value={value}
         onChange={(event) => setValue(event.target.value)}
         placeholder="https://youtu.be/..."
         autoComplete="off"
         spellCheck={false}
         disabled={disabled}
+        icon={<LinkIcon size={18} weight="regular" />}
+        error={error}
       />
-      <button className="action-button action-primary" type="submit" disabled={disabled || busy}>
-        <span>{busy ? 'Adding' : 'Add to queue'}</span>
-      </button>
-      {error !== null ? <p className="form-error" role="alert">{error}</p> : null}
-      {notice !== null ? <p className="quiet-note" role="status">{notice}</p> : null}
+      <Button
+        type="submit"
+        variant="secondary"
+        size="md"
+        className="mt-3"
+        icon={<PlusIcon size={16} weight="bold" />}
+        disabled={disabled || busy}
+        busy={busy}
+      >
+        {busy ? 'Adding' : 'Add to queue'}
+      </Button>
+      {notice === null ? null : (
+        <p role="status" className="mt-2 text-[0.8125rem] text-ink-3">{notice}</p>
+      )}
     </form>
   );
 }

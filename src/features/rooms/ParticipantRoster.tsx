@@ -1,19 +1,20 @@
+import { UsersThreeIcon } from '@phosphor-icons/react';
 import type { RosterEntry } from './useRoomData';
+import { Panel, RosterRow } from '../../ui';
 
 export default function ParticipantRoster({ roster }: { roster: RosterEntry[] }) {
   return (
-    <section className="panel" aria-labelledby="roster-heading">
-      <h2 id="roster-heading">In the room</h2>
-      <ul className="roster">
+    <Panel title="In the room" icon={<UsersThreeIcon size={18} weight="duotone" />}>
+      <ul className="flex flex-wrap gap-2">
         {roster.map((member) => (
-          <li key={member.memberId} className="roster-entry">
-            <span className={member.online ? 'presence presence-online' : 'presence'} aria-hidden="true" />
-            <span className="roster-name">{member.displayName}</span>
-            {member.role === 'host' ? <span className="roster-tag">Host</span> : null}
-            <span className="sr-only">{member.online ? 'Online' : 'Away'}</span>
-          </li>
+          <RosterRow
+            key={member.memberId}
+            name={member.displayName}
+            online={member.online}
+            isHost={member.role === 'host'}
+          />
         ))}
       </ul>
-    </section>
+    </Panel>
   );
 }

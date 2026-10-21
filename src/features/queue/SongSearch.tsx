@@ -1,10 +1,12 @@
 import { useCallback, useState } from 'react';
+import { MagnifyingGlassIcon, PlusIcon, QueueIcon } from '@phosphor-icons/react';
 import { RoomApiError } from '../../lib/edgeApi';
 import { useRoomApi } from '../../app/RoomApiProvider';
 import { loadGuestToken } from '../rooms/tokenStore';
 import { addSong } from './queueApi';
 import { scrollToQueue } from './queueAnchor';
 import { useTypeahead } from './useTypeahead';
+import { Button, Field } from '../../ui';
 import type { SearchResult } from '../../types/search';
 
 type SuggestResponse = { suggestions: string[] };
@@ -111,89 +113,91 @@ export default function SongSearch({ roomId, disabled = false, onAdded }: Props)
   const typedEnough = typeahead.query.trim().length >= 2;
 
   return (
-    <div className="search-block">
-      <div className="entry-card">
-        <label htmlFor="song-search">Find a song on YouTube</label>
-        <input
-          id="song-search"
-          name="song-search"
-          value={typeahead.query}
-          onChange={(event) => typeahead.setQuery(event.target.value)}
-          placeholder="Start typing a song or artist"
-          autoComplete="off"
-          maxLength={100}
-          disabled={disabled}
-          role="combobox"
-          aria-expanded={results.length > 0 || typeahead.suggestions.length > 0}
-          aria-controls="song-options"
-          aria-autocomplete="list"
-        />
-        <div className="control-row">
-          <button
-            className="action-button action-secondary"
-            type="button"
-            onClick={() => void searchNow(typeahead.query)}
-            disabled={disabled || searching || !typedEnough}
-          >
-            <span>{searching ? 'Looking' : 'Show songs'}</span>
-          </button>
-          <button className="action-button action-secondary" type="button" onClick={() => scrollToQueue()}>
-            <span>View queue</span>
-          </button>
-        </div>
+    <div className="flex flex-col gap-3">
+      <Field
+        id="song-search"
+        label="Find a song on YouTube"
+        value={typeahead.query}
+        onChange={(event) => typeahead.setQuery(event.target.value)}
+        placeholder="Start typing a song or artist"
+        autoComplete="off"
+        maxLength={100}
+        disabled={disabled}
+        icon={<MagnifyingGlassIcon size={18} weight="regular" />}
+        role="combobox"
+        aria-expanded={results.length > 0 || typeahead.suggestions.length > 0}
+        aria-controls="song-options"
+        aria-autocomplete="list"
+      />
+      <div className="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          icon={<MagnifyingGlassIcon size={16} weight="bold" />}
+          disabled={disabled || searching || !typedEnough}
+          onClick={() => void searchNow(typeahead.query)}
+        >
+          {searching ? 'Looking' : 'Show songs'}
+        </Button>
+        <Button variant="ghost" size="sm" icon={<QueueIcon size={16} weight="duotone" />} onClick={() => scrollToQueue()}>
+          View queue
+        </Button>
       </div>
 
-      {error !== null ? <p className="form-error" role="alert">{error}</p> : null}
-      {message !== null ? <p className="quiet-note" role="status">{message}</p> : null}
+      {error !== null ? (
+        <p role="alert" className="rounded-media border-l-2 border-danger bg-danger/10 px-3 py-2 text-[0.8125rem] text-danger">{error}</p>
+      ) : null}
+      {message !== null ? <p role="status" className="text-[0.8125rem] text-ink-3">{message}</p> : null}
 
       {!songSearchReady && typedEnough ? (
-        <p className="quiet-note" role="status">
+        <p role="status" className="text-[0.8125rem] text-ink-3">
           Songs from YouTube need a data API key. Suggestions below still come from YouTube.
         </p>
       ) : null}
 
       {results.length > 0 ? (
-        <ul className="search-results" id="song-options" aria-label="Songs">
+        <ul id="song-options" aria-label="Songs" className="flex flex-col gap-2">
           {results.map((result) => (
-            <li key={result.videoId} className="search-result">
+            <li key={result.videoId} className="flex items-center gap-3 rounded-panel border border-line bg-surface-2 p-2.5">
               {result.thumbnailUrl !== null ? (
-                <img className="queue-thumb" src={result.thumbnailUrl} alt="" width={72} height={40} loading="lazy" />
+                <img className="h-10 w-[4.5rem] shrink-0 rounded-media object-cover" src={result.thumbnailUrl} alt="" width={72} height={40} loading="lazy" />
               ) : null}
-              <span className="queue-copy">
-                <span className="queue-title">{result.title}</span>
-                <span className="queue-meta">{result.channelTitle ?? 'YouTube'}</span>
+              <span className="min-w-0 flex-1">
+                <span className="block truncate text-[0.9375rem] font-semibold">{result.title}</span>
+                <span className="block truncate text-[0.8125rem] text-ink-3">{result.channelTitle ?? 'YouTube'}</span>
               </span>
               <a
-                className="youtube-link"
                 href={watchUrl(result.videoId)}
                 target="_blank"
                 rel="noreferrer noopener"
                 aria-label={'Open ' + result.title + ' on YouTube'}
+                className="hidden text-[0.75rem] text-ink-3 underline hover:text-signal sm:inline"
               >
                 YouTube
               </a>
-              <button
-                className="action-button action-primary"
-                type="button"
-                onClick={() => void handleAdd(result.videoId)}
+              <Button
+                variant="primary"
+                size="sm"
+                icon={<PlusIcon size={16} weight="bold" />}
                 disabled={disabled || addingId !== null}
+                onClick={() => void handleAdd(result.videoId)}
               >
-                <span>{addingId === result.videoId ? 'Adding' : 'Queue'}</span>
-              </button>
+                {addingId === result.videoId ? 'Adding' : 'Queue'}
+              </Button>
             </li>
           ))}
         </ul>
       ) : null}
 
       {results.length === 0 && typeahead.suggestions.length > 0 ? (
-        <ul className="suggest-list" id="song-options" aria-label="Song suggestions">
+        <ul id="song-options" aria-label="Song suggestions" className="flex flex-col gap-1.5">
           {typeahead.suggestions.map((suggestion) => (
             <li key={suggestion}>
               <button
-                className="suggest-item"
                 type="button"
                 onClick={() => void searchNow(suggestion)}
                 disabled={disabled}
+                className="w-full rounded-panel border border-line bg-surface-2 px-3.5 py-2.5 text-left text-[0.875rem] text-ink transition-colors hover:border-signal/40 hover:bg-surface-3 disabled:opacity-40"
               >
                 {suggestion}
               </button>

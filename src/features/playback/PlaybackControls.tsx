@@ -1,12 +1,15 @@
 import { useState } from 'react';
+import { PauseIcon, PlayIcon, SkipForwardIcon } from '@phosphor-icons/react';
 import { useRoomApi } from '../../app/RoomApiProvider';
 import { RoomApiError } from '../../lib/edgeApi';
 import { sendPlaybackCommand, type PlaybackState } from './playbackApi';
+import { TransportButton } from '../../ui';
 
 type Props = {
   roomId: string;
   playback: PlaybackState | undefined;
   disabled?: boolean;
+  shape?: 'dock' | 'bar';
   onChanged?: () => void;
 };
 
@@ -19,7 +22,7 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'That playback action failed.';
 }
 
-export default function PlaybackControls({ roomId, playback, disabled = false, onChanged }: Props) {
+export default function PlaybackControls({ roomId, playback, disabled = false, shape = 'bar', onChanged }: Props) {
   const api = useRoomApi();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -40,34 +43,37 @@ export default function PlaybackControls({ roomId, playback, disabled = false, o
   }
 
   return (
-    <div className="playback-controls">
-      <div className="control-row">
-        <button
-          className="action-button action-secondary"
-          type="button"
-          onClick={() => void run('play')}
+    <div className="flex flex-col gap-2">
+      <div className={shape === 'dock' ? 'flex items-center justify-center gap-3' : 'flex flex-wrap items-center gap-2'}>
+        <TransportButton
+          shape={shape}
+          label="Play"
+          icon={<PlayIcon size={20} weight="fill" />}
+          active={isPlaying}
           disabled={disabled || busy || isPlaying}
-        >
-          Play
-        </button>
-        <button
-          className="action-button action-secondary"
-          type="button"
-          onClick={() => void run('pause')}
+          onClick={() => void run('play')}
+        />
+        <TransportButton
+          shape={shape}
+          label="Pause"
+          icon={<PauseIcon size={20} weight="fill" />}
+          active={!isPlaying}
           disabled={disabled || busy || !isPlaying}
-        >
-          Pause
-        </button>
-        <button
-          className="action-button action-primary"
-          type="button"
-          onClick={() => void run('next')}
+          onClick={() => void run('pause')}
+        />
+        <TransportButton
+          shape={shape}
+          label="Skip"
+          icon={<SkipForwardIcon size={20} weight="fill" />}
           disabled={disabled || busy}
-        >
-          Skip
-        </button>
+          onClick={() => void run('next')}
+        />
       </div>
-      {error !== null ? <p className="form-error" role="alert">{error}</p> : null}
+      {error === null ? null : (
+        <p role="alert" className="rounded-media border-l-2 border-danger bg-danger/10 px-3 py-2 text-[0.8125rem] text-danger">
+          {error}
+        </p>
+      )}
     </div>
   );
 }

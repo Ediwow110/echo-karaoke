@@ -17,8 +17,7 @@ function renderHome() {
   return render(
     createElement(
       RoomApiProvider,
-      { api },
-      createElement(MemoryRouter, { children: createElement(HomePage) }),
+      { api, children: createElement(MemoryRouter, { children: createElement(HomePage) }) },
     ),
   );
 }

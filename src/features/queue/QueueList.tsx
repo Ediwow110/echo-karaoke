@@ -1,5 +1,7 @@
+import { MusicNoteIcon } from '@phosphor-icons/react';
 import type { QueueEntry } from '../rooms/useRoomData';
 import { QUEUE_ELEMENT_ID } from './queueAnchor';
+import { Panel, QueueRow } from '../../ui';
 
 type Props = {
   queue: QueueEntry[];
@@ -20,55 +22,37 @@ export default function QueueList({
 }: Props) {
   if (queue.length === 0) {
     return (
-      <section className="panel" id={QUEUE_ELEMENT_ID} aria-labelledby="queue-heading">
-        <h2 id="queue-heading">Up next</h2>
-        <p className="empty-state">No songs yet. Search for a track or paste a YouTube link to start the queue.</p>
-      </section>
+      <Panel title="Up next" icon={<MusicNoteIcon size={18} weight="duotone" />}>
+        <p id={QUEUE_ELEMENT_ID} className="text-[0.875rem] text-ink-3">
+          No songs yet. Search for a track or paste a YouTube link to start the queue.
+        </p>
+      </Panel>
     );
   }
 
   return (
-    <section className="panel" id={QUEUE_ELEMENT_ID} aria-labelledby="queue-heading">
-      <h2 id="queue-heading">Up next</h2>
-      <ol className="queue">
+    <Panel title="Up next" icon={<MusicNoteIcon size={18} weight="duotone" />}>
+      <ol id={QUEUE_ELEMENT_ID} className="flex flex-col gap-2">
         {queue.map((song) => (
-          <li key={song.songId} className="queue-entry">
-            <span className="queue-position">{song.position}</span>
-            {song.thumbnailUrl !== null ? (
-              <img className="queue-thumb" src={song.thumbnailUrl} alt="" width={72} height={40} loading="lazy" />
-            ) : null}
-            <span className="queue-copy">
-              <span className="queue-title">{song.title}</span>
-              <span className="queue-meta">{song.channelTitle ?? 'YouTube'} · added by {song.addedBy}</span>
-            </span>
-            {onRemove !== undefined && (canRemove === undefined || canRemove(song)) ? (
-              <button
-                className="remove-button"
-                type="button"
-                onClick={() => onRemove(song.songId)}
-                disabled={removingDisabled}
-                aria-label={'Remove ' + song.title}
-              >
-                Remove
-              </button>
-            ) : null}
-            {onVote !== undefined ? (
-              <button
-                className="vote-button"
-                type="button"
-                onClick={() => onVote(song.songId)}
-                disabled={votingDisabled}
-                aria-label={'Vote for ' + song.title + ', ' + song.voteCount + ' votes'}
-              >
-                <span aria-hidden="true">▲</span>
-                <span className="vote-count">{song.voteCount}</span>
-              </button>
-            ) : (
-              <span className="queue-votes" aria-label={song.voteCount + ' votes'}>{song.voteCount}</span>
-            )}
-          </li>
+          <QueueRow
+            key={song.songId}
+            song={{
+              songId: song.songId,
+              title: song.title,
+              channelTitle: song.channelTitle,
+              thumbnailUrl: song.thumbnailUrl,
+              position: song.position,
+              addedBy: song.addedBy,
+              voteCount: song.voteCount,
+            }}
+            onVote={onVote}
+            votingDisabled={votingDisabled}
+            onRemove={onRemove}
+            canRemove={canRemove === undefined ? true : canRemove(song)}
+            removingDisabled={removingDisabled}
+          />
         ))}
       </ol>
-    </section>
+    </Panel>
   );
 }

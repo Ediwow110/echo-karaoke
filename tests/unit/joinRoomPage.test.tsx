@@ -17,15 +17,17 @@ function renderJoin(code = 'ABCDEFGHJKMNPQRS') {
   return render(
     createElement(
       RoomApiProvider,
-      { api },
-      createElement(
-        MemoryRouter,
-        { initialEntries: ['/join/' + code] },
-        createElement(
-          Routes,
-          { children: createElement(Route, { path: '/join/:roomCode', element: createElement(JoinRoomPage) }) },
+      {
+        api,
+        children: createElement(
+          MemoryRouter,
+          { initialEntries: ['/join/' + code] },
+          createElement(
+            Routes,
+            { children: createElement(Route, { path: '/join/:roomCode', element: createElement(JoinRoomPage) }) },
+          ),
         ),
-      ),
+      },
     ),
   );
 }
