@@ -7,6 +7,7 @@ export type EdgeFunctionName =
   | 'queue-command'
   | 'youtube-search'
   | 'youtube-suggest'
+  | 'youtube-popular'
   | 'playback-command'
   | 'playback-report'
   | 'vote-command'

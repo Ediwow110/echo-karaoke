@@ -647,3 +647,44 @@ describe.skipIf(!runsLocally)('youtube suggestions', () => {
     }
   });
 });
+
+describe.skipIf(!runsLocally)('youtube popular songs', () => {
+  it('needs a room pass and reports popular songs as unavailable without a YouTube key', async () => {
+    const session = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session,
+      body: { displayName: 'Popular Host' },
+    });
+    const roomId = created.body.roomId as string;
+    const guestToken = created.body.guestToken as string;
+
+    const noSession = await callFunction('youtube-popular', {
+      body: { roomId },
+    });
+    expect(noSession.status).toBe(401);
+
+    const noToken = await callFunction('youtube-popular', {
+      session,
+      body: { roomId },
+    });
+    expect(noToken.status).toBe(401);
+
+    const badToken = await callFunction('youtube-popular', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: 'x'.repeat(43),
+      body: { roomId },
+    });
+    expect(badToken.status).toBe(401);
+
+    const withoutKey = await callFunction('youtube-popular', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId },
+    });
+    expect(withoutKey.status).toBe(200);
+    expect(withoutKey.body.available).toBe(false);
+    expect(withoutKey.body.results).toEqual([]);
+  });
+});
