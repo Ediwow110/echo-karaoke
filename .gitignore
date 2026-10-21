@@ -10,3 +10,6 @@ blob-report/
 
 # Playwright MCP scratch files
 .playwright-mcp/
+
+# The design spec that the console redesign replaced
+ENCORE_DESIGN_SPEC.md

@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
@@ -56,18 +56,24 @@ describe('landing page', () => {
 
   it('leads a phone with joining and a wide screen with starting a room', () => {
     const { container } = renderHome();
-    const startCard = container.querySelector('[data-start-card]');
-    const joinCard = container.querySelector('[data-join-card]');
-    expect(startCard?.className).toContain('order-2');
-    expect(startCard?.className).toContain('sm:order-1');
-    expect(joinCard?.className).toContain('order-1');
-    expect(joinCard?.className).toContain('sm:order-2');
+    const cards = [...container.querySelectorAll('[data-start-card], [data-join-card]')];
+    expect(cards.map((card) => card.getAttribute('data-start-card') !== null ? 'start' : 'join')).toEqual(['join', 'start']);
+  });
+
+  it('puts the start card first on a wide screen', () => {
+    const wide = vi.fn().mockReturnValue({ matches: true, addEventListener: () => {}, removeEventListener: () => {} });
+    vi.stubGlobal('matchMedia', wide);
+    const { container } = renderHome();
+    const cards = [...container.querySelectorAll('[data-start-card], [data-join-card]')];
+    expect(cards.map((card) => card.getAttribute('data-start-card') !== null ? 'start' : 'join')).toEqual(['start', 'join']);
+    vi.unstubAllGlobals();
   });
 
   it('tells a wide screen that it plays the music', () => {
+    const wide = vi.fn().mockReturnValue({ matches: true, addEventListener: () => {}, removeEventListener: () => {} });
+    vi.stubGlobal('matchMedia', wide);
     renderHome();
-    const line = screen.getByText(/this screen plays the music/i);
-    expect(line.className).toContain('hidden');
-    expect(line.className).toContain('sm:block');
+    expect(screen.getByText(/this screen plays the music/i)).toBeInTheDocument();
+    vi.unstubAllGlobals();
   });
 });

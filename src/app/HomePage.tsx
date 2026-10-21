@@ -10,6 +10,7 @@ import {
 } from '@phosphor-icons/react';
 import { useRoomApi } from './RoomApiProvider';
 import { createRoom, joinRoom } from '../features/rooms/roomApi';
+import { useMediaQuery } from '../lib/useMediaQuery';
 import { Button, Field } from '../ui';
 
 function describeError(error: unknown): string {
@@ -25,6 +26,10 @@ const steps = [
 export default function HomePage() {
   const api = useRoomApi();
   const navigate = useNavigate();
+  // A phone leads with joining, because a phone is a remote. A wide screen
+  // leads with starting a room, because a wide screen is the stage. The order
+  // is set in the markup so that the focus order follows the picture.
+  const wide = useMediaQuery('(min-width: 640px)');
   const [createName, setCreateName] = useState('');
   const [joinName, setJoinName] = useState('');
   const [joinCode, setJoinCode] = useState('');
@@ -57,6 +62,92 @@ export default function HomePage() {
     }
   }
 
+  const startCard = (
+    <form
+      onSubmit={handleCreate}
+      data-start-card
+      className="rounded-panel border border-line bg-surface p-6"
+      aria-label="Start a room"
+    >
+      <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
+        <BroadcastIcon size={22} weight="duotone" aria-hidden="true" />
+      </span>
+      <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Start a room</h2>
+      <p className="mt-1 text-[0.8125rem] text-ink-3">You host on the big screen.</p>
+      {wide ? <p className="mt-1 text-[0.8125rem] text-ink-3">This screen plays the music for the room.</p> : null}
+      <Field
+        id="create-name"
+        label="Host name"
+        value={createName}
+        onChange={(event) => setCreateName(event.target.value)}
+        placeholder="Ana"
+        autoComplete="nickname"
+        maxLength={32}
+      />
+      <Button
+        type="submit"
+        variant="primary"
+        size="lg"
+        className="mt-4 w-full"
+        icon={<BroadcastIcon size={18} weight="duotone" />}
+        busy={busy === 'create'}
+      >
+        {busy === 'create' ? 'Starting the room' : 'Start a room'}
+      </Button>
+    </form>
+  );
+
+  const joinCard = (
+    <form
+      onSubmit={handleJoin}
+      data-join-card
+      className="rounded-panel border border-line bg-surface p-6"
+      aria-label="Join a room"
+    >
+      <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
+        <KeyIcon size={22} weight="duotone" aria-hidden="true" />
+      </span>
+      <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Join a room</h2>
+      <p className="mt-1 text-[0.8125rem] text-ink-3">Scan the code on the host screen, or type it.</p>
+      <a
+        href="/scan"
+        className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-panel border border-line bg-surface-2 px-4 text-[0.875rem] font-semibold text-ink transition-[transform,background-color,border-color] duration-(--duration-fast) ease-(--ease-console) hover:-translate-y-px hover:border-line-strong hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+      >
+        <QrCodeIcon size={18} weight="duotone" aria-hidden="true" />
+        Scan a code
+      </a>
+      <Field
+        id="join-code"
+        label="Room code"
+        value={joinCode}
+        onChange={(event) => setJoinCode(event.target.value)}
+        placeholder="ABCD EFGH JKMN PQRS"
+        autoComplete="off"
+        spellCheck={false}
+        maxLength={24}
+      />
+      <Field
+        id="join-name"
+        label="Guest name"
+        value={joinName}
+        onChange={(event) => setJoinName(event.target.value)}
+        placeholder="Sam"
+        autoComplete="nickname"
+        maxLength={32}
+      />
+      <Button
+        type="submit"
+        variant="secondary"
+        size="lg"
+        className="mt-4 w-full"
+        icon={<KeyIcon size={18} weight="duotone" />}
+        busy={busy === 'join'}
+      >
+        {busy === 'join' ? 'Joining the room' : 'Join a room'}
+      </Button>
+    </form>
+  );
+
   return (
     <main className="min-h-dvh bg-graphite text-ink">
       <header className="sticky top-0 z-40 border-b border-line bg-graphite/85 backdrop-blur">
@@ -85,87 +176,8 @@ export default function HomePage() {
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <form
-              onSubmit={handleCreate}
-              data-start-card
-              className="order-2 rounded-panel border border-line bg-surface p-6 sm:order-1"
-              aria-label="Start a room"
-            >
-              <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
-                <BroadcastIcon size={22} weight="duotone" aria-hidden="true" />
-              </span>
-              <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Start a room</h2>
-              <p className="mt-1 text-[0.8125rem] text-ink-3">You host on the big screen.</p>
-              <p className="mt-1 hidden text-[0.8125rem] text-ink-3 sm:block">This screen plays the music for the room.</p>
-              <Field
-                id="create-name"
-                label="Host name"
-                value={createName}
-                onChange={(event) => setCreateName(event.target.value)}
-                placeholder="Ana"
-                autoComplete="nickname"
-                maxLength={32}
-              />
-              <Button
-                type="submit"
-                variant="primary"
-                size="lg"
-                className="mt-4 w-full"
-                icon={<BroadcastIcon size={18} weight="duotone" />}
-                busy={busy === 'create'}
-              >
-                {busy === 'create' ? 'Starting the room' : 'Start a room'}
-              </Button>
-            </form>
-
-            <form
-              onSubmit={handleJoin}
-              data-join-card
-              className="order-1 rounded-panel border border-line bg-surface p-6 sm:order-2"
-              aria-label="Join a room"
-            >
-              <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
-                <KeyIcon size={22} weight="duotone" aria-hidden="true" />
-              </span>
-              <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Join a room</h2>
-              <p className="mt-1 text-[0.8125rem] text-ink-3">Scan the code on the host screen, or type it.</p>
-              <a
-                href="/scan"
-                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-panel border border-line bg-surface-2 px-4 text-[0.875rem] font-semibold text-ink transition-[transform,background-color,border-color] duration-(--duration-fast) ease-(--ease-console) hover:-translate-y-px hover:border-line-strong hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-              >
-                <QrCodeIcon size={18} weight="duotone" aria-hidden="true" />
-                Scan a code
-              </a>
-              <Field
-                id="join-code"
-                label="Room code"
-                value={joinCode}
-                onChange={(event) => setJoinCode(event.target.value)}
-                placeholder="ABCD EFGH JKMN PQRS"
-                autoComplete="off"
-                spellCheck={false}
-                maxLength={24}
-              />
-              <Field
-                id="join-name"
-                label="Guest name"
-                value={joinName}
-                onChange={(event) => setJoinName(event.target.value)}
-                placeholder="Sam"
-                autoComplete="nickname"
-                maxLength={32}
-              />
-              <Button
-                type="submit"
-                variant="secondary"
-                size="lg"
-                className="mt-4 w-full"
-                icon={<KeyIcon size={18} weight="duotone" />}
-                busy={busy === 'join'}
-              >
-                {busy === 'join' ? 'Joining the room' : 'Join a room'}
-              </Button>
-            </form>
+            {wide ? startCard : joinCard}
+            {wide ? joinCard : startCard}
           </div>
 
           {error === null ? null : (
