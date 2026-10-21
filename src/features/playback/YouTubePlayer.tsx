@@ -185,11 +185,12 @@ export default function YouTubePlayer({ playback, onEnded, onProgress, playerFac
   return (
     <section ref={panelRef} className={'rounded-panel border border-line bg-surface p-4' + (mode === 'theater' ? ' lg:col-span-2' : '')} aria-label="Karaoke player">
       <div className="relative aspect-video overflow-hidden rounded-media bg-black" data-mode={mode}>
+        {/* The player needs its box before a song exists, so the box is always
+            there and the empty message sits on top of it. */}
+        <div className="h-full w-full" ref={hostRef} data-video-id={videoId ?? undefined} />
         {videoId === null ? (
-          <p className="grid h-full place-items-center text-[0.9375rem] text-ink-3">Add a song to start the night.</p>
-        ) : (
-          <div className="h-full w-full" ref={hostRef} data-video-id={videoId} />
-        )}
+          <p className="absolute inset-0 grid place-items-center text-[0.9375rem] text-ink-3">Add a song to start the night.</p>
+        ) : null}
 
         {needsTap ? (
           <div className="absolute inset-0 grid place-items-center bg-graphite/70">

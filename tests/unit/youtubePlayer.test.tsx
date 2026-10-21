@@ -106,6 +106,16 @@ describe('host player', () => {
     setState(1);
   });
 
+  it('builds the player before a song is queued', async () => {
+    const { factory, created } = fakeFactory();
+
+    render(createElement(YouTubePlayer, { playback: undefined, onEnded: () => {}, playerFactory: factory }));
+
+    await waitFor(() => {
+      expect(created()).toBe(1);
+    });
+  });
+
   it('pauses when the room is paused', async () => {    const { factory, calls } = fakeFactory();
 
     render(createElement(YouTubePlayer, {
