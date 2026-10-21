@@ -34,7 +34,7 @@ export default function IconButton({
         {...rest}
         type="button"
         aria-label={label}
-        aria-pressed={active === true ? true : undefined}
+        aria-pressed={active}
         className={[
           'grid place-items-center rounded-full',
           'transition-[transform,background-color,border-color] duration-(--duration-fast) ease-(--ease-console)',

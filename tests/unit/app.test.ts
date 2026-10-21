@@ -22,8 +22,8 @@ describe('karaoke home screen', () => {
   it('offers clearly labeled room entry points', () => {
     renderHome();
 
-    expect(screen.getByRole('button', { name: /create room/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /join room/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /start a room/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /join a room/i })).toBeInTheDocument();
   });
 
   it('asks for a display name and a room code', () => {

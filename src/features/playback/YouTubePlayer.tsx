@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
+import { ArrowsOutIcon, CornersInIcon, CornersOutIcon, PlayIcon } from '@phosphor-icons/react';
 import type { PlaybackState } from './playbackApi';
+import { Button, IconButton } from '../../ui';
 
 export type PlayerHandle = {
   load(videoId: string): void;
@@ -114,46 +116,27 @@ export default function YouTubePlayer({ playback, onEnded, onProgress, playerFac
   }
 
   return (
-    <section ref={panelRef} className={'player-panel' + (mode === 'theater' ? ' player-theater' : '')} aria-label="Karaoke player">
-      <div className="player-stage" data-mode={mode}>
+    <section ref={panelRef} className={'rounded-panel border border-line bg-surface p-4' + (mode === 'theater' ? ' lg:col-span-2' : '')} aria-label="Karaoke player">
+      <div className="relative aspect-video overflow-hidden rounded-media bg-black" data-mode={mode}>
         {videoId === null ? (
-          <p className="empty-state">Add a song to start the night.</p>
+          <p className="grid h-full place-items-center text-[0.9375rem] text-ink-3">Add a song to start the night.</p>
         ) : (
-          <div className="player-host" ref={hostRef} data-video-id={videoId} />
+          <div className="h-full w-full" ref={hostRef} data-video-id={videoId} />
         )}
       </div>
 
-      <div className="player-modes" role="group" aria-label="Player view">
-        <button
-          className="mode-button"
-          type="button"
-          aria-pressed={mode === 'normal'}
-          onClick={() => onModeChange?.('normal')}
-        >
-          Normal
-        </button>
-        <button
-          className="mode-button"
-          type="button"
-          aria-pressed={mode === 'theater'}
-          onClick={() => onModeChange?.('theater')}
-        >
-          Theater
-        </button>
-        <button
-          className="mode-button"
-          type="button"
-          aria-pressed={isFullscreen}
-          onClick={() => void toggleFullscreen()}
-        >
-          {isFullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-        </button>
+      <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Player view">
+        <IconButton icon={<CornersOutIcon size={18} weight="regular" />} label="Theater" active={mode === 'theater'} onClick={() => onModeChange?.('theater')} />
+        <IconButton icon={<CornersInIcon size={18} weight="regular" />} label="Normal" active={mode === 'normal'} onClick={() => onModeChange?.('normal')} />
+        <IconButton icon={<ArrowsOutIcon size={18} weight="regular" />} label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} active={isFullscreen} onClick={() => void toggleFullscreen()} />
       </div>
 
       {needsTap ? (
-        <button
-          className="action-button action-primary"
-          type="button"
+        <Button
+          variant="primary"
+          size="md"
+          className="mt-3"
+          icon={<PlayIcon size={18} weight="fill" />}
           onClick={() => {
             try {
               playerRef.current?.play();
@@ -164,12 +147,14 @@ export default function YouTubePlayer({ playback, onEnded, onProgress, playerFac
           }}
         >
           Tap to start audio
-        </button>
+        </Button>
       ) : null}
 
-      {error !== null ? <p className="form-error" role="alert">{error}</p> : null}
+      {error !== null ? (
+        <p role="alert" className="mt-3 rounded-media border-l-2 border-danger bg-danger/10 px-3 py-2 text-[0.8125rem] text-danger">{error}</p>
+      ) : null}
       {videoId !== null && playback?.currentVideoId !== undefined ? (
-        <p className="quiet-note">Now playing {videoId}</p>
+        <p className="mt-3 font-mono text-[0.75rem] text-ink-3">Now playing {videoId}</p>
       ) : null}
     </section>
   );
