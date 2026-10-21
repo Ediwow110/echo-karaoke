@@ -5,8 +5,8 @@ import { describe, expect, it } from 'vitest';
 const css = require('node:fs').readFileSync(process.cwd() + '/src/styles.css', 'utf8');
 
 function color(name: string): string {
-  const value = css.match(new RegExp('--' + name + ':\\s*(#[0-9a-fA-F]{6})'))?.[1];
-  if (!value) throw new Error('Missing --' + name + ' CSS color');
+  const value = css.match(new RegExp('--color-' + name + ':\\s*(#[0-9a-fA-F]{6})'))?.[1];
+  if (!value) throw new Error('Missing --color-' + name + ' token');
   return value;
 }
 
@@ -21,63 +21,67 @@ function contrast(foreground: string, background: string): number {
   return (values[0] + 0.05) / (values[1] + 0.05);
 }
 
-describe('landing page CSS', () => {
-  it('stacks the hero before tablet columns become too narrow', () => {
-    expect(css).toContain('@media (max-width: 790px) { .hero { grid-template-columns: 1fr; } }');
-  });
-
-  it('keeps the landing shell edge-to-edge', () => {
-    const start = css.indexOf('.home-shell {');
-    const end = css.indexOf('}', start);
-    expect(css.slice(start, end)).toContain('padding: 0');
-  });
-
-  it('defines a premium gold accent color', () => {
-    const gold = color('gold');
-    expect(gold).toMatch(/^#[0-9a-fA-F]{6}$/);
-  });
-
-  it('renders the hero art as a full-bleed panel without a border', () => {
-    const start = css.indexOf('.hero-art {');
-    const end = css.indexOf('}', start);
-    const block = css.slice(start, end);
-    expect(block).not.toContain('border:');
-    expect(block).not.toContain('border-radius');
-  });
-
-  it('styles entry cards with a gold hairline border', () => {
-    const start = css.indexOf('.entry-card { position:');
-    const end = css.indexOf('}', start);
-    expect(css.slice(start, end)).toContain('border: 1px solid');
-  });
-
-  it('sets the hero heading to a serif display face', () => {
-    const start = css.indexOf('h1 {');
-    const end = css.indexOf('}', start);
-    expect(css.slice(start, end)).toContain('Playfair Display');
-  });
-
-  it('uses accessible muted text for landing-page notes', () => {
-    for (const selector of ['.topbar-note', '.quiet-note', '.bottomline p']) {
-      const start = css.indexOf(selector + ' {');
-      expect(start).toBeGreaterThanOrEqual(0);
-      const end = css.indexOf('}', start);
-      expect(css.slice(start, end)).toContain('color: var(--muted)');
+describe('console design tokens', () => {
+  it('defines the graphite palette', () => {
+    for (const name of ['graphite', 'surface', 'surface-2', 'ink', 'ink-2', 'signal', 'signal-fill', 'live', 'danger']) {
+      expect(color(name)).toMatch(/^#[0-9a-fA-F]{6}$/);
     }
+  });
 
-    const paper = color('paper');
-    const muted = color('muted');
-    const ink = color('ink');
-    const bodyStart = css.indexOf('.hero-description {');
-    expect(bodyStart).toBeGreaterThanOrEqual(0);
-    const bodyEnd = css.indexOf('}', bodyStart);
-    let bodyText = css.slice(bodyStart, bodyEnd).split('color: ')[1]?.split(';')[0];
-    if (bodyText?.startsWith('var(--')) {
-      bodyText = color(bodyText.match(/--([^)]+)/)![1]);
+  it('keeps body text above the AA threshold', () => {
+    expect(contrast(color('ink'), color('graphite'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color('ink-2'), color('surface'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color('ink-3'), color('surface'))).toBeGreaterThanOrEqual(3);
+  });
+
+  it('keeps the primary button label readable', () => {
+    expect(contrast('#ffffff', color('signal-fill'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('keeps the accent readable on graphite', () => {
+    expect(contrast(color('signal'), color('graphite'))).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('uses the Space Grotesk display face and drops the serif', () => {
+    expect(css).toContain('Space Grotesk');
+    expect(css).not.toContain('Playfair');
+  });
+
+  it('self-hosts every font', () => {
+    expect(css).not.toContain('fonts.googleapis.com');
+    expect(css).not.toContain('fonts.gstatic.com');
+    expect(css).toContain('/fonts/');
+  });
+
+  it('never hides text while a font loads', () => {
+    const faces = css.split('@font-face').slice(1);
+    expect(faces.length).toBeGreaterThan(0);
+    for (const face of faces) {
+      expect(face).toContain('font-display: swap');
     }
-    expect(bodyText).toMatch(/^#[0-9a-fA-F]{6}$/);
-    expect(contrast(muted, paper)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(ink, paper)).toBeGreaterThanOrEqual(4.5);
-    expect(contrast(bodyText!, paper)).toBeGreaterThanOrEqual(4.5);
+  });
+
+  it('defines one radius scale', () => {
+    expect(css).toMatch(/--radius-panel:\s*14px/);
+    expect(css).toMatch(/--radius-badge:\s*8px/);
+    expect(css).toMatch(/--radius-media:\s*10px/);
+  });
+
+  it('declares motion as tokens', () => {
+    expect(css).toMatch(/--duration-fast:\s*140ms/);
+    expect(css).toMatch(/--duration-base:\s*200ms/);
+    expect(css).toMatch(/--duration-slow:\s*320ms/);
+    expect(css).toMatch(/--ease-console:\s*cubic-bezier\(/);
+  });
+
+  it('halts every animation for visitors who ask for reduced motion', () => {
+    expect(css).toMatch(/@media \(prefers-reduced-motion: reduce\)/);
+    const reduced = css.slice(css.indexOf('@media (prefers-reduced-motion: reduce)'));
+    expect(reduced).toContain('animation-duration: .01ms');
+    expect(reduced).toContain('animation-iteration-count: 1');
+  });
+
+  it('renders native controls in the dark palette', () => {
+    expect(css).toMatch(/color-scheme:\s*dark/);
   });
 });
