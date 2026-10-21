@@ -5,6 +5,7 @@ import { useRoomData } from '../features/rooms/useRoomData';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
+import PopularSongs from '../features/queue/PopularSongs';
 import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
 import { toggleVote } from '../features/queue/voteApi';
@@ -114,7 +115,10 @@ export default function GuestRoomPage() {
           )}
 
           <Panel title="Add a song" icon={<MagnifyingGlassIcon size={18} weight="duotone" />}>
-            <SongSearch roomId={roomId} disabled={locked} onAdded={() => { void refresh(); }} />
+            <PopularSongs roomId={roomId} onAdded={() => { void refresh(); }} />
+            <div className="mt-4 border-t border-line pt-4">
+              <SongSearch roomId={roomId} disabled={locked} onAdded={() => { void refresh(); }} />
+            </div>
             <div className="mt-4 border-t border-line pt-4">
               <PasteSongForm roomId={roomId} disabled={locked} onAdded={() => { void refresh(); }} />
             </div>

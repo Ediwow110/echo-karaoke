@@ -20,6 +20,7 @@ import { buildJoinUrl } from '../features/rooms/roomUrl';
 import ParticipantRoster from '../features/rooms/ParticipantRoster';
 import QueueList from '../features/queue/QueueList';
 import PasteSongForm from '../features/queue/PasteSongForm';
+import PopularSongs from '../features/queue/PopularSongs';
 import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
 import YouTubePlayer, { type PlayerViewMode } from '../features/playback/YouTubePlayer';
@@ -215,7 +216,10 @@ export default function HostRoomPage() {
           <ParticipantRoster roster={roster} />
 
           <Panel title="Add a song as host" icon={<MusicNoteIcon size={18} weight="duotone" />}>
-            <SongSearch roomId={roomId} onAdded={() => { void refresh(); }} />
+            <PopularSongs roomId={roomId} onAdded={() => { void refresh(); }} />
+            <div className="mt-4 border-t border-line pt-4">
+              <SongSearch roomId={roomId} onAdded={() => { void refresh(); }} />
+            </div>
             <div className="mt-4 border-t border-line pt-4">
               <PasteSongForm roomId={roomId} onAdded={() => { void refresh(); }} />
             </div>

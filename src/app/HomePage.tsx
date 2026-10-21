@@ -85,12 +85,18 @@ export default function HomePage() {
           </p>
 
           <div className="mt-8 grid gap-4 sm:grid-cols-2">
-            <form onSubmit={handleCreate} className="rounded-panel border border-line bg-surface p-6" aria-label="Start a room">
+            <form
+              onSubmit={handleCreate}
+              data-start-card
+              className="order-2 rounded-panel border border-line bg-surface p-6 sm:order-1"
+              aria-label="Start a room"
+            >
               <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
                 <BroadcastIcon size={22} weight="duotone" aria-hidden="true" />
               </span>
               <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Start a room</h2>
               <p className="mt-1 text-[0.8125rem] text-ink-3">You host on the big screen.</p>
+              <p className="mt-1 hidden text-[0.8125rem] text-ink-3 sm:block">This screen plays the music for the room.</p>
               <Field
                 id="create-name"
                 label="Host name"
@@ -112,7 +118,12 @@ export default function HomePage() {
               </Button>
             </form>
 
-            <form onSubmit={handleJoin} className="rounded-panel border border-line bg-surface p-6" aria-label="Join a room">
+            <form
+              onSubmit={handleJoin}
+              data-join-card
+              className="order-1 rounded-panel border border-line bg-surface p-6 sm:order-2"
+              aria-label="Join a room"
+            >
               <span className="grid size-10 place-items-center rounded-media bg-signal-soft text-signal">
                 <KeyIcon size={22} weight="duotone" aria-hidden="true" />
               </span>

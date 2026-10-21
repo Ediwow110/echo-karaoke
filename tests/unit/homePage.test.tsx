@@ -53,4 +53,21 @@ describe('landing page', () => {
     expect(screen.getByText('Invite')).toBeInTheDocument();
     expect(screen.getByText('Sing')).toBeInTheDocument();
   });
+
+  it('leads a phone with joining and a wide screen with starting a room', () => {
+    const { container } = renderHome();
+    const startCard = container.querySelector('[data-start-card]');
+    const joinCard = container.querySelector('[data-join-card]');
+    expect(startCard?.className).toContain('order-2');
+    expect(startCard?.className).toContain('sm:order-1');
+    expect(joinCard?.className).toContain('order-1');
+    expect(joinCard?.className).toContain('sm:order-2');
+  });
+
+  it('tells a wide screen that it plays the music', () => {
+    renderHome();
+    const line = screen.getByText(/this screen plays the music/i);
+    expect(line.className).toContain('hidden');
+    expect(line.className).toContain('sm:block');
+  });
 });
