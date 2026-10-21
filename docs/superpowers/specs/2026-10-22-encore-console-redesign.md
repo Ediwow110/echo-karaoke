@@ -134,8 +134,7 @@ One radius rule, applied everywhere:
 
 ### 4.4 Spacing
 
-An 8 pixel base unit. Section padding moves from 20 to 24 pixels on panels, and screen
-gutters become 24 pixels on desktop and 16 pixels on phones.
+An 8 pixel base unit. Panels and cards use 24 pixels of padding. Screen gutters are 24 pixels on desktop and 16 pixels on phones.
 
 ### 4.5 Motion
 
@@ -223,10 +222,13 @@ at `src/ui/index.ts`.
 | `Field` | label, input, helper and error | error text sits below the input, input turns `--color-danger` |
 | `Panel` | titled section | optional leading icon in the title |
 | `Chip` | small status label | mono type, 8 pixel radius |
-| `Tooltip` | hover and focus label | pure CSS, appears on hover and on keyboard focus |
 | `QueueRow` | one queued song | thumbnail, title, added by, vote control, optional remove control |
-| `TransportButton` | one transport action | round, 56 pixel on the host screen, 52 pixel on the guest remote |
+| `TransportButton` | one transport action | round dock shape on the guest phone, labelled bar shape on the host screen |
 | `RosterRow` | one participant | presence dot, display name, host tag |
+| `LockBanner` | locked state banner | lock icon plus the reason |
+
+The tooltip is not a component. It is a `.tooltip` helper class in the stylesheet that
+reads its text from a `data-tooltip` attribute, wrapped around icon only controls.
 
 ---
 
@@ -361,7 +363,7 @@ graphite gradient at the bottom, so both photographs read as one system.
 - `public/fonts/space-grotesk-latin.woff2` and the latin ext file.
 - `public/images/hero-microphone.jpg` and `public/images/singer-stage.jpg`.
 - `src/ui/Button.tsx`, `IconButton.tsx`, `Field.tsx`, `Panel.tsx`, `Chip.tsx`,
-  `Tooltip.tsx`, `QueueRow.tsx`, `TransportButton.tsx`, `RosterRow.tsx`, `index.ts`.
+  `QueueRow.tsx`, `TransportButton.tsx`, `RosterRow.tsx`, `LockBanner.tsx`, `index.ts`.
 
 ### Rewritten
 - `src/styles.css`: token layer, base reset, one component layer, keyframes.
@@ -369,8 +371,9 @@ graphite gradient at the bottom, so both photographs read as one system.
 - `src/features/queue/QueueList.tsx`, `src/features/rooms/ParticipantRoster.tsx`,
   `src/features/playback/PlaybackControls.tsx`, `src/features/queue/SongSearch.tsx`,
   `src/features/queue/PasteSongForm.tsx`.
-- `tests/unit/styles.test.ts`, `tests/unit/premiumDesign.test.ts`,
-  `tests/unit/appShell.test.ts`: the design contract tests follow the new tokens.
+- `tests/unit/styles.test.ts`, `tests/unit/premiumDesign.test.ts` renamed to
+  `tests/unit/consoleDesign.test.ts`, `tests/unit/appShell.test.ts`: the design contract
+  tests follow the new tokens.
 - `index.html`: browser theme color and the font preloads.
 - `supabase/config.toml`: local port remap so the stack starts on this machine.
 
