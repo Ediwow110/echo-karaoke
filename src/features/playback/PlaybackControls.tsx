@@ -10,6 +10,7 @@ type Props = {
   playback: PlaybackState | undefined;
   disabled?: boolean;
   shape?: 'dock' | 'bar';
+  layout?: 'stack' | 'inline';
   onChanged?: () => void;
 };
 
@@ -22,7 +23,7 @@ function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'That playback action failed.';
 }
 
-export default function PlaybackControls({ roomId, playback, disabled = false, shape = 'bar', onChanged }: Props) {
+export default function PlaybackControls({ roomId, playback, disabled = false, shape = 'bar', layout = 'stack', onChanged }: Props) {
   const api = useRoomApi();
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,38 +43,55 @@ export default function PlaybackControls({ roomId, playback, disabled = false, s
     }
   }
 
+  const status = (
+    <span className={['flex items-center gap-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-3', shape === 'dock' ? 'justify-center' : ''].join(' ')}>
+      <span
+        aria-hidden="true"
+        className={['size-2 rounded-full', isPlaying ? 'animate-presence-pulse bg-live' : 'bg-ink-3'].join(' ')}
+      />
+      {isPlaying ? 'Playing' : 'Paused'}
+    </span>
+  );
+
+  const buttons = (
+    <div className={shape === 'dock' ? 'flex items-center justify-center gap-3' : 'flex flex-wrap items-center gap-2'}>
+      <TransportButton
+        shape={shape}
+        label="Play"
+        icon={<PlayIcon size={20} weight="fill" />}
+        disabled={disabled || busy || isPlaying}
+        onClick={() => void run('play')}
+      />
+      <TransportButton
+        shape={shape}
+        label="Pause"
+        icon={<PauseIcon size={20} weight="fill" />}
+        disabled={disabled || busy || !isPlaying}
+        onClick={() => void run('pause')}
+      />
+      <TransportButton
+        shape={shape}
+        label="Skip"
+        icon={<SkipForwardIcon size={20} weight="fill" />}
+        disabled={disabled || busy}
+        onClick={() => void run('next')}
+      />
+    </div>
+  );
+
+  if (layout === 'inline') {
+    return (
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {status}
+        {buttons}
+      </div>
+    );
+  }
+
   return (
     <div className="flex flex-col gap-2">
-      <span className={['flex items-center gap-1.5 font-mono text-[0.6875rem] uppercase tracking-[0.12em] text-ink-3', shape === 'dock' ? 'justify-center' : ''].join(' ')}>
-        <span
-          aria-hidden="true"
-          className={['size-2 rounded-full', isPlaying ? 'animate-presence-pulse bg-live' : 'bg-ink-3'].join(' ')}
-        />
-        {isPlaying ? 'Playing' : 'Paused'}
-      </span>
-      <div className={shape === 'dock' ? 'flex items-center justify-center gap-3' : 'flex flex-wrap items-center gap-2'}>
-        <TransportButton
-          shape={shape}
-          label="Play"
-          icon={<PlayIcon size={20} weight="fill" />}
-          disabled={disabled || busy || isPlaying}
-          onClick={() => void run('play')}
-        />
-        <TransportButton
-          shape={shape}
-          label="Pause"
-          icon={<PauseIcon size={20} weight="fill" />}
-          disabled={disabled || busy || !isPlaying}
-          onClick={() => void run('pause')}
-        />
-        <TransportButton
-          shape={shape}
-          label="Skip"
-          icon={<SkipForwardIcon size={20} weight="fill" />}
-          disabled={disabled || busy}
-          onClick={() => void run('next')}
-        />
-      </div>
+      {status}
+      {buttons}
       {error === null ? null : (
         <p role="alert" className="rounded-media border-l-2 border-danger bg-danger/10 px-3 py-2 text-[0.8125rem] text-danger">
           {error}

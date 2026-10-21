@@ -1,0 +1,54 @@
+- main [ref=f30e3]:
+  - generic [ref=f30e5]:
+    - link "encore" [ref=f30e6] [cursor=pointer]:
+      - /url: /
+    - link "How it works" [ref=f30e11] [cursor=pointer]:
+      - /url: "#how"
+  - generic [ref=f30e15]:
+    - generic [ref=f30e16]:
+      - paragraph [ref=f30e17]: Live on YouTube
+      - heading "One room. Every voice." [level=1] [ref=f30e18]
+      - paragraph [ref=f30e19]: Open a room, send the code, and everyone sings from their own phone. One shared queue, one screen for the music.
+      - generic [ref=f30e20]:
+        - form "Start a room" [ref=f30e21]:
+          - heading "Start a room" [level=2] [ref=f30e26]
+          - paragraph [ref=f30e27]: You host on the big screen.
+          - generic [ref=f30e28]:
+            - generic [ref=f30e29]: Host name
+            - textbox "Host name" [ref=f30e31]:
+              - /placeholder: Ana
+          - button "Start a room" [ref=f30e32]
+        - form "Join a room" [ref=f30e37]:
+          - heading "Join a room" [level=2] [ref=f30e42]
+          - paragraph [ref=f30e43]: Scan the code on the host screen, or type it.
+          - link "Scan a code" [ref=f30e44] [cursor=pointer]:
+            - /url: /scan
+          - generic [ref=f30e48]:
+            - generic [ref=f30e49]: Room code
+            - textbox "Room code" [ref=f30e51]:
+              - /placeholder: ABCD EFGH JKMN PQRS
+          - generic [ref=f30e52]:
+            - generic [ref=f30e53]: Guest name
+            - textbox "Guest name" [ref=f30e55]:
+              - /placeholder: Sam
+          - button "Join a room" [ref=f30e56]
+    - generic [ref=f30e61]:
+      - img "A vintage chrome microphone on a lit stage" [ref=f30e63]
+      - list [ref=f30e66]:
+        - listitem [ref=f30e67]:
+          - paragraph [ref=f30e71]: Start
+          - paragraph [ref=f30e72]: Open a room on the big screen
+        - listitem [ref=f30e73]:
+          - paragraph [ref=f30e77]: Invite
+          - paragraph [ref=f30e78]: Send the code or the link
+        - listitem [ref=f30e79]:
+          - paragraph [ref=f30e83]: Sing
+          - paragraph [ref=f30e84]: Queue a song from any phone
+  - generic [ref=f30e87]:
+    - generic [ref=f30e88]:
+      - heading "The host owns the screen. The guests own the queue." [level=2] [ref=f30e89]
+      - paragraph [ref=f30e90]: The host screen plays the music and shows the queue. Every guest searches YouTube from their own phone, votes for the next track and holds the remote. No account, no install, one room code.
+    - img "A singer on stage under blue light" [ref=f30e92]
+  - generic [ref=f30e96]:
+    - paragraph [ref=f30e97]: Encore. A shared stage for songs worth singing together.
+    - paragraph [ref=f30e98]: No accounts. No install. One code.

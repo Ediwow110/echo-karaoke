@@ -8,6 +8,7 @@ import HomePage from './HomePage';
 const JoinRoomPage = lazy(() => import('./JoinRoomPage'));
 const GuestRoomPage = lazy(() => import('./GuestRoomPage'));
 const HostRoomPage = lazy(() => import('./HostRoomPage'));
+const ScanRoomPage = lazy(() => import('../features/scan/ScanRoomPage'));
 
 export default function App() {
   return (
@@ -23,6 +24,7 @@ export default function App() {
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/join/:roomCode" element={<JoinRoomPage />} />
+          <Route path="/scan" element={<ScanRoomPage />} />
           <Route path="/room/:roomId" element={<GuestRoomPage />} />
           <Route path="/room/:roomId/host" element={<HostRoomPage />} />
           <Route path="*" element={<HomePage />} />

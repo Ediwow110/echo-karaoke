@@ -117,7 +117,14 @@ export default function HomePage() {
                 <KeyIcon size={22} weight="duotone" aria-hidden="true" />
               </span>
               <h2 className="mt-4 font-display text-lg font-semibold tracking-tight">Join a room</h2>
-              <p className="mt-1 text-[0.8125rem] text-ink-3">Type the code the host shared.</p>
+              <p className="mt-1 text-[0.8125rem] text-ink-3">Scan the code on the host screen, or type it.</p>
+              <a
+                href="/scan"
+                className="mt-4 inline-flex min-h-11 items-center justify-center gap-2 rounded-panel border border-line bg-surface-2 px-4 text-[0.875rem] font-semibold text-ink transition-[transform,background-color,border-color] duration-(--duration-fast) ease-(--ease-console) hover:-translate-y-px hover:border-line-strong hover:bg-surface-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+              >
+                <QrCodeIcon size={18} weight="duotone" aria-hidden="true" />
+                Scan a code
+              </a>
               <Field
                 id="join-code"
                 label="Room code"

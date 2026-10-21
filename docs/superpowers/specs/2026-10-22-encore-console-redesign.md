@@ -439,3 +439,37 @@ Measured on the production build after the redesign:
 - **Theme:** one dark theme. The product runs at night.
 - **Motion:** CSS only, no animation dependency.
 - **Assets:** two self-hosted photographs replace the CSS artwork.
+
+## 15. Follow-up: controls in the frame and phone scanning
+
+Two changes came after the first review of the built screens.
+
+### 15.1 The host transport controls sit inside the video frame
+
+The controls used to live in a panel under the player. They now sit over the bottom of the
+picture, the way a video player is expected to work.
+
+- `YouTubePlayer` gains an `overlay` slot that renders inside the 16 by 9 stage.
+- `PlayerChrome` draws the bar: the song title and channel on the left, the state and the
+  transport controls on the right, over a graphite gradient.
+- The bar fades away after 2600ms of stillness while a song plays. A pointer movement or a
+  key press brings it back. Focus inside the bar always reveals it.
+- The view buttons for theater, normal and fullscreen move to the top right corner of the
+  frame.
+- The separate Playback panel is removed from the host screen.
+- The picture sits in an iframe, which keeps every pointer event to itself. The bar wakes on
+  a movement the page can see, which includes the strip under the picture, and on any key
+  press.
+
+### 15.2 A phone joins by scanning the host code
+
+- A lazy route at `/scan` opens the rear camera and decodes the code with jsQR, which is a
+  pure decoder with no runtime dependency.
+- A detected code sends the guest to the join page, where a name gives them the remote.
+- The join card on the home screen gains a `Scan a code` action.
+- The typed code stays as the fallback for every guest, and a blocked camera explains that
+  the code can be typed instead.
+- The scanner bundle is 139 kB, 50 kB gzip, and it loads only on the scan route. The entry
+  bundle grows by 0.14 kB gzip.
+- The scanner is proven against the exact code the host screen draws: the test rasterizes
+  that code and decodes it with the same library the camera uses.

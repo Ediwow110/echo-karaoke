@@ -60,9 +60,13 @@ try {
   warmSessionBundle();
 } catch (error) {
   root.render(
-    <main className="config-error">
-      <h1>Encore needs configuration</h1>
-      <p>{error instanceof Error ? error.message : 'Supabase environment variables are missing.'}</p>
+    <main className="grid min-h-dvh place-items-center bg-graphite px-4 text-ink">
+      <div className="w-full max-w-[30rem] rounded-panel border border-line bg-surface p-6">
+        <h1 className="font-display text-2xl font-semibold tracking-tight">Encore needs configuration</h1>
+        <p className="mt-3 text-[0.875rem] text-ink-2">
+          {error instanceof Error ? error.message : 'Supabase environment variables are missing.'}
+        </p>
+      </div>
     </main>,
   );
 }

@@ -25,7 +25,7 @@ export default function TransportButton({
         disabled={disabled}
         aria-label={label}
         className={[
-          'inline-flex min-h-11 items-center gap-2 rounded-panel border px-4 text-[0.875rem] font-semibold',
+          'inline-flex min-h-10 items-center gap-2 rounded-panel border px-3.5 text-[0.8125rem] font-semibold',
           'transition-[transform,background-color,border-color] duration-(--duration-fast) ease-(--ease-console)',
           'hover:-translate-y-px active:translate-y-0 active:scale-[0.98]',
           'disabled:pointer-events-none disabled:opacity-40',

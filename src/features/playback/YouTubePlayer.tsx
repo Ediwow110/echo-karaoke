@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useRef, useState, type ReactNode } from 'react';
 import { ArrowsOutIcon, CornersInIcon, CornersOutIcon, PlayIcon } from '@phosphor-icons/react';
 import type { PlaybackState } from './playbackApi';
 import { Button, IconButton } from '../../ui';
@@ -21,9 +21,10 @@ type Props = {
   playerFactory?: PlayerFactory;
   mode?: PlayerViewMode;
   onModeChange?: (mode: PlayerViewMode) => void;
+  overlay?: ReactNode;
 };
 
-export default function YouTubePlayer({ playback, onEnded, onProgress, playerFactory, mode = 'normal', onModeChange }: Props) {
+export default function YouTubePlayer({ playback, onEnded, onProgress, playerFactory, mode = 'normal', onModeChange, overlay }: Props) {
   const panelRef = useRef<HTMLElement | null>(null);
   const hostRef = useRef<HTMLDivElement | null>(null);
   const playerRef = useRef<PlayerHandle | null>(null);
@@ -123,12 +124,14 @@ export default function YouTubePlayer({ playback, onEnded, onProgress, playerFac
         ) : (
           <div className="h-full w-full" ref={hostRef} data-video-id={videoId} />
         )}
-      </div>
 
-      <div className="mt-4 flex flex-wrap items-center gap-2" role="group" aria-label="Player view">
-        <IconButton icon={<CornersOutIcon size={18} weight="regular" />} label="Theater" active={mode === 'theater'} onClick={() => onModeChange?.('theater')} />
-        <IconButton icon={<CornersInIcon size={18} weight="regular" />} label="Normal" active={mode === 'normal'} onClick={() => onModeChange?.('normal')} />
-        <IconButton icon={<ArrowsOutIcon size={18} weight="regular" />} label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} active={isFullscreen} onClick={() => void toggleFullscreen()} />
+        <div className="absolute right-3 top-3 flex items-center gap-2" role="group" aria-label="Player view">
+          <IconButton icon={<CornersOutIcon size={18} weight="regular" />} label="Theater" active={mode === 'theater'} onClick={() => onModeChange?.('theater')} />
+          <IconButton icon={<CornersInIcon size={18} weight="regular" />} label="Normal" active={mode === 'normal'} onClick={() => onModeChange?.('normal')} />
+          <IconButton icon={<ArrowsOutIcon size={18} weight="regular" />} label={isFullscreen ? 'Exit fullscreen' : 'Fullscreen'} active={isFullscreen} onClick={() => void toggleFullscreen()} />
+        </div>
+
+        {overlay}
       </div>
 
       {needsTap ? (
@@ -152,9 +155,6 @@ export default function YouTubePlayer({ playback, onEnded, onProgress, playerFac
 
       {error !== null ? (
         <p role="alert" className="mt-3 rounded-media border-l-2 border-danger bg-danger/10 px-3 py-2 text-[0.8125rem] text-danger">{error}</p>
-      ) : null}
-      {videoId !== null && playback?.currentVideoId !== undefined ? (
-        <p className="mt-3 font-mono text-[0.75rem] text-ink-3">Now playing {videoId}</p>
       ) : null}
     </section>
   );

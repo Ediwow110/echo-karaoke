@@ -23,6 +23,7 @@ import PasteSongForm from '../features/queue/PasteSongForm';
 import SongSearch from '../features/queue/SongSearch';
 import PlaybackControls from '../features/playback/PlaybackControls';
 import YouTubePlayer, { type PlayerViewMode } from '../features/playback/YouTubePlayer';
+import PlayerChrome from '../features/playback/PlayerChrome';
 import { youtubePlayerFactory } from '../features/playback/youtubeIframe';
 import { reportPlaybackPosition, sendPlaybackCommand } from '../features/playback/playbackApi';
 import { Button, Chip, LockBanner, Panel } from '../ui';
@@ -127,6 +128,7 @@ export default function HostRoomPage() {
   const roster = data.roster ?? [];
   const queue = data.queue ?? [];
   const locked = data.room?.guestControlLocked === true;
+  const nowPlaying = queue.find((song) => song.status === 'playing');
 
   return (
     <main className="min-h-dvh bg-graphite text-ink">
@@ -164,16 +166,22 @@ export default function HostRoomPage() {
               void reportPlaybackPosition(api, roomId, seconds).catch(() => undefined);
             }}
             playerFactory={youtubePlayerFactory}
+            overlay={
+              <PlayerChrome
+                playing={data.playback?.isPlaying === true}
+                title={nowPlaying?.title ?? null}
+                channel={nowPlaying?.channelTitle ?? null}
+              >
+                <PlaybackControls
+                  roomId={roomId}
+                  playback={data.playback}
+                  shape="bar"
+                  layout="inline"
+                  onChanged={() => { void refresh(); }}
+                />
+              </PlayerChrome>
+            }
           />
-
-          <Panel title="Playback" icon={<MusicNoteIcon size={18} weight="duotone" />}>
-            <PlaybackControls
-              roomId={roomId}
-              playback={data.playback}
-              shape="bar"
-              onChanged={() => { void refresh(); }}
-            />
-          </Panel>
 
           <QueueList
             queue={queue}
