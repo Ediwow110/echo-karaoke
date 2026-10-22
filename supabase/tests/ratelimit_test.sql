@@ -37,16 +37,18 @@ select is(
   'the limiter counts every request');
 
 select is(
-  public.consume_rate_limit('user-b', 'short', 1, 1) ->> 'allowed',
+  public.consume_rate_limit('user-b', 'short', 1, 60) ->> 'allowed',
   'true',
   'the short window starts allowed');
 select is(
-  public.consume_rate_limit('user-b', 'short', 1, 1) ->> 'allowed',
+  public.consume_rate_limit('user-b', 'short', 1, 60) ->> 'allowed',
   'false',
   'the short window then denies');
-select pg_sleep(1.1);
+update public.rate_limits
+set window_start = window_start - interval '2 minutes'
+where subject = 'user-b' and bucket = 'short';
 select is(
-  public.consume_rate_limit('user-b', 'short', 1, 1) ->> 'allowed',
+  public.consume_rate_limit('user-b', 'short', 1, 60) ->> 'allowed',
   'true',
   'an expired window resets the count');
 
