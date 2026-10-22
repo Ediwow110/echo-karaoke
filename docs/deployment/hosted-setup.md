@@ -7,7 +7,7 @@ verify, database, and integration all passed. Every hosted value below is named,
 never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The local
-gates are already green: 229 unit tests, 234 database assertions against Neon, 4
+gates are already green: 235 unit tests, 243 database assertions against Neon, 6
 operation integration tests, and a production build. This document covers only what a
 hosted account makes possible.
 
@@ -182,6 +182,8 @@ vercel env add AUTH_DATABASE_URL production
 vercel env add BETTER_AUTH_SECRET production
 vercel env add BETTER_AUTH_URL production
 vercel env add ALLOWED_ORIGINS production
+vercel env add ROOM_MEMBER_LIMIT production
+vercel env add ANON_SIGNIN_LIMIT_PER_HOUR production
 ```
 
 | Variable | Value |
@@ -191,10 +193,19 @@ vercel env add ALLOWED_ORIGINS production
 | `BETTER_AUTH_SECRET` | A random secret of at least 32 characters |
 | `BETTER_AUTH_URL` | `https://echo-karaoke-mocha.vercel.app` |
 | `ALLOWED_ORIGINS` | `https://echo-karaoke-mocha.vercel.app` |
+| `ROOM_MEMBER_LIMIT` | `50` (allowed 2–500); host plus guests |
+| `ANON_SIGNIN_LIMIT_PER_HOUR` | `120` (allowed 1–1000); per hashed network address |
 
 `ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. It is
 not a CORS allowlist any more: the function is same-origin, so no CORS headers are
 needed.
+
+The two abuse limits are optional and have those defaults. The room cap is enforced
+atomically in `join_room` under a room row lock. The sign-in limit is checked before
+Better Auth, uses the first `x-forwarded-for` address, and stores only an
+HMAC-SHA-256 of it. If the limiter store is unavailable, sign-in fails closed with a
+503. Raise `ANON_SIGNIN_LIMIT_PER_HOUR` for a venue network that expects more than 120
+new guests in an hour.
 
 Repeat the database, auth secret, and origin variables for the Preview environment.
 Do **not** set `BETTER_AUTH_URL` for Preview; the current deployment host is derived
@@ -273,7 +284,7 @@ The jobs:
 
 1. `verify` runs typecheck, the unit suite, the build, and `npm audit`.
 2. `database` creates a Neon branch through the API, applies the migration chain,
-   runs the 234 pgTAP assertions, and deletes the branch even on failure.
+   runs the 243 pgTAP assertions, and deletes the branch even on failure.
 3. `integration` creates a second branch, applies the chain, deletes the inherited
    `public.jwks` rows so Better Auth generates keys for this run's secret, runs the
    operation suite, and deletes the branch.
@@ -305,9 +316,9 @@ five-minute guarantee; the interval is opportunistic.
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 234/234.
-- [x] `npm run test:integration` reports 4/4 against Neon.
-- [x] `npm test` reports 229 unit tests passing.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 243/243.
+- [x] `npm run test:integration` reports 6/6 against Neon.
+- [x] `npm test` reports 235 unit tests passing.
 - [x] `npm run build` passes.
 - [x] `vercel deploy --prod` builds with the guard enabled.
 - [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.

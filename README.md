@@ -62,6 +62,11 @@ Apply the schema and run the database suite against the Neon owner URL:
 
     ALLOWED_ORIGINS=https://your-app.example
 
+Two abuse controls are optional. The room cap counts the host and every guest. The sign-in cap counts anonymous sign-ins per hashed network address per hour:
+
+    ROOM_MEMBER_LIMIT=50
+    ANON_SIGNIN_LIMIT_PER_HOUR=120
+
 Before shipping, run `npm run verify:deploy`. It refuses a build when any `VITE_` variable holds a PostgreSQL connection string, when `ALLOWED_ORIGINS` is missing or malformed, or when an API base URL escapes the app origin. `vercel.json` applies the security headers and the CSP at the Vercel edge, pins the function to `sin1`, and sends `/api/*` to the function instead of the app shell.
 
 The hosted setup, step by step, is in `docs/deployment/hosted-setup.md`. It covers the Neon project, the two database credentials, the auth service, the Vercel environment, the CI secrets, and the preview checks.
@@ -72,9 +77,9 @@ Rooms are cleaned up when a room is created. That request first deletes every ro
 
 ## Tests
 
-    npm test                 # 229 unit and component tests (jsdom)
+    npm test                 # 235 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 234 pgTAP assertions
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 243 pgTAP assertions
     npm run test:integration # the function's auth and operation path against Neon
     npm run test:e2e         # Playwright against vercel dev on port 3000
 
@@ -93,7 +98,7 @@ The E2E suite creates rooms against the running app; start `vercel dev` first or
 - Room codes gate joining only. Do not treat a room as secret.
 - Guest request and playback permissions are independent. Skip, remove and reorder are always host-only.
 - A partial unique index prevents two active copies of the same video in one room. Played songs may return.
-- There is no join throttle and no member cap. A song cap of five per minute per member is enforced, room creation is capped at 10 rooms per session per hour, and a room whose members have not sent a heartbeat for 30 minutes is deleted the next time somebody creates a room, but a busy room can still grow.
+- A song cap of five per minute per member is enforced. Room creation is capped at 10 rooms per session per hour, and a room is capped at 50 members including the host (`ROOM_MEMBER_LIMIT`, 2–500). Anonymous sign-in is capped at 120 per hour per network address (`ANON_SIGNIN_LIMIT_PER_HOUR`, 1–1000), stored as an HMAC, not a raw IP. These are speed bumps; a large venue should set the sign-in cap for its expected crowd.
 
 ## Layout
 

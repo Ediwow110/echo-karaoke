@@ -610,8 +610,9 @@ and `echo_auth`. The current report is
 | N-13 | Low | CI branch URLs carried `channel_binding`, which the Supabase CLI sent to the server | Fixed |
 | N-14 | High | The host heartbeat used the guest pass, so a session replacement stopped refreshing the host member | Fixed |
 | N-15 | Low | `ratelimit_test.sql` used a one-second bucket, so CI could flap across a wall-clock boundary | Fixed |
+| N-16 | Medium | No room-size cap and no per-network sign-in throttle | Fixed locally |
 
-Gates on 2026-10-23: 229 unit tests, 234 database assertions on Neon, 4 operation
+Gates on 2026-10-23: 235 unit tests, 243 database assertions on Neon, 6 operation
 integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
 (sign-in 200, token 200, create-room 201). Production is deployed at
 `https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production
@@ -621,5 +622,8 @@ appeared in the host roster. CI run 39871229479 passed `verify`, `database`, and
 `integration` with the heartbeat fix on `master`; production was redeployed, and a
 second anonymous session used the original host pass to touch (200), read (200), and
 end (200) the room. A one-second bucket boundary made `ratelimit_test.sql` flaky once;
-the test now expires the stored window deterministically. The remaining work is the
-physical-phone camera run and the open items in the report.
+the test now expires the stored window deterministically. The room member cap and the
+hashed-IP sign-in throttle are verified locally (429 at the sign-in cap, 409
+`ROOM_FULL` at the room cap, existing guests still rejoin) and await their deployment
+and CI run. The remaining work is the physical-phone camera run and the open items in
+the report.

@@ -24,6 +24,7 @@ fix.
 | Production browser flow | Playwright, desktop host plus 390px guest | room created, guest joined, queue visible, guest in the host roster |
 | Heartbeat after session swap | integration test plus `heartbeat_test.sql` | 401 before; 200 after; host member refreshed without an auth user id |
 | Production heartbeat | new anonymous session plus the original host pass | touch 200, host read 200, end 200 |
+| Abuse controls | unit, pgTAP, and integration | sign-in 429 at the cap; room join 409 `ROOM_FULL`; existing guest rejoins |
 | CI | GitHub Actions runs 39868480083, 39868803159, 39870306564, and 39871229479 | verify, database, integration passed |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
@@ -142,9 +143,29 @@ and refreshes the host member without reading the auth user id. Both heartbeat p
 now reject ended rooms (`0023_host_heartbeat.sql`). The regression is covered by an
 integration test that swaps the auth session (401 before the fix, 200 after), a client
 unit test that checks the selected pass, and the `heartbeat_test.sql` suite. Database
-assertions are now 234. The production deployment was repeated; a second anonymous
+assertions are now 243, including the heartbeat and room-cap suites. The production
+deployment was repeated; a second anonymous
 session used the original host pass to touch the member (200), read the room (200),
 and end it (200).
+
+### 15. Medium, fixed: no room-size cap and no sign-in throttle
+
+`join_room` inserted guests without a count, and anonymous sign-in had no limit, so
+one network could mint identities without bound or fill a room. The room cap is now
+enforced inside `join_room` while the room row is locked, so concurrent joins cannot
+overshoot the cap; the limit is supplied by the service (`ROOM_MEMBER_LIMIT`, default
+50, host included) and returns 409 `ROOM_FULL` (`0024_abuse_limits.sql`). An existing
+guest can still rejoin at the cap.
+
+Sign-in is checked before Better Auth against the existing `rate_limits` table. The
+subject is an HMAC-SHA-256 of the first `x-forwarded-for` address, never the raw IP;
+the default is 120 per hour (`ANON_SIGNIN_LIMIT_PER_HOUR`), the response is 429 with
+`Retry-After`, and a limiter-store failure fails closed with 503. The client surfaces
+the server's rate-limit message instead of the generic session error.
+
+Evidence: a fresh guest is rejected at the cap, an existing guest still joins, the
+third sign-in from one network returns 429, and the suites are 235 unit, 243 database,
+and 6 integration tests.
 
 ## The boundary that did not move
 
@@ -172,6 +193,5 @@ and end it (200).
 ## Order to finish
 
 1. Run a physical phone camera QR flow against the production alias.
-2. Add a per-IP sign-in throttle and an explicit room-size limit before a public party.
-3. Decide whether the dev tunnel is updated for `/api` or retired.
-4. Decide whether the YouTube key is configured or left as the paste-link fallback.
+2. Decide whether the dev tunnel is updated for `/api` or retired.
+3. Decide whether the YouTube key is configured or left as the paste-link fallback.
