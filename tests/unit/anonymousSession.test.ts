@@ -1,111 +1,133 @@
-import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { SupabaseClient } from '@supabase/supabase-js';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-function clientWith(auth: Record<string, unknown>): SupabaseClient {
-  return { auth } as unknown as SupabaseClient;
+type Call = { url: string; init: RequestInit };
+
+function jsonResponse(body: unknown, status = 200): Response {
+  return new Response(JSON.stringify(body), {
+    status,
+    headers: { 'Content-Type': 'application/json' },
+  });
 }
 
-async function loadModule() {
+function stubFetch(handler: (url: string, init: RequestInit) => Response | Promise<Response>): Call[] {
+  const calls: Call[] = [];
+  vi.stubGlobal('fetch', vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+    const call = { url: String(input), init: init ?? {} };
+    calls.push(call);
+    return handler(call.url, call.init);
+  }));
+  return calls;
+}
+
+async function loadAuth() {
   vi.resetModules();
-  return import('../../src/lib/supabase');
+  return import('../../src/lib/auth');
 }
 
-describe('ensureAnonymousSession', () => {
+describe('the anonymous session', () => {
   beforeEach(() => {
     vi.resetModules();
+    vi.unstubAllGlobals();
   });
 
-  it('keeps a valid stored session and validates it only once', async () => {
-    const getUser = vi.fn(async () => ({ data: { user: { id: 'user-a' } }, error: null }));
-    const signInAnonymously = vi.fn(async () => ({ data: { session: { access_token: 'new' } }, error: null }));
-    const supabase = clientWith({
-      getSession: vi.fn(async () => ({ data: { session: { access_token: 'stored' } }, error: null })),
-      getUser,
-      signInAnonymously,
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    vi.restoreAllMocks();
+  });
+
+  it('reuses the token from an existing session without signing in', async () => {
+    let tokenCalls = 0;
+    const calls = stubFetch((url) => {
+      if (url.endsWith('/api/auth/token')) {
+        tokenCalls += 1;
+        return jsonResponse({ token: 'bearer-token' });
+      }
+      return jsonResponse({}, 404);
     });
-    const { ensureAnonymousSession } = await loadModule();
+    const { ensureAnonymousSession } = await loadAuth();
 
-    expect(await ensureAnonymousSession(supabase)).toBe('stored');
-    expect(await ensureAnonymousSession(supabase)).toBe('stored');
-    expect(getUser).toHaveBeenCalledTimes(1);
-    expect(signInAnonymously).not.toHaveBeenCalled();
+    expect(await ensureAnonymousSession()).toBe('bearer-token');
+    expect(await ensureAnonymousSession()).toBe('bearer-token');
+    expect(tokenCalls).toBe(1);
+    expect(calls.some((call) => call.url.endsWith('/api/auth/sign-in/anonymous'))).toBe(false);
+    expect(calls[0].init.credentials).toBe('include');
   });
 
-  it('replaces a session the auth server rejects', async () => {
-    const signOut = vi.fn(async () => ({ error: null }));
-    const signInAnonymously = vi.fn(async () => ({ data: { session: { access_token: 'fresh' } }, error: null }));
-    const supabase = clientWith({
-      getSession: vi.fn(async () => ({ data: { session: { access_token: 'stale' } }, error: null })),
-      getUser: vi.fn(async () => ({ data: { user: null }, error: { status: 401, message: 'invalid' } })),
-      signOut,
-      signInAnonymously,
+  it('signs in anonymously when no session token exists', async () => {
+    let tokenCalls = 0;
+    let signInCalls = 0;
+    const calls = stubFetch((url, init) => {
+      if (url.endsWith('/api/auth/token')) {
+        tokenCalls += 1;
+        return tokenCalls === 1 ? jsonResponse({}, 401) : jsonResponse({ token: 'bearer-token' });
+      }
+      if (url.endsWith('/api/auth/sign-in/anonymous')) {
+        signInCalls += 1;
+        expect(init.method).toBe('POST');
+        expect(init.credentials).toBe('include');
+        return jsonResponse({ user: { id: 'user-1' } });
+      }
+      return jsonResponse({}, 404);
     });
-    const { ensureAnonymousSession } = await loadModule();
+    const { ensureAnonymousSession } = await loadAuth();
 
-    expect(await ensureAnonymousSession(supabase)).toBe('fresh');
-    expect(signOut).toHaveBeenCalledWith({ scope: 'local' });
-    expect(signInAnonymously).toHaveBeenCalledTimes(1);
+    expect(await ensureAnonymousSession()).toBe('bearer-token');
+    expect(await ensureAnonymousSession()).toBe('bearer-token');
+    expect(signInCalls).toBe(1);
+    expect(tokenCalls).toBe(2);
+    expect(calls.length).toBe(3);
   });
 
-  it('keeps the stored session when auth is unreachable', async () => {
-    const signOut = vi.fn(async () => ({ error: null }));
-    const supabase = clientWith({
-      getSession: vi.fn(async () => ({ data: { session: { access_token: 'stored' } }, error: null })),
-      getUser: vi.fn(async () => ({ data: { user: null }, error: { status: 0, message: 'network' } })),
-      signOut,
-      signInAnonymously: vi.fn(),
+  it('refreshes the token after its in-memory lifetime', async () => {
+    let now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    let tokenCalls = 0;
+    stubFetch((url) => {
+      if (url.endsWith('/api/auth/token')) {
+        tokenCalls += 1;
+        return jsonResponse({ token: tokenCalls === 1 ? 'first-token' : 'second-token' });
+      }
+      return jsonResponse({}, 404);
     });
-    const { ensureAnonymousSession } = await loadModule();
+    const { ensureAnonymousSession } = await loadAuth();
 
-    expect(await ensureAnonymousSession(supabase)).toBe('stored');
-    expect(signOut).not.toHaveBeenCalled();
+    expect(await ensureAnonymousSession()).toBe('first-token');
+    now += 10 * 60_000 + 1;
+    expect(await ensureAnonymousSession()).toBe('second-token');
+    expect(tokenCalls).toBe(2);
   });
 
-  it('creates an anonymous session when none is stored', async () => {
-    const signInAnonymously = vi.fn(async () => ({ data: { session: { access_token: 'new' } }, error: null }));
-    const supabase = clientWith({
-      getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
-      getUser: vi.fn(),
-      signInAnonymously,
-    });
-    const { ensureAnonymousSession } = await loadModule();
-
-    expect(await ensureAnonymousSession(supabase)).toBe('new');
-    expect(signInAnonymously).toHaveBeenCalledTimes(1);
-  });
-
-  it('starts one anonymous session for concurrent callers', async () => {
+  it('starts one token request for concurrent callers', async () => {
     let release: () => void = () => undefined;
     const gate = new Promise<void>((resolve) => {
       release = resolve;
     });
-    const signInAnonymously = vi.fn(async () => {
-      await gate;
-      return { data: { session: { access_token: 'new' } }, error: null };
+    let tokenCalls = 0;
+    stubFetch(async (url) => {
+      if (url.endsWith('/api/auth/token')) {
+        tokenCalls += 1;
+        await gate;
+        return jsonResponse({ token: 'shared-token' });
+      }
+      return jsonResponse({}, 404);
     });
-    const supabase = clientWith({
-      getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
-      getUser: vi.fn(),
-      signInAnonymously,
-    });
-    const { ensureAnonymousSession } = await loadModule();
+    const { ensureAnonymousSession } = await loadAuth();
 
-    const first = ensureAnonymousSession(supabase);
-    const second = ensureAnonymousSession(supabase);
+    const first = ensureAnonymousSession();
+    const second = ensureAnonymousSession();
     release();
-
-    await expect(Promise.all([first, second])).resolves.toEqual(['new', 'new']);
-    expect(signInAnonymously).toHaveBeenCalledTimes(1);
+    await expect(Promise.all([first, second])).resolves.toEqual(['shared-token', 'shared-token']);
+    expect(tokenCalls).toBe(1);
   });
 
-  it('reports a failed anonymous sign-in', async () => {
-    const supabase = clientWith({
-      getSession: vi.fn(async () => ({ data: { session: null }, error: null })),
-      getUser: vi.fn(),
-      signInAnonymously: vi.fn(async () => ({ data: { session: null }, error: { message: 'disabled' } })),
+  it('reports a failed sign-in and token exchange', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/api/auth/token')) return jsonResponse({}, 401);
+      if (url.endsWith('/api/auth/sign-in/anonymous')) return jsonResponse({}, 500);
+      return jsonResponse({}, 404);
     });
-    const { ensureAnonymousSession } = await loadModule();
+    const { ensureAnonymousSession } = await loadAuth();
 
-    await expect(ensureAnonymousSession(supabase)).rejects.toThrow('Could not start a guest session');
+    await expect(ensureAnonymousSession()).rejects.toThrow('Could not start a guest session');
   });
 });

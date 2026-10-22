@@ -19,8 +19,7 @@ export type RoomTokens = {
 };
 
 export type EdgeApiConfig = {
-  url: string;
-  anonKey: string;
+  baseUrl?: string;
   getAccessToken: () => Promise<string | null>;
   getCachedAccessToken?: () => string | null;
   fetchImpl?: typeof fetch;
@@ -70,7 +69,7 @@ export type EdgeApi = {
 
 export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
   const doFetch = config.fetchImpl ?? fetch;
-  const baseUrl = trimTrailingSlash(config.url);
+  const baseUrl = trimTrailingSlash(config.baseUrl ?? '');
 
   return {
     async invoke<T>(name: EdgeFunctionName, body: unknown, tokens: RoomTokens = {}, options: EdgeInvokeOptions = {}): Promise<T> {
@@ -81,7 +80,6 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
       }
 
       const headers: Record<string, string> = {
-        apikey: config.anonKey,
         Authorization: 'Bearer ' + accessToken,
         'Content-Type': 'application/json',
       };
@@ -94,7 +92,7 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
 
       let response: Response;
       try {
-        response = await doFetch(baseUrl + '/functions/v1/' + name, {
+        response = await doFetch(baseUrl + '/api/' + name, {
           method: 'POST',
           headers,
           body: JSON.stringify(body),

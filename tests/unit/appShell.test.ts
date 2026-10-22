@@ -5,7 +5,6 @@ import { describe, expect, it } from 'vitest';
 const html = require('node:fs').readFileSync(process.cwd() + '/index.html', 'utf8');
 const app = require('node:fs').readFileSync(process.cwd() + '/src/app/App.tsx', 'utf8');
 const main = require('node:fs').readFileSync(process.cwd() + '/src/main.tsx', 'utf8');
-const publicConfig = require('node:fs').readFileSync(process.cwd() + '/src/lib/publicConfig.ts', 'utf8');
 
 describe('application shell', () => {
   it('loads its fonts from the app itself', () => {
@@ -25,13 +24,14 @@ describe('application shell', () => {
     expect(app).toContain('Suspense');
   });
 
-  it('validates the environment without loading the database client', () => {
-    expect(publicConfig).not.toContain('@supabase');
-    expect(main).toContain("from './lib/publicConfig'");
+  it('boots without a client-side environment check', () => {
+    expect(main).not.toContain('publicConfig');
+    expect(main).not.toContain('@supabase');
   });
 
-  it('keeps the database client out of the first download', () => {
-    expect(main).toContain("await import('./lib/supabase')");
+  it('keeps the session client out of the first download', () => {
+    expect(main).toContain("await import('./lib/auth')");
+    expect(main).not.toMatch(/^import .*'\.\/lib\/auth'/m);
     expect(main).not.toMatch(/^import .*'\.\/lib\/supabase'/m);
   });
 

@@ -20,24 +20,23 @@ function headersOf(call: Call): Record<string, string> {
 }
 
 const base = {
-  url: 'http://local.test',
-  anonKey: 'anon-key',
+  baseUrl: 'http://local.test',
   getAccessToken: async () => 'access-token',
 };
 
 describe('edge api client', () => {
-  it('calls the function endpoint with session and public key headers', async () => {
+  it('calls the same-origin operation endpoint with the bearer token', async () => {
     const { calls, impl } = fakeFetch({ status: 200, body: { ok: true } });
     const api = createEdgeApi({ ...base, fetchImpl: impl });
 
     await api.invoke('join-room', { code: 'ABCDEFGHJKMNPQRS', displayName: 'Ana' });
 
     expect(calls).toHaveLength(1);
-    expect(calls[0].url).toBe('http://local.test/functions/v1/join-room');
+    expect(calls[0].url).toBe('http://local.test/api/join-room');
     expect(calls[0].init.method).toBe('POST');
     const headers = headersOf(calls[0]);
     expect(headers.Authorization).toBe('Bearer access-token');
-    expect(headers.apikey).toBe('anon-key');
+    expect(headers.apikey).toBeUndefined();
     expect(headers['x-room-guest-token']).toBeUndefined();
     expect(headers['x-room-host-token']).toBeUndefined();
   });
