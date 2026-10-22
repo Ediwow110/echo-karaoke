@@ -4,8 +4,16 @@ const TTL_MS = 10 * 60 * 1000;
 
 let cached: { url: string; keys: Jwks['keys']; fetchedAt: number } | null = null;
 
-export async function fetchJwks(url: string): Promise<Jwks['keys']> {
-  if (cached !== null && cached.url === url && Date.now() - cached.fetchedAt < TTL_MS) {
+export async function fetchJwks(
+  url: string,
+  options: { force?: boolean } = {},
+): Promise<Jwks['keys']> {
+  if (
+    options.force !== true
+    && cached !== null
+    && cached.url === url
+    && Date.now() - cached.fetchedAt < TTL_MS
+  ) {
     return cached.keys;
   }
 

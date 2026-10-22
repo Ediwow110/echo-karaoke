@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { requireAnonymousCaller, verifyBearerToken } from '../../server/auth/identity';
+import { jwksUrl, requireAnonymousCaller, verifyBearerToken } from '../../server/auth/identity';
 
 const JWKS_URL = 'http://127.0.0.1:9/jwks';
 
@@ -32,8 +32,18 @@ describe('bearer token verification', () => {
   });
 
   it('rejects a token whose signature does not verify', async () => {
-    const forged = jwt({ alg: 'EdDSA', kid: 'fake' }, { sub: 'user-1', isAnonymous: true });
+    const forged = jwt(
+      { alg: 'EdDSA', kid: 'fake' },
+      { sub: 'user-1', isAnonymous: true, exp: Math.floor(Date.now() / 1000) + 60 },
+    );
     await expect(verifyBearerToken(forged, JWKS_URL)).rejects.toThrow();
+  });
+
+  it('reads the key set from the configured auth origin, not the request host', () => {
+    expect(jwksUrl({ BETTER_AUTH_URL: 'https://echo.example' }))
+      .toBe('https://echo.example/api/auth/jwks');
+    expect(jwksUrl({ VERCEL_URL: 'echo-preview.vercel.app' }))
+      .toBe('https://echo-preview.vercel.app/api/auth/jwks');
   });
 
   it('requires a bearer authorization header', async () => {

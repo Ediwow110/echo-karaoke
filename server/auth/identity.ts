@@ -1,6 +1,11 @@
 import { fetchJwks } from './jwks';
+import { resolveBaseUrl } from './origins';
 
 export type VerifiedIdentity = { userId: string; isAnonymous: boolean };
+
+export function jwksUrl(env: Record<string, string | undefined> = process.env): string {
+  return resolveBaseUrl(env) + '/api/auth/jwks';
+}
 
 function decodePart(part: string): Record<string, unknown> {
   try {
@@ -40,9 +45,15 @@ export async function verifyBearerToken(
   if (options.isAnonymous !== false && payload.isAnonymous !== true) {
     throw new Error('only an anonymous identity may use this endpoint');
   }
+  if (typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()) {
+    throw new Error('the token has expired');
+  }
 
-  const keys = await fetchJwks(jwksUrl);
-  const key = keys.find((entry) => entry.kid === header.kid);
+  let key = (await fetchJwks(jwksUrl)).find((entry) => entry.kid === header.kid);
+  if (key === undefined) {
+    // A rotated key set must not wait out the ten-minute cache.
+    key = (await fetchJwks(jwksUrl, { force: true })).find((entry) => entry.kid === header.kid);
+  }
   if (key === undefined) {
     throw new Error('the token was signed with an unknown key');
   }
@@ -60,9 +71,6 @@ export async function verifyBearerToken(
   if (!valid) {
     throw new Error('the token signature does not verify');
   }
-  if (typeof payload.exp === 'number' && payload.exp * 1000 < Date.now()) {
-    throw new Error('the token has expired');
-  }
 
   return { userId: payload.sub, isAnonymous: payload.isAnonymous === true };
 }
@@ -75,7 +83,6 @@ export async function requireAnonymousCaller(
     throw new Error('a signed-in session is required');
   }
   const token = header.slice('bearer '.length).trim();
-  const origin = new URL(request.url).origin;
-  const identity = await verifyBearerToken(token, `${origin}/api/auth/jwks`);
+  const identity = await verifyBearerToken(token, jwksUrl());
   return { userId: identity.userId, accessToken: token };
 }

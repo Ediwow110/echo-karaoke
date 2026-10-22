@@ -18,9 +18,12 @@ export function resolveBaseUrl(env: Environment = process.env): string {
   if (explicit.length > 0) {
     return explicit.replace(/\/+$/, '');
   }
-  return originFrom(env.VERCEL_URL)
-    ?? originFrom(env.VERCEL_PROJECT_PRODUCTION_URL)
-    ?? 'http://127.0.0.1:3000';
+  const current = originFrom(env.VERCEL_URL);
+  const production = originFrom(env.VERCEL_PROJECT_PRODUCTION_URL);
+  if (env.VERCEL_ENV === 'production' && production !== null) {
+    return production;
+  }
+  return current ?? production ?? 'http://127.0.0.1:3000';
 }
 
 export function resolveTrustedOrigins(

@@ -14,6 +14,7 @@ export const auth = betterAuth({
     max: 3,
     idleTimeoutMillis: 10_000,
     connectionTimeoutMillis: 10_000,
+    allowExitOnIdle: true,
   }),
   trustedOrigins: resolveTrustedOrigins(process.env, baseURL),
   advanced: { cookiePrefix: 'echo' },

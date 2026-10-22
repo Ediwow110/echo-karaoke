@@ -20,6 +20,14 @@ describe('auth origins', () => {
     expect(resolveBaseUrl({})).toBe('http://127.0.0.1:3000');
   });
 
+  it('uses the stable production domain for a production deployment', () => {
+    expect(resolveBaseUrl({
+      VERCEL_ENV: 'production',
+      VERCEL_URL: 'echo-abc123.vercel.app',
+      VERCEL_PROJECT_PRODUCTION_URL: 'echo-karaoke.vercel.app',
+    })).toBe('https://echo-karaoke.vercel.app');
+  });
+
   it('trusts the base URL, both Vercel hosts, and the configured origins once each', () => {
     const env = {
       BETTER_AUTH_URL: 'https://echo.example',
