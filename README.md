@@ -67,7 +67,7 @@ The hosted setup, step by step, is in `docs/deployment/hosted-setup.md`. It cove
 
 Vercel: `vercel.json` runs `npm run verify:deploy` before the build, rewrites SPA routes, and applies CSP/security headers. Set `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `ALLOWED_ORIGINS` in the Vercel project environment, and mirror `ALLOWED_ORIGINS` as a Supabase Edge secret. The CSP allows `*.supabase.co`; update `connect-src` if your Supabase project uses a custom domain. Test the camera/QR scan and YouTube playback on the first preview. After deploying, run `npm run verify:preview -- https://your-app.example` to check the headers, CSP, SPA fallback, and asset caching. With `VITE_SUPABASE_URL` set, that check also confirms that the CSP allows the Supabase origin the app actually calls.
 
-Rooms are cleaned up automatically when everyone has left. A `pg_cron` job runs every five minutes and deletes any room whose members have not sent a heartbeat for 30 minutes; members, queue items, votes, events, and host secrets cascade. The app sends a slow heartbeat while a tab is hidden, so a background host tab is not treated as empty. The manual `public.cleanup_ended_rooms(cutoff)` function remains available for a specific ended-room retention pass; it refuses cutoffs less than one day old. Anonymous Auth users are intentionally retained: they contain no room content after the sweep and Supabase manages the identities. Room creation is capped at 10 rooms per session per hour; this is a per-session speed bump, not a replacement for Supabase Auth's signup rate limits.
+Rooms are cleaned up when a room is created. That request first deletes every room whose members have not sent a heartbeat for 30 minutes and every ended room older than two days; members, queue items, votes, events, and host secrets cascade. The app sends a slow heartbeat while a tab is hidden, so a background host tab is not treated as empty. Anonymous identities are intentionally retained: they contain no room content after the sweep, and Better Auth owns them. Room creation is capped at 10 rooms per session per hour; this is a per-session speed bump, not a replacement for sign-in rate limits.
 
 Run the app:
 
@@ -97,7 +97,7 @@ The integration suite skips itself when those variables are absent, so the defau
 - Room codes gate joining only. Do not treat a room as secret.
 - Guest request and playback permissions are independent. Skip, remove and reorder are always host-only.
 - A partial unique index prevents two active copies of the same video in one room. Played songs may return.
-- There is no join throttle and no member cap. A song cap of five per minute per member is enforced, room creation is capped at 10 rooms per session per hour, and a room is swept after 30 minutes without a heartbeat, but a busy room can still grow. Supabase Anonymous Auth is the real per-IP limit, and it is 30 sign-ins per hour per IP address on a hosted project, so every guest on one venue network counts against the same budget. Raise that limit before the first public party.
+- There is no join throttle and no member cap. A song cap of five per minute per member is enforced, room creation is capped at 10 rooms per session per hour, and a room whose members have not sent a heartbeat for 30 minutes is deleted the next time somebody creates a room, but a busy room can still grow.
 
 ## Layout
 

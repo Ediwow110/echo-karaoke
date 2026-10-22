@@ -1,5 +1,6 @@
 import { operationCall, serviceDatabase } from '../db/client';
 import { HttpError, jsonResponse, mapDatabaseError } from './errors';
+import { sweepAbandonedRooms, sweepEndedRooms } from './sweep';
 import {
   generateRoomCode,
   generateToken,
@@ -17,6 +18,7 @@ export async function createRoom(request: Request, caller: Caller): Promise<Resp
   const roomName = normalizeRoomName(body.roomName);
   const guestsCanAdd = readOptionalBoolean(body.guestsCanAdd, true);
   const guestsCanControlPlayback = readOptionalBoolean(body.guestsCanControlPlayback, false);
+  await Promise.allSettled([sweepAbandonedRooms(), sweepEndedRooms()]);
   const database = serviceDatabase();
 
   for (let attempt = 0; attempt < 4; attempt += 1) {

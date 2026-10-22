@@ -226,4 +226,33 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
     });
     expect(suggest.status).toBe(400);
   });
+
+  it('sweeps an abandoned room when the next room is created', async () => {
+    const { serviceDatabase } = await import('../../server/db/client');
+    const sql = serviceDatabase();
+    const hostAuth = await signIn();
+
+    const first = await call('create-room', hostAuth, { displayName: 'Abandoned Host' });
+    expect(first.status).toBe(201);
+    const firstRoom = (await first.json()) as { roomId: string; hostToken: string };
+    await sql`update public.rooms set created_at = now() - interval '40 minutes' where id = ${firstRoom.roomId}::uuid`;
+    await sql`update public.members set last_seen_at = now() - interval '40 minutes' where room_id = ${firstRoom.roomId}::uuid`;
+
+    const second = await call('create-room', hostAuth, { displayName: 'Fresh Host' });
+    expect(second.status).toBe(201);
+    const secondRoom = (await second.json()) as { roomId: string; hostToken: string };
+
+    const remaining = await sql`select count(*)::int as count from public.rooms where id = ${firstRoom.roomId}::uuid`;
+    expect(remaining[0]?.count).toBe(0);
+
+    const stale = await call('host-room-read', hostAuth, { roomId: firstRoom.roomId }, {
+      'x-room-host-token': firstRoom.hostToken,
+    });
+    expect(stale.status).toBe(401);
+
+    const fresh = await call('host-room-read', hostAuth, { roomId: secondRoom.roomId }, {
+      'x-room-host-token': secondRoom.hostToken,
+    });
+    expect(fresh.status).toBe(200);
+  });
 });
