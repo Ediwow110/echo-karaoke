@@ -575,3 +575,30 @@ the reviewer re-checked the evidence independently of the auditor.
 - The report is written outside the tracked tree first, because the repository is
   public and a report that names a live weakness is a disclosure. Committing the
   report is a separate decision for the owner.
+
+## Neon boundary audit (2026-10-23)
+
+The ledger above describes the Supabase boundary. It is kept for history. The Neon
+migration replaced the Edge Functions with one same-origin Vercel Function, replaced
+Supabase Auth with Better Auth, and split the database credentials into `service_role`
+and `echo_auth`. The current report is
+`docs/audit/2026-10-22-neon-boundary-audit.md`.
+
+| ID | Severity | Finding | Status |
+|---|---|---|---|
+| N-1 | High | JWKS was fetched from the request origin, so a spoofed Host could supply the keys | Fixed |
+| N-2 | Medium | A JWT without `exp` was accepted | Fixed |
+| N-3 | High | The default function export was treated as a Node `(req, res)` handler and never answered | Fixed |
+| N-4 | High | The catch-all function matched only one path segment, so `/api/auth/token` would 404 | Fixed |
+| N-5 | Medium | `config.runtime = 'nodejs24'` is not a valid Vercel value | Fixed |
+| N-6 | Medium | TypeScript 7 could not be emitted by the Vercel function builder | Fixed |
+| N-7 | Medium | service_role had no explicit revoke on the auth tables | Fixed |
+| N-8 | Low | The client token and sign-in requests had no deadline | Fixed |
+| N-9 | Low | An unknown key id waited out the ten-minute JWKS cache | Fixed |
+| N-10 | Info | `clearAnonymousSession` was dead API | Removed |
+
+Gates on 2026-10-23: 226 unit tests, 225 database assertions on Neon, 3 operation
+integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
+(sign-in 200, token 200, create-room 201). No production deployment and no push were
+performed. The remaining work is the approval-gated Vercel environment, the CI
+secrets, and the four open items in the report.

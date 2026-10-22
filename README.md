@@ -72,9 +72,9 @@ Rooms are cleaned up when a room is created. That request first deletes every ro
 
 ## Tests
 
-    npm test                 # 216 unit and component tests (jsdom)
+    npm test                 # 226 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 221 pgTAP assertions
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 225 pgTAP assertions
     npm run test:integration # the function's auth and operation path against Neon
     npm run test:e2e         # Playwright against vercel dev on port 3000
 
@@ -97,7 +97,7 @@ The E2E suite creates rooms against the running app; start `vercel dev` first or
 
 ## Layout
 
-    api/[...path].ts        the only Vercel Function: auth routes and operations
+    api/router.ts           the only Vercel Function: auth routes and operations
     server/auth             Better Auth configuration, token verification, JWKS
     server/operations       the thirteen operations, the sweep, error mapping
     server/db               Neon serverless client and operation calls

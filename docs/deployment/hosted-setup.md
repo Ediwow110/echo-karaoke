@@ -5,7 +5,7 @@ Status: Procedure only. Nothing has been pushed or deployed from this document. 
 hosted value below is named, never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The local
-gates are already green: 216 unit tests, 221 database assertions against Neon, 2
+gates are already green: 226 unit tests, 225 database assertions against Neon, 3
 operation integration tests, and a production build. This document covers only what a
 hosted account makes possible.
 
@@ -90,8 +90,28 @@ Run the database suite against the same URL:
 npx supabase test db --db-url "$NEON_DATABASE_URL"
 ```
 
-Expected: `Result: PASS`, 8 files and 221 assertions. Docker must be running because
+Expected: `Result: PASS`, 8 files and 225 assertions. Docker must be running because
 the Supabase CLI runs `pg_prove` in a container.
+
+### Role logins
+
+The migrations create `service_role` and `echo_auth` as `NOLOGIN`, because a password
+must not live in a migration. On a fresh project, enable both logins once with the
+owner connection:
+
+```sql
+alter role service_role login password '<service-role-password>';
+alter role echo_auth login password '<auth-role-password>';
+```
+
+Then build the connection strings:
+
+- `DATABASE_URL` uses the `service_role` login through the pooled host.
+- `AUTH_DATABASE_URL` uses the `echo_auth` login through the direct host.
+- `NEON_DATABASE_URL` keeps the owner login for migrations and CI only.
+
+Passwords must be percent-encoded inside a URL. The owner login also remains the only
+role that can run the migrations.
 
 ### Rotating `BETTER_AUTH_SECRET`
 
@@ -239,7 +259,7 @@ The jobs:
 
 1. `verify` runs typecheck, the unit suite, the build, and `npm audit`.
 2. `database` creates a Neon branch through the API, applies the migration chain,
-   runs the 221 pgTAP assertions, and deletes the branch even on failure.
+   runs the 225 pgTAP assertions, and deletes the branch even on failure.
 3. `integration` creates a second branch, applies the chain, deletes the inherited
    `public.jwks` rows so Better Auth generates keys for this run's secret, runs the
    operation suite, and deletes the branch.
@@ -265,7 +285,7 @@ five-minute guarantee; the interval is opportunistic.
 
 ## Verification checklist
 
-- [ ] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 221/221.
+- [ ] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 225/225.
 - [ ] `npm run test:integration` reports 2/2 against Neon.
 - [ ] `npm test` reports the unit suite green.
 - [ ] `npm run build` passes.
