@@ -92,6 +92,19 @@ export async function touchRoomMember(
   roomId: string,
   role: 'guest' | 'host',
 ): Promise<void> {
+  if (role === 'host') {
+    const hostToken = loadHostToken(roomId);
+    if (hostToken === null) {
+      return;
+    }
+    try {
+      await api.invoke('touch-member', { roomId }, { hostToken });
+    } catch {
+      // A heartbeat is best effort; the read that follows reports real failures.
+    }
+    return;
+  }
+
   const guestToken = loadGuestToken(roomId);
   if (guestToken === null) {
     return;
@@ -101,7 +114,6 @@ export async function touchRoomMember(
   } catch {
     // A heartbeat is best effort; the read that follows reports real failures.
   }
-  void role;
 }
 
 export type HostAction =

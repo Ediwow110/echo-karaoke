@@ -256,6 +256,24 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
     expect(missing.headers.get('content-type')).toContain('application/json');
   });
 
+  it('keeps a host heartbeat after the auth session is replaced', async () => {
+    const original = await signIn();
+    const created = await call('create-room', original, { displayName: 'Session Host' });
+    expect(created.status).toBe(201);
+    const room = (await created.json()) as { roomId: string; hostToken: string };
+
+    const replacement = await signIn();
+    const touched = await call('touch-member', replacement, { roomId: room.roomId }, {
+      'x-room-host-token': room.hostToken,
+    });
+    expect(touched.status).toBe(200);
+
+    const read = await call('host-room-read', replacement, { roomId: room.roomId }, {
+      'x-room-host-token': room.hostToken,
+    });
+    expect(read.status).toBe(200);
+  });
+
   it('sweeps an abandoned room when the next room is created', async () => {
     const { serviceDatabase } = await import('../../server/db/client');
     const sql = serviceDatabase();

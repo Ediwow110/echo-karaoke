@@ -99,14 +99,22 @@ export async function readRoomHost(request: Request, caller: Caller): Promise<Re
 }
 
 export async function touchMember(request: Request, caller: Caller): Promise<Response> {
-  const guestToken = requireTokenHeader(request, 'x-room-guest-token');
+  const hostToken = optionalTokenHeader(request, 'x-room-host-token');
+  const guestToken = optionalTokenHeader(request, 'x-room-guest-token');
   const body = await readJsonObject(request);
-  const result = await callOperation('touch_member', [
-    requireRoomId(body.roomId),
+  const roomId = requireRoomId(body.roomId);
+
+  if (hostToken !== null) {
+    return jsonResponse(await callOperation('touch_host', [roomId, hostToken]));
+  }
+  if (guestToken === null) {
+    throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+  }
+  return jsonResponse(await callOperation('touch_member', [
+    roomId,
     caller.userId,
     guestToken,
-  ]);
-  return jsonResponse(result);
+  ]));
 }
 
 export async function voteCommand(request: Request, caller: Caller): Promise<Response> {
