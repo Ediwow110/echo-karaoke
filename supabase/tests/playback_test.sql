@@ -5,7 +5,9 @@ select no_plan();
 
 select function_privs_are('public', 'playback_command', array['uuid','uuid','text','text','text'], 'anon', array[]::text[], 'anon cannot drive playback');
 select function_privs_are('public', 'playback_command', array['uuid','uuid','text','text','text'], 'authenticated', array[]::text[], 'authenticated cannot drive playback');
-select function_privs_are('public', 'playback_report', array['uuid','uuid','text','integer'], 'authenticated', array[]::text[], 'authenticated cannot report playback position');
+select function_privs_are('public', 'playback_report', array['uuid','uuid','text','integer','integer','uuid'], 'authenticated', array[]::text[], 'authenticated cannot report playback position');
+select function_privs_are('public', 'host_access_check', array['uuid','uuid','text'], 'anon', array[]::text[], 'anon cannot preflight a host');
+select function_privs_are('public', 'host_access_check', array['uuid','uuid','text'], 'authenticated', array[]::text[], 'authenticated cannot preflight a host');
 
 create temp table pctx on commit drop as
 select
@@ -35,6 +37,15 @@ select lives_ok(
   format('select public.queue_add(%L::uuid, %L::uuid, null, %L, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'abc123XYZ_-', 'Second'),
   'host adds the second song');
 
+select throws_ok(
+  format('select public.playback_command(%L::uuid, %L::uuid, %L, null, %L)', (select room_id from pctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), 'play'),
+  '22023', 'GUEST_CONTROLS_LOCKED',
+  'guest playback starts host-only');
+
+select lives_ok(
+  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'unlock_playback'),
+  'the host allows guest playback');
+
 select is(
   public.playback_command(
     (select room_id from pctx),
@@ -44,7 +55,7 @@ select is(
     'play'
   ) -> 'playback' ->> 'isPlaying',
   'true',
-  'a guest can start playback');
+  'a guest can start playback when allowed');
 
 select is(
   public.playback_command(
@@ -57,6 +68,11 @@ select is(
   'dQw4w9WgXcQ',
   'the first queued song becomes current');
 
+-- Request locking does not take guest playback away.
+select lives_ok(
+  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'lock'),
+  'host locks guest requests');
+
 select is(
   public.playback_command(
     (select room_id from pctx),
@@ -66,18 +82,27 @@ select is(
     'pause'
   ) -> 'playback' ->> 'isPlaying',
   'false',
-  'a guest can pause playback');
+  'guest playback remains independent of request locking');
+
+select lives_ok(
+  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'unlock'),
+  'host unlocks guest requests');
+
+select throws_ok(
+  format('select public.playback_command(%L::uuid, %L::uuid, %L, null, %L)', (select room_id from pctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), 'next'),
+  '42501', 'FORBIDDEN',
+  'skipping stays host-only even when guest playback is allowed');
 
 select is(
   public.playback_command(
     (select room_id from pctx),
-    '22222222-2222-2222-2222-222222222222'::uuid,
-    repeat('m', 40),
+    '11111111-1111-1111-1111-111111111111'::uuid,
     null::text,
+    (select host_token from pctx),
     'next'
   ) -> 'playback' ->> 'currentVideoId',
   'abc123XYZ_-',
-  'skipping advances to the next song');
+  'the host skip advances to the next song');
 
 select is(
   (select status from public.queue_songs where room_id = (select room_id from pctx) and video_id = 'dQw4w9WgXcQ'),
@@ -94,10 +119,10 @@ select throws_ok(
   '22023', 'VALIDATION_ERROR',
   'an unknown playback action is rejected');
 
--- Guest lock blocks guest playback but not the host.
+-- Playback lock blocks guest playback but not the host.
 select lives_ok(
-  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'lock'),
-  'host locks guest controls');
+  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'lock_playback'),
+  'host returns playback to host-only');
 
 select throws_ok(
   format('select public.playback_command(%L::uuid, %L::uuid, %L, null, %L)', (select room_id from pctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), 'pause'),
@@ -114,15 +139,96 @@ select is(
     (select room_id from pctx),
     '11111111-1111-1111-1111-111111111111'::uuid,
     (select host_token from pctx),
-    42
+    42,
+    210,
+    (select id from public.queue_songs where room_id = (select room_id from pctx) and status = 'playing' limit 1)
   ) ->> 'positionSeconds',
   '42',
   'the host reports the playback position');
+
+select is(
+  public.playback_report(
+    (select room_id from pctx),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    (select host_token from pctx),
+    999,
+    210,
+    '00000000-0000-0000-0000-000000000000'::uuid
+  ) ->> 'positionSeconds',
+  '42',
+  'a late report from another song is ignored');
+
+select is(
+  public.playback_report(
+    (select room_id from pctx),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    (select host_token from pctx),
+    43,
+    210,
+    (select id from public.queue_songs where room_id = (select room_id from pctx) and status = 'playing' limit 1)
+  ) ->> 'durationSeconds',
+  '210',
+  'the host reports the real video duration');
+
+select is(
+  public.read_room_host(
+    (select room_id from pctx),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    (select host_token from pctx)
+  ) -> 'playback' ->> 'durationSeconds',
+  '210',
+  'the host read includes the reported duration');
 
 select throws_ok(
   format('select public.playback_report(%L::uuid, %L::uuid, %L, 10)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
   '28000', 'UNAUTHORIZED',
   'a wrong host pass cannot report a position');
+
+-- The current song must be skipped rather than removed under playback.
+select throws_ok(
+  format('select public.queue_remove(%L::uuid, %L::uuid, null, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), (select id from public.queue_songs where room_id = (select room_id from pctx) and status = 'playing' limit 1)),
+  '22023', 'SONG_PLAYING',
+  'the current song cannot be removed from the queue');
+
+-- An up-next song can still be removed.
+select lives_ok(
+  format('select public.queue_add(%L::uuid, %L::uuid, null, %L, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'newVideoID0', 'Third'),
+  'host adds an up-next song');
+select is(
+  public.queue_remove(
+    (select room_id from pctx),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    null::text,
+    (select host_token from pctx),
+    (select id from public.queue_songs where room_id = (select room_id from pctx) and status = 'queued' limit 1)
+  ) ->> 'removed',
+  'true',
+  'an up-next song can still be removed');
+
+-- Clearing the queue also stops playback and removes the current pointer.
+select lives_ok(
+  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from pctx), '11111111-1111-1111-1111-111111111111', (select host_token from pctx), 'clear_queue'),
+  'host clears the queue');
+select is(
+  (select count(*)::int from public.queue_songs where room_id = (select room_id from pctx)),
+  0,
+  'clearing the queue removes every song');
+select is(
+  public.read_room_host(
+    (select room_id from pctx),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    (select host_token from pctx)
+  ) -> 'playback' ->> 'currentSongId',
+  null::text,
+  'clearing the queue clears the current song');
+select is(
+  public.read_room_host(
+    (select room_id from pctx),
+    '11111111-1111-1111-1111-111111111111'::uuid,
+    (select host_token from pctx)
+  ) -> 'playback' ->> 'isPlaying',
+  'false',
+  'clearing the queue stops playback');
 
 -- Ending the room stops playback commands.
 select lives_ok(

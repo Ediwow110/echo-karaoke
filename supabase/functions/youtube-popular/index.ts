@@ -1,4 +1,6 @@
 import {
+  consumeDailyRateLimit,
+  consumeRateLimit,
   handleThrown,
   HttpError,
   jsonResponse,
@@ -16,6 +18,12 @@ const CACHE_TTL_MS = 5 * 60_000;
 const MUSIC_CATEGORY_ID = '10';
 const REGION_CODE = 'US';
 const MAX_RESULTS = 12;
+const DEFAULT_DAILY_POPULAR_BUDGET = 200;
+
+function dailyPopularBudget(): number {
+  const raw = Number(Deno.env.get('YOUTUBE_DAILY_POPULAR_BUDGET') ?? String(DEFAULT_DAILY_POPULAR_BUDGET));
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_DAILY_POPULAR_BUDGET;
+}
 
 let cached: { at: number; results: SearchResult[] } | null = null;
 
@@ -26,6 +34,11 @@ let cached: { at: number; results: SearchResult[] } | null = null;
 async function fetchPopular(apiKey: string): Promise<SearchResult[]> {
   if (cached !== null && Date.now() - cached.at < CACHE_TTL_MS) {
     return cached.results;
+  }
+
+  const budget = await consumeDailyRateLimit('global', 'youtube-popular-day', dailyPopularBudget());
+  if (!budget.allowed) {
+    throw new HttpError('SEARCH_UNAVAILABLE', 503, 'The music chart is unavailable right now');
   }
 
   const target = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&videoCategoryId=' +
@@ -93,6 +106,11 @@ Deno.serve(async (req) => {
         200,
         origin,
       );
+    }
+
+    const memberLimit = await consumeRateLimit(caller.userId, 'youtube-popular-member', 30, 60);
+    if (!memberLimit.allowed) {
+      throw new HttpError('RATE_LIMITED', 429, 'Suggestions are busy. Try again shortly.');
     }
 
     const results = await fetchPopular(apiKey);

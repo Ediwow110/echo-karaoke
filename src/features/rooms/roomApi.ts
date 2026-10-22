@@ -6,6 +6,7 @@ import { loadGuestToken, loadHostToken, saveGuestToken, saveHostToken } from './
 export type CreatedRoom = {
   roomId: string;
   roomCode: string;
+  roomName: string;
   memberId: string;
   displayName: string;
   role: string;
@@ -15,6 +16,8 @@ export type CreatedRoom = {
 
 export type JoinedRoom = {
   roomId: string;
+  roomCode: string;
+  roomName: string;
   memberId: string;
   displayName: string;
   role: string;
@@ -26,12 +29,24 @@ export type RoomDeps = {
   randomGuestNumber?: () => number;
 };
 
+export type CreateRoomOptions = {
+  roomName?: string;
+  guestsCanAdd?: boolean;
+  guestsCanControlPlayback?: boolean;
+};
+
 export async function createRoom(
   deps: RoomDeps,
   displayName: string,
+  options: CreateRoomOptions = {},
 ): Promise<CreatedRoom> {
   const normalized = normalizeDisplayName(displayName, deps.randomGuestNumber?.());
-  const created = await deps.api.invoke<CreatedRoom>('create-room', { displayName: normalized });
+  const created = await deps.api.invoke<CreatedRoom>('create-room', {
+    displayName: normalized,
+    roomName: options.roomName ?? '',
+    guestsCanAdd: options.guestsCanAdd ?? true,
+    guestsCanControlPlayback: options.guestsCanControlPlayback ?? false,
+  });
 
   saveGuestToken(created.roomId, created.guestToken);
   saveHostToken(created.roomId, created.hostToken);
@@ -89,10 +104,18 @@ export async function touchRoomMember(
   void role;
 }
 
+export type HostAction =
+  | 'end'
+  | 'lock'
+  | 'unlock'
+  | 'lock_playback'
+  | 'unlock_playback'
+  | 'clear_queue';
+
 export async function sendHostCommand<T>(
   api: EdgeApi,
   roomId: string,
-  action: 'end' | 'lock' | 'unlock' | 'clear_queue',
+  action: HostAction,
 ): Promise<T> {
   const hostToken = loadHostToken(roomId);
   if (hostToken === null) {

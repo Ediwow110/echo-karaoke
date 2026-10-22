@@ -59,4 +59,13 @@ describe('console design system', () => {
   it('keeps a visible focus ring on every control', () => {
     expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-signal\)/);
   });
+
+  it('reveals route content, list rows and still stage imagery', () => {
+    expect(css).toContain('@keyframes page-in');
+    expect(css).toContain('@keyframes list-in');
+    expect(css).toContain('@keyframes stage-drift');
+    expect(css).toContain('.page-enter');
+    expect(css).toContain('.stagger-in');
+    expect(css).toContain('.stage-drift');
+  });
 });

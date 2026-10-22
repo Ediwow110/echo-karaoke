@@ -36,6 +36,11 @@ select is(
   '1',
   'the first added song takes position one');
 
+select throws_ok(
+  format('select public.queue_add(%L::uuid, %L::uuid, %L, null, %L, %L)', (select room_id from qctx), '11111111-1111-1111-1111-111111111111', (select guest_token from qctx), 'dQw4w9WgXcQ', 'Duplicate'),
+  '22023', 'DUPLICATE_SONG',
+  'an active song cannot be queued twice');
+
 select is(
   public.queue_add(
     (select room_id from qctx),
@@ -86,11 +91,21 @@ select lives_ok(
   format('select public.queue_add(%L::uuid, %L::uuid, %L, null, %L, %L)', (select room_id from qctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), 'otherSong99', 'Other song'),
   'the second guest adds their own song');
 
--- Ownership: a guest cannot remove another member's song.
+-- Ownership: removal is host-only, even for the guest's own song.
 select throws_ok(
   format('select public.queue_remove(%L::uuid, %L::uuid, %L, null, (select id from public.queue_songs where room_id = %L::uuid and video_id = %L))', (select room_id from qctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), (select room_id from qctx), 'dQw4w9WgXcQ'),
   '42501', 'FORBIDDEN',
   'a guest cannot remove another member song');
+
+select throws_ok(
+  format('select public.queue_remove(%L::uuid, %L::uuid, %L, null, (select id from public.queue_songs where room_id = %L::uuid and video_id = %L))', (select room_id from qctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), (select room_id from qctx), 'otherSong99'),
+  '42501', 'FORBIDDEN',
+  'a guest cannot remove their own song either');
+
+select throws_ok(
+  format('select public.queue_reorder(%L::uuid, %L::uuid, %L, null, (select id from public.queue_songs where room_id = %L::uuid and video_id = %L), %L)', (select room_id from qctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), (select room_id from qctx), 'otherSong99', 'down'),
+  '42501', 'FORBIDDEN',
+  'a guest cannot reorder the queue');
 
 -- The host can moderate any song.
 select lives_ok(

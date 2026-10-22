@@ -2,23 +2,34 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { youtubePlayerFactory } from '../../src/features/playback/youtubeIframe';
 
 type FakeOptions = {
-  events: { onReady: () => void; onStateChange: (event: { data: number }) => void };
+  events: {
+    onReady: () => void;
+    onStateChange: (event: { data: number }) => void;
+    onError: (event: { data: number }) => void;
+  };
 };
 
-const loaded: string[] = [];
+const loaded: Array<{ videoId: string; startSeconds?: number }> = [];
 const calls: string[] = [];
 let options: FakeOptions | null = null;
 let currentState = -1;
+let volume = 100;
+let reportedCurrentTime = 42;
+let reportedDuration = 210;
 
 class FakePlayer {
   constructor(_element: HTMLElement, given: Record<string, unknown>) {
     options = given as unknown as FakeOptions;
   }
-  loadVideoById(videoId: string) { loaded.push(videoId); }
+  loadVideoById(input: { videoId: string; startSeconds?: number }) { loaded.push(input); }
   playVideo() { calls.push('play'); }
   pauseVideo() { calls.push('pause'); }
-  getCurrentTime() { return 42; }
+  seekTo(seconds: number) { calls.push('seek:' + seconds); }
+  getCurrentTime() { return reportedCurrentTime; }
+  getDuration() { return reportedDuration; }
   getPlayerState() { return currentState; }
+  setVolume(next: number) { volume = next; calls.push('volume:' + next); }
+  getVolume() { return volume; }
   destroy() { calls.push('destroy'); }
 }
 
@@ -34,6 +45,9 @@ beforeEach(() => {
   calls.length = 0;
   options = null;
   currentState = -1;
+  volume = 100;
+  reportedCurrentTime = 42;
+  reportedDuration = 210;
 });
 
 function ready(): void {
@@ -47,9 +61,9 @@ function state(data: number): void {
 
 describe('the YouTube player factory', () => {
   it('holds a song that arrives before the player is ready', async () => {
-    const handle = youtubePlayerFactory(document.createElement('div'), () => {});
+    const handle = youtubePlayerFactory(document.createElement('div'), { onEnded: () => undefined });
 
-    handle.load('dQw4w9WgXcQ');
+    handle.load('dQw4w9WgXcQ', 12);
     handle.play();
 
     expect(loaded).toEqual([]);
@@ -58,12 +72,28 @@ describe('the YouTube player factory', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     ready();
 
-    expect(loaded).toEqual(['dQw4w9WgXcQ']);
+    expect(loaded).toEqual([{ videoId: 'dQw4w9WgXcQ', startSeconds: 12 }]);
     expect(calls).toContain('play');
   });
 
-  it('reports the state the player hands over', async () => {
-    const handle = youtubePlayerFactory(document.createElement('div'), () => {});
+  it('sanitizes non-finite player times and seeks', async () => {
+    reportedCurrentTime = Number.NaN;
+    reportedDuration = Number.NaN;
+    const handle = youtubePlayerFactory(document.createElement('div'), { onEnded: () => undefined });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    ready();
+
+    expect(handle.getCurrentTime()).toBe(0);
+    expect(handle.getDuration()).toBe(0);
+    handle.seekTo(Number.NaN);
+    handle.seekTo(-5);
+    expect(calls).not.toContain('seek:NaN');
+    expect(calls).toContain('seek:0');
+  });
+
+  it('reports the state and duration the player hands over', async () => {
+    const handle = youtubePlayerFactory(document.createElement('div'), { onEnded: () => undefined });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     ready();
@@ -71,11 +101,12 @@ describe('the YouTube player factory', () => {
 
     expect(handle.getState()).toBe(3);
     expect(handle.getCurrentTime()).toBe(42);
+    expect(handle.getDuration()).toBe(210);
   });
 
   it('calls back when a song ends', async () => {
     let ended = 0;
-    const handle = youtubePlayerFactory(document.createElement('div'), () => { ended += 1; });
+    const handle = youtubePlayerFactory(document.createElement('div'), { onEnded: () => { ended += 1; } });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     ready();
@@ -85,8 +116,34 @@ describe('the YouTube player factory', () => {
     expect(handle.getState()).toBe(0);
   });
 
+  it('seeks and controls volume through the handle', async () => {
+    const handle = youtubePlayerFactory(document.createElement('div'), { onEnded: () => undefined });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    ready();
+    handle.seekTo(30);
+    handle.setVolume(55);
+
+    expect(calls).toContain('seek:30');
+    expect(calls).toContain('volume:55');
+    expect(handle.getVolume()).toBe(55);
+  });
+
+  it('reports playback errors', async () => {
+    let code = 0;
+    youtubePlayerFactory(document.createElement('div'), {
+      onEnded: () => undefined,
+      onError: (next) => { code = next; },
+    });
+
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    options?.events.onError({ data: 150 });
+
+    expect(code).toBe(150);
+  });
+
   it('stops the player when it is destroyed', async () => {
-    const handle = youtubePlayerFactory(document.createElement('div'), () => {});
+    const handle = youtubePlayerFactory(document.createElement('div'), { onEnded: () => undefined });
 
     await new Promise((resolve) => setTimeout(resolve, 0));
     ready();

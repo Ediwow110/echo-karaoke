@@ -11,7 +11,14 @@ import {
   serviceClient,
 } from '../_shared/room.ts';
 
-const ALLOWED_ACTIONS = new Set(['end', 'lock', 'unlock', 'clear_queue']);
+const ALLOWED_ACTIONS = new Set([
+  'end',
+  'lock',
+  'unlock',
+  'lock_playback',
+  'unlock_playback',
+  'clear_queue',
+]);
 
 Deno.serve(async (req) => {
   const origin = req.headers.get('Origin');

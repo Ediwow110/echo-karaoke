@@ -31,6 +31,7 @@ describe('room api', () => {
     const { api, calls } = fakeApi({
       roomId: 'room-1',
       roomCode: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
       memberId: 'member-1',
       displayName: 'Ana',
       role: 'host',
@@ -38,10 +39,19 @@ describe('room api', () => {
       hostToken: 'host-token-value',
     });
 
-    const created = await createRoom({ api, randomGuestNumber: () => 3 }, '  Ana  ');
+    const created = await createRoom({ api, randomGuestNumber: () => 3 }, '  Ana  ', {
+      roomName: 'After Hours',
+      guestsCanAdd: false,
+      guestsCanControlPlayback: true,
+    });
 
     expect(calls[0].name).toBe('create-room');
-    expect(calls[0].body).toEqual({ displayName: 'Ana' });
+    expect(calls[0].body).toEqual({
+      displayName: 'Ana',
+      roomName: 'After Hours',
+      guestsCanAdd: false,
+      guestsCanControlPlayback: true,
+    });
     expect(created.roomId).toBe('room-1');
     expect(loadGuestToken('room-1')).toBe('guest-token-value');
     expect(loadHostToken('room-1')).toBe('host-token-value');

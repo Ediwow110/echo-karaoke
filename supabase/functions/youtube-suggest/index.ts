@@ -1,4 +1,6 @@
 import {
+  consumeDailyRateLimit,
+  consumeRateLimit,
   handleThrown,
   HttpError,
   jsonResponse,
@@ -87,6 +89,16 @@ Deno.serve(async (req) => {
     }
     if ((access.data as { status?: string }).status === 'ended') {
       throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
+    }
+
+    const memberLimit = await consumeRateLimit(caller.userId, 'youtube-suggest-member', 60, 60);
+    if (!memberLimit.allowed) {
+      throw new HttpError('RATE_LIMITED', 429, 'Suggestions are busy. Keep typing or paste a link.');
+    }
+
+    const daily = await consumeDailyRateLimit('global', 'youtube-suggest-day', 3000);
+    if (!daily.allowed) {
+      return jsonResponse({ suggestions: [] }, 200, origin);
     }
 
     const suggestions = await fetchSuggestions(query);

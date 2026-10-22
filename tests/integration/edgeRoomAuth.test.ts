@@ -10,6 +10,7 @@ const runsLocally = BASE_URL.length > 0 && ANON_KEY.length > 0;
 type FnResult = {
   status: number;
   body: Record<string, unknown>;
+  headers: Headers;
 };
 
 async function anonymousSession(): Promise<string> {
@@ -53,10 +54,59 @@ async function callFunction(
   } catch {
     body = { raw: text };
   }
-  return { status: response.status, body };
+  return { status: response.status, body, headers: response.headers };
 }
 
 describe.skipIf(!runsLocally)('Edge Function room authorization', () => {
+  it('marks token-bearing responses as non-cacheable', async () => {
+    const session = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session,
+      body: { displayName: 'Header Host' },
+    });
+
+    expect(created.status).toBe(201);
+    expect(created.headers.get('cache-control')).toBe('no-store');
+    expect(created.headers.get('x-content-type-options')).toBe('nosniff');
+    expect(created.headers.get('referrer-policy')).toBe('no-referrer');
+
+    const unauthorized = await callFunction('create-room', { body: { displayName: 'Nobody' } });
+    expect(unauthorized.status).toBe(401);
+    expect(unauthorized.headers.get('cache-control')).toBe('no-store');
+  });
+
+  it('rejects malformed JSON and malformed room identifiers', async () => {
+    const session = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session,
+      body: { displayName: 'Validation Host' },
+    });
+    const guestToken = created.body.guestToken as string;
+
+    const malformed = await fetch(BASE_URL + '/functions/v1/guest-room-read', {
+      method: 'POST',
+      headers: {
+        apikey: ANON_KEY,
+        Authorization: 'Bearer ' + session,
+        'Content-Type': 'application/json',
+        'x-room-guest-token': guestToken,
+      },
+      body: '{"roomId":',
+    });
+    expect(malformed.status).toBe(400);
+    const malformedBody = (await malformed.json()) as { error?: { code?: string } };
+    expect(malformedBody.error?.code).toBe('VALIDATION_ERROR');
+
+    const invalidRoom = await callFunction('guest-room-read', {
+      session,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId: 'not-a-uuid' },
+    });
+    expect(invalidRoom.status).toBe(400);
+    expect((invalidRoom.body.error as { code: string }).code).toBe('VALIDATION_ERROR');
+  });
+
   it('rejects requests without a session and without a room token', async () => {
     const noSession = await callFunction('create-room', { body: { displayName: 'Nobody' } });
     expect(noSession.status).toBe(401);
@@ -354,7 +404,7 @@ describe.skipIf(!runsLocally)('queue command authorization', () => {
       session: hostSession,
       roomHeader: 'x-room-host-token',
       roomToken: hostToken,
-      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+      body: { roomId, action: 'add', videoId: 'M7lc1UVf-VE' },
     });
     expect(hostAdd.status).toBe(201);
 
@@ -426,6 +476,42 @@ describe.skipIf(!runsLocally)('youtube search authorization', () => {
   });
 });
 describe.skipIf(!runsLocally)('playback authorization', () => {
+  it('rejects removing the song that is currently on stage', async () => {
+    const hostSession = await anonymousSession();
+    const created = await callFunction('create-room', {
+      session: hostSession,
+      body: { displayName: 'Stage Host' },
+    });
+    const roomId = created.body.roomId as string;
+    const hostToken = created.body.hostToken as string;
+
+    const added = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: created.body.guestToken as string,
+      body: { roomId, action: 'add', videoId: 'dQw4w9WgXcQ' },
+    });
+    expect(added.status).toBe(201);
+    const songId = added.body.songId as string;
+
+    const played = await callFunction('playback-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'play' },
+    });
+    expect(played.status).toBe(200);
+
+    const removed = await callFunction('queue-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'remove', songId },
+    });
+    expect(removed.status).toBe(409);
+    expect((removed.body.error as { code: string }).code).toBe('SONG_PLAYING');
+  });
+
   it('plays, pauses and skips through the room pass and blocks locked guests', async () => {
     const hostSession = await anonymousSession();
     const guestSession = await anonymousSession();
@@ -457,6 +543,22 @@ describe.skipIf(!runsLocally)('playback authorization', () => {
     });
     expect(noToken.status).toBe(401);
 
+    const lockedByDefault = await callFunction('playback-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, action: 'play' },
+    });
+    expect(lockedByDefault.status).toBe(403);
+    expect((lockedByDefault.body.error as { code: string }).code).toBe('GUEST_CONTROLS_LOCKED');
+
+    await callFunction('host-command', {
+      session: hostSession,
+      roomHeader: 'x-room-host-token',
+      roomToken: hostToken,
+      body: { roomId, action: 'unlock_playback' },
+    });
+
     const played = await callFunction('playback-command', {
       session: guestSession,
       roomHeader: 'x-room-guest-token',
@@ -468,11 +570,20 @@ describe.skipIf(!runsLocally)('playback authorization', () => {
     expect(playback.isPlaying).toBe(true);
     expect(playback.currentVideoId).toBe('dQw4w9WgXcQ');
 
+    const guestPause = await callFunction('playback-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, action: 'pause' },
+    });
+    expect(guestPause.status).toBe(200);
+    expect((guestPause.body.playback as { isPlaying: boolean }).isPlaying).toBe(false);
+
     await callFunction('host-command', {
       session: hostSession,
       roomHeader: 'x-room-host-token',
       roomToken: hostToken,
-      body: { roomId, action: 'lock' },
+      body: { roomId, action: 'lock_playback' },
     });
 
     const locked = await callFunction('playback-command', {
@@ -483,6 +594,15 @@ describe.skipIf(!runsLocally)('playback authorization', () => {
     });
     expect(locked.status).toBe(403);
     expect((locked.body.error as { code: string }).code).toBe('GUEST_CONTROLS_LOCKED');
+
+    const guestSkip = await callFunction('playback-command', {
+      session: guestSession,
+      roomHeader: 'x-room-guest-token',
+      roomToken: guestToken,
+      body: { roomId, action: 'next' },
+    });
+    expect(guestSkip.status).toBe(403);
+    expect((guestSkip.body.error as { code: string }).code).toBe('FORBIDDEN');
 
     const hostPause = await callFunction('playback-command', {
       session: hostSession,
@@ -497,10 +617,11 @@ describe.skipIf(!runsLocally)('playback authorization', () => {
       session: hostSession,
       roomHeader: 'x-room-host-token',
       roomToken: hostToken,
-      body: { roomId, positionSeconds: 33 },
+      body: { roomId, positionSeconds: 33, durationSeconds: 213 },
     });
     expect(reported.status).toBe(200);
     expect(reported.body.positionSeconds).toBe(33);
+    expect(reported.body.durationSeconds).toBe(213);
 
     const guestReport = await callFunction('playback-report', {
       session: guestSession,
@@ -686,5 +807,26 @@ describe.skipIf(!runsLocally)('youtube popular songs', () => {
     expect(withoutKey.status).toBe(200);
     expect(withoutKey.body.available).toBe(false);
     expect(withoutKey.body.results).toEqual([]);
+  });
+});
+
+describe.skipIf(!runsLocally)('room creation limits', () => {
+  it('rejects the eleventh room in an hour for one session', async () => {
+    const session = await anonymousSession();
+
+    for (let index = 0; index < 10; index += 1) {
+      const created = await callFunction('create-room', {
+        session,
+        body: { displayName: 'Cap Host ' + index },
+      });
+      expect(created.status).toBe(201);
+    }
+
+    const blocked = await callFunction('create-room', {
+      session,
+      body: { displayName: 'Cap Host 11' },
+    });
+    expect(blocked.status).toBe(429);
+    expect((blocked.body.error as { code: string }).code).toBe('ROOM_CREATE_RATE_LIMITED');
   });
 });

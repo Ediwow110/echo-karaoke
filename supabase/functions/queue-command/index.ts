@@ -1,4 +1,6 @@
 import {
+  consumeDailyRateLimit,
+  consumeRateLimit,
   handleThrown,
   HttpError,
   jsonResponse,
@@ -12,6 +14,7 @@ import {
 import { fetchVideoMetadata, isValidVideoId } from '../_shared/youtube.ts';
 
 const ACTIONS = new Set(['add', 'remove', 'reorder']);
+const METADATA_DAILY_BUDGET = 1000;
 
 function requireSongId(value: unknown): string {
   if (typeof value !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(value)) {
@@ -58,6 +61,39 @@ Deno.serve(async (req) => {
       const videoId = body.videoId;
       if (!isValidVideoId(videoId)) {
         throw new HttpError('VALIDATION_ERROR', 400, 'A valid YouTube video is required');
+      }
+
+      // Authorize before calling the external metadata service. Otherwise an
+      // anonymous caller with a random header can use this endpoint as an
+      // outbound request amplifier.
+      const access = capability.hostToken !== null
+        ? await admin.rpc('host_access_check', {
+          p_room_id: roomId,
+          p_user_id: caller.userId,
+          p_host_token: capability.hostToken,
+        })
+        : await admin.rpc('room_access_check', {
+          p_room_id: roomId,
+          p_user_id: caller.userId,
+          p_guest_token: capability.guestToken,
+        });
+
+      if (access.error !== null || access.data === null) {
+        throw mapDatabaseError(access.error);
+      }
+      if ((access.data as { status?: string }).status === 'ended') {
+        throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
+      }
+
+      // Reject the member's burst before spending the shared daily budget.
+      const metadataLimit = await consumeRateLimit(caller.userId, 'queue-metadata', 10, 60);
+      if (!metadataLimit.allowed) {
+        throw new HttpError('LOOKUP_RATE_LIMITED', 429, 'Too many song lookups. Give it a moment.');
+      }
+
+      const metadataDaily = await consumeDailyRateLimit('global', 'queue-metadata-day', METADATA_DAILY_BUDGET);
+      if (!metadataDaily.allowed) {
+        throw new HttpError('LOOKUP_RATE_LIMITED', 429, 'Too many song lookups today. Try again tomorrow.');
       }
 
       const metadata = await fetchVideoMetadata(videoId);

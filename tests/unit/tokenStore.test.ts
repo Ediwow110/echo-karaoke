@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   clearGuestToken,
   clearRoomTokens,
@@ -52,5 +52,16 @@ describe('room token storage', () => {
   it('does not store empty tokens', () => {
     saveGuestToken('room-a', '');
     expect(loadGuestToken('room-a')).toBeNull();
+  });
+
+  it('keeps a pass in memory when local storage rejects the write', () => {
+    const setItem = vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('QuotaExceededError');
+    });
+
+    saveHostToken('room-a', 'host-a');
+    expect(loadHostToken('room-a')).toBe('host-a');
+
+    setItem.mockRestore();
   });
 });

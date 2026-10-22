@@ -1,151 +1,245 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Browser, type Page } from '@playwright/test';
 
 // These tests drive the real SPA against the local Supabase stack.
 // Start: npx supabase start, npx supabase functions serve, npm run dev
 
-async function createRoom(page: import('@playwright/test').Page, hostName: string) {
-  await page.goto('/');
-  await page.getByLabel(/host name/i).fill(hostName);
-  await page.getByRole('button', { name: /create room/i }).click();
-  await expect(page.getByText(/host screen/i)).toBeVisible();
+const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173';
+
+async function createRoom(page: Page, roomName = 'After Hours', hostName = 'Alex'): Promise<{ code: string; joinUrl: string }> {
+  await page.goto(BASE + '/');
+  await page.getByLabel('Room name').fill(roomName);
+  await page.getByLabel('Your name').fill(hostName);
+  await page.getByRole('button', { name: 'Create room' }).click();
+  await page.waitForURL(/\/host$/, { timeout: 20000 });
+  await expect(page.getByRole('heading', { level: 1, name: roomName })).toBeVisible();
+
+  const qr = page.locator('img[data-join-url]').first();
+  await expect(qr).toHaveAttribute('data-join-url', /\/join\/[0-9A-Z]{16}$/, { timeout: 20000 });
+  const joinUrl = await qr.getAttribute('data-join-url');
+  if (joinUrl === null) {
+    throw new Error('The room QR did not carry a join URL');
+  }
+  return { code: joinUrl.split('/').pop() ?? '', joinUrl };
 }
 
-async function readRoomCode(page: import('@playwright/test').Page): Promise<string> {
-  const code = page.locator('.join-code');
-  await expect(code).toBeVisible();
-  return (await code.textContent())?.trim() ?? '';
+async function joinRoom(browser: Browser, code: string, guestName: string, viewport = { width: 390, height: 844 }): Promise<Page> {
+  const context = await browser.newContext({ viewport, isMobile: viewport.width < 640, deviceScaleFactor: 1 });
+  const guest = await context.newPage();
+  await guest.goto(BASE + '/join/' + code);
+  await guest.getByLabel('Your name').fill(guestName);
+  await guest.getByRole('button', { name: 'Join room' }).click();
+  await guest.waitForURL(/\/room\/[0-9a-f-]{36}$/, { timeout: 20000 });
+  return guest;
 }
 
-test('host creates a room and a guest joins from another browser', async ({ browser }) => {
-  const hostContext = await browser.newContext();
-  const guestContext = await browser.newContext();
-  const host = await hostContext.newPage();
-  const guest = await guestContext.newPage();
+function roomIdFromUrl(url: string): string {
+  return url.split('/room/')[1]?.split(/[/?#]/)[0] ?? '';
+}
 
-  await createRoom(host, 'Host Ana');
-  const code = await readRoomCode(host);
-  expect(code).toMatch(/^[0-9A-HJKMNP-TV-Z]{16}$/);
+async function undersizedControls(page: Page): Promise<Array<{ label: string; width: number; height: number }>> {
+  return page.evaluate(() => {
+    const visible = (el: Element): boolean => {
+      const rect = el.getBoundingClientRect();
+      return rect.width > 0 && rect.height > 0;
+    };
+    return [...document.querySelectorAll('button, input, textarea, select, a[href], [role="button"]')]
+      .filter(visible)
+      .map((el) => {
+        const rect = el.getBoundingClientRect();
+        return {
+          label: (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 44),
+          width: Math.round(rect.width),
+          height: Math.round(rect.height),
+        };
+      })
+      .filter((entry) => entry.width < 44 || entry.height < 44);
+  });
+}
 
-  await guest.goto('/join/' + code);
-  await guest.getByLabel(/your name/i).fill('Guest Sam');
-  await guest.getByRole('button', { name: /join room/i }).click();
+async function horizontalOverflow(page: Page): Promise<number> {
+  return page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+}
 
-  await expect(guest.getByRole('heading', { name: 'Guest Sam' })).toBeVisible();
-  await expect(guest.getByText(/room code/i)).toContainText(code);
+async function clippedControls(page: Page): Promise<string[]> {
+  return page.evaluate(() => {
+    const viewport = document.documentElement.clientWidth;
+    return [...document.querySelectorAll('button, a[href], input, [role="button"]')]
+      .map((el) => {
+        const rect = el.getBoundingClientRect();
+        return { rect, label: (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 44) };
+      })
+      .filter(({ rect }) => rect.width > 0 && rect.height > 0 && (rect.right > viewport + 1 || rect.left < -1))
+      .map(({ label }) => label);
+  });
+}
 
-  // The host sees both singers in the roster.
-  await expect(host.getByText('Guest Sam')).toBeVisible();
+test('the QR encodes the real join URL and a guest can join from it', async ({ page, browser }) => {
+  const { code, joinUrl } = await createRoom(page, 'QR Night', 'Host Ana');
 
-  await hostContext.close();
-  await guestContext.close();
+  const decoded = await page.evaluate(async () => {
+    const image = document.querySelector('img[data-join-url]') as HTMLImageElement | null;
+    if (image === null) return null;
+    await image.decode();
+    const canvas = document.createElement('canvas');
+    canvas.width = image.naturalWidth;
+    canvas.height = image.naturalHeight;
+    const context = canvas.getContext('2d');
+    if (context === null) return null;
+    context.drawImage(image, 0, 0);
+    const pixels = context.getImageData(0, 0, canvas.width, canvas.height);
+    // Vite's dev resolver exposes the locally installed decoder.
+    // @ts-expect-error the dev-only module specifier is resolved by Vite at runtime
+    const module = await import('/@id/jsqr');
+    return module.default(pixels.data, pixels.width, pixels.height, { inversionAttempts: 'dontInvert' })?.data ?? null;
+  });
+
+  expect(decoded).toBe(joinUrl);
+
+  const guest = await joinRoom(browser, code, 'Guest Sam');
+  await expect(guest.getByRole('heading', { level: 1, name: 'QR Night' })).toBeVisible();
+  await expect(guest.getByText(/hosted by host ana/i)).toBeVisible();
+  await expect(guest.getByRole('link', { name: /queue ·/i })).toBeVisible();
+
+  const hostId = roomIdFromUrl(page.url());
+  await page.goto(BASE + '/room/' + hostId + '/host/settings');
+  await expect(page.getByText('Guest Sam')).toBeVisible({ timeout: 15000 });
+
+  await guest.context().close();
 });
 
-test('a guest adds a song and the host sees it queued', async ({ browser }) => {
-  const hostContext = await browser.newContext();
-  const guestContext = await browser.newContext();
-  const host = await hostContext.newPage();
-  const guest = await guestContext.newPage();
+test('a host reopening the invite returns to the host screen', async ({ page }) => {
+  const { joinUrl } = await createRoom(page, 'Host Guard', 'Host Mia');
 
-  await createRoom(host, 'Host Ben');
-  const code = await readRoomCode(host);
+  await page.goto(joinUrl);
+  await page.getByLabel('Your name').fill('Mia Guest');
+  await page.getByRole('button', { name: 'Join room' }).click();
 
-  await guest.goto('/join/' + code);
-  await guest.getByLabel(/your name/i).fill('Guest Kim');
-  await guest.getByRole('button', { name: /join room/i }).click();
-  await expect(guest.getByRole('heading', { name: 'Guest Kim' })).toBeVisible();
-
-  await guest.getByLabel(/paste a youtube link/i).fill('https://youtu.be/dQw4w9WgXcQ');
-  await guest.getByRole('button', { name: /add to queue/i }).click();
-
-  await expect(guest.getByRole('status')).toContainText(/in the queue/i, { timeout: 20000 });
-  await expect(host.getByText(/never gonna give you up/i)).toBeVisible({ timeout: 20000 });
-
-  await hostContext.close();
-  await guestContext.close();
+  await page.waitForURL(/\/host$/, { timeout: 20000 });
+  await expect(page.getByRole('heading', { level: 1, name: 'Host Guard' })).toBeVisible();
+  await expect(page.getByText('Hosted by Host Mia')).toBeVisible();
+  await expect(page.getByRole('banner').getByRole('link', { name: 'Room settings' })).toBeVisible();
 });
 
-test('the host can lock guests and the remote explains why controls stop', async ({ browser }) => {
-  const hostContext = await browser.newContext();
-  const guestContext = await browser.newContext();
-  const host = await hostContext.newPage();
-  const guest = await guestContext.newPage();
+test('a guest adds a song and the host sees it in the queue', async ({ page, browser }) => {
+  const { code } = await createRoom(page, 'Queue Night', 'Host Ben');
+  const guest = await joinRoom(browser, code, 'Guest Kim');
+  const guestRoomId = roomIdFromUrl(guest.url());
 
-  await createRoom(host, 'Host Cleo');
-  const code = await readRoomCode(host);
+  await guest.getByRole('link', { name: 'Search' }).click();
+  await guest.getByLabel('Paste a YouTube link').fill('https://youtu.be/dQw4w9WgXcQ');
+  await guest.getByRole('button', { name: 'Add to queue' }).click();
+  await expect(guest.getByText(/is in the queue/i)).toBeVisible({ timeout: 20000 });
 
-  await guest.goto('/join/' + code);
-  await guest.getByLabel(/your name/i).fill('Guest Dee');
-  await guest.getByRole('button', { name: /join room/i }).click();
-  await expect(guest.getByRole('heading', { name: 'Guest Dee' })).toBeVisible();
+  await guest.getByRole('link', { name: /queue ·/i }).click();
+  await expect(guest.getByRole('list', { name: 'Up next' }).getByText(/never gonna give you up/i)).toBeVisible({ timeout: 15000 });
+  expect(guestRoomId.length).toBeGreaterThan(0);
 
-  await host.getByRole('button', { name: 'Lock guest controls', exact: true }).click();
-  await expect(host.getByText(/guest controls are locked/i)).toBeVisible();
-  await expect(guest.getByText(/guest controls are locked/i)).toBeVisible({ timeout: 15000 });
+  const hostId = roomIdFromUrl(page.url());
+  await page.goto(BASE + '/room/' + hostId + '/host/queue');
+  await expect(page.locator('#song-queue').getByText(/never gonna give you up/i)).toBeVisible({ timeout: 20000 });
 
-  await expect(guest.getByRole('button', { name: /^skip$/i })).toBeDisabled();
+  await guest.context().close();
+});
 
-  await host.getByRole('button', { name: 'Unlock guest controls', exact: true }).click();
-  await expect(guest.getByRole('button', { name: /^skip$/i })).toBeEnabled({ timeout: 15000 });
+test('the host can split request and playback permissions', async ({ page, browser }) => {
+  const { code } = await createRoom(page, 'Rules Night', 'Host Cleo');
+  const guest = await joinRoom(browser, code, 'Guest Dee');
+  const hostId = roomIdFromUrl(page.url());
 
-  await hostContext.close();
-  await guestContext.close();
+  await page.goto(BASE + '/room/' + hostId + '/host/settings');
+  const adds = page.getByRole('switch', { name: /guests can add songs/i });
+  const playback = page.getByRole('switch', { name: /guests can pause or resume/i });
+  await expect(adds).toBeChecked();
+  await expect(playback).not.toBeChecked();
+
+  await adds.click();
+  await expect(guest.getByText(/guest requests are off/i)).toBeVisible({ timeout: 15000 });
+  await guest.getByRole('link', { name: 'Search' }).click();
+  await expect(guest.getByRole('button', { name: 'Add to queue' })).toBeDisabled();
+
+  await page.getByRole('switch', { name: /guests can pause or resume/i }).click();
+  await guest.getByRole('link', { name: /queue ·/i }).click();
+  await expect(guest.getByText(/you can pause and resume/i)).toBeVisible({ timeout: 15000 });
+
+  await guest.context().close();
 });
 
 test('an unknown room code reports that the room does not exist', async ({ page }) => {
-  await page.goto('/join/AAAAAAAABBBBBBBB');
-  await page.getByLabel(/your name/i).fill('Lost Singer');
-  await page.getByRole('button', { name: /join room/i }).click();
-
+  await page.goto(BASE + '/join/AAAAAAAABBBBBBBB');
+  await page.getByLabel('Your name').fill('Lost Singer');
+  await page.getByRole('button', { name: 'Join room' }).click();
   await expect(page.getByRole('alert')).toContainText(/no room uses that code/i);
 });
-test('typing shows YouTube songs and adding lands on the queue', async ({ page }) => {
-  await createRoom(page, 'Host Eve');
 
-  // Both add paths are offered on the host screen: live search and paste.
-  await expect(page.getByLabel(/find a song on youtube/i)).toBeVisible();
-  await expect(page.getByLabel(/paste a youtube link/i)).toBeVisible();
-  await expect(page.getByRole('button', { name: /view queue/i })).toBeVisible();
+test('a phone remote joins and shows the shared queue', async ({ page, browser }) => {
+  const { code } = await createRoom(page, 'Phone Night', 'Host Fay');
+  const guest = await joinRoom(browser, code, 'Guest Gil', { width: 390, height: 844 });
 
-  // Typing pulls real YouTube suggestions without an API key.
-  await page.getByLabel(/find a song on youtube/i).fill('dancing queen');
-  const suggestions = page.getByLabel(/song suggestions/i).getByRole('button');
-  await expect(suggestions.first()).toBeVisible({ timeout: 20000 });
-  expect(await suggestions.count()).toBeGreaterThan(2);
+  await expect(guest.getByRole('heading', { level: 1, name: 'Phone Night' })).toBeVisible();
+  await expect(guest.getByRole('heading', { name: /the room queue/i })).toBeVisible();
+  await expect(guest.getByRole('link', { name: /queue ·/i })).toBeVisible();
 
-  // Choosing one asks for the songs behind that term.
-  await suggestions.first().click();
-  await expect(page.getByRole('button', { name: /show songs/i })).toBeEnabled();
-
-  // Adding by link still works and drops the singer on the queue.
-  await page.getByLabel(/paste a youtube link/i).fill('https://youtu.be/dQw4w9WgXcQ');
-  await page.getByRole('button', { name: /add to queue/i }).click();
-  await expect(page.getByText(/is in the queue/i)).toBeVisible({ timeout: 20000 });
-
-  await page.getByRole('button', { name: /view queue/i }).click();
-  const queue = page.locator('#song-queue');
-  await expect(queue).toBeVisible();
-  await expect(queue.getByText(/never gonna give you up/i)).toBeVisible({ timeout: 20000 });
+  await guest.context().close();
 });
 
-test('the wireless remote offers search and the shared queue', async ({ browser }) => {
-  const hostContext = await browser.newContext();
-  const guestContext = await browser.newContext();
-  const host = await hostContext.newPage();
-  const guest = await guestContext.newPage();
+test('switching sessions replaces the room and its player', async ({ page }) => {
+  await createRoom(page, 'First Session', 'Host One');
+  await createRoom(page, 'Second Session', 'Host Two');
+  await expect(page.getByRole('heading', { level: 1, name: 'Second Session' })).toBeVisible();
+  await page.waitForSelector('[data-host-player] iframe', { timeout: 20000 });
+  await page.evaluate(() => {
+    (window as unknown as { __secondRoomFrame?: Element | null }).__secondRoomFrame = document.querySelector('[data-host-player] iframe');
+  });
 
-  await createRoom(host, 'Host Fay');
-  const code = await readRoomCode(host);
+  await page.getByRole('link', { name: 'First Session', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'First Session' })).toBeVisible();
+  await page.waitForSelector('[data-host-player] iframe', { timeout: 20000 });
 
-  await guest.goto('/join/' + code);
-  await guest.getByLabel(/your name/i).fill('Guest Gil');
-  await guest.getByRole('button', { name: /join room/i }).click();
-  await expect(guest.getByRole('heading', { name: 'Guest Gil' })).toBeVisible();
+  const replaced = await page.evaluate(() => {
+    const previous = (window as unknown as { __secondRoomFrame?: Element | null }).__secondRoomFrame;
+    return previous !== null && previous !== document.querySelector('[data-host-player] iframe');
+  });
+  expect(replaced).toBe(true);
 
-  // The remote can search YouTube and reach the shared queue.
-  await expect(guest.getByLabel(/find a song on youtube/i)).toBeVisible();
-  await expect(guest.getByRole('button', { name: /view queue/i })).toBeVisible();
-  await expect(guest.locator('#song-queue')).toBeVisible();
+  await page.getByRole('link', { name: 'Second Session', exact: true }).click();
+  await expect(page.getByRole('heading', { level: 1, name: 'Second Session' })).toBeVisible();
+});
 
-  await hostContext.close();
-  await guestContext.close();
+test('the phone remote keeps full touch targets and reflows at 200% text', async ({ page, browser }) => {
+  const { code } = await createRoom(page, 'Access Night', 'Host Uma');
+
+  await page.setViewportSize({ width: 1280, height: 900 });
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await page.waitForTimeout(300);
+  expect(await clippedControls(page)).toEqual([]);
+  await page.evaluate(() => { document.documentElement.style.fontSize = ''; });
+  await page.setViewportSize({ width: 1440, height: 1000 });
+
+  const guest = await joinRoom(browser, code, 'Guest Zoe');
+  await guest.getByRole('link', { name: 'Search' }).click();
+  await guest.getByLabel('Paste a YouTube link').fill('https://youtu.be/dQw4w9WgXcQ');
+  await guest.getByRole('button', { name: 'Add to queue' }).click();
+  await guest.getByText(/is in the queue/i).waitFor({ timeout: 20000 });
+  await guest.getByRole('link', { name: /queue ·/i }).click();
+  await guest.getByRole('list', { name: 'Up next' }).waitFor({ timeout: 15000 });
+
+  expect(await undersizedControls(guest)).toEqual([]);
+  expect(await horizontalOverflow(guest)).toBeLessThanOrEqual(0);
+
+  await guest.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await guest.waitForTimeout(300);
+  expect(await horizontalOverflow(guest)).toBeLessThanOrEqual(0);
+  await guest.evaluate(() => { document.documentElement.style.fontSize = ''; });
+
+  const joinContext = await browser.newContext({ viewport: { width: 390, height: 844 }, isMobile: true });
+  const joinPage = await joinContext.newPage();
+  await joinPage.goto(BASE + '/join/' + code);
+  await joinPage.getByRole('heading', { name: 'Join the room.' }).waitFor({ timeout: 20000 });
+  expect(await undersizedControls(joinPage)).toEqual([]);
+  await joinPage.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await joinPage.waitForTimeout(300);
+  expect(await horizontalOverflow(joinPage)).toBeLessThanOrEqual(0);
+
+  await joinContext.close();
+  await guest.context().close();
 });

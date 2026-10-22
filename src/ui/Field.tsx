@@ -6,18 +6,31 @@ export type FieldProps = InputHTMLAttributes<HTMLInputElement> & {
   hint?: string;
   error?: string | null;
   icon?: ReactNode;
+  action?: ReactNode;
+  hideLabel?: boolean;
 };
 
-export default function Field({ id, label, hint, error, icon, className = '', ...rest }: FieldProps) {
+export default function Field({
+  id,
+  label,
+  hint,
+  error,
+  icon,
+  action,
+  hideLabel = false,
+  className = '',
+  ...rest
+}: FieldProps) {
   const invalid = typeof error === 'string' && error.length > 0;
   return (
-    <div className="mt-4">
-      <label htmlFor={id} className="block font-mono text-[0.6875rem] uppercase tracking-[0.14em] text-ink-3">
-        {label}
-      </label>
-      <div className="relative mt-2">
+    <div>
+      <div className={hideLabel ? 'sr-only' : 'flex min-h-5 items-center justify-between gap-3'}>
+        <label htmlFor={id} className="text-[0.75rem] font-semibold text-ink">{label}</label>
+        {action}
+      </div>
+      <div className={hideLabel ? 'relative' : 'relative mt-2'}>
         {icon === undefined ? null : (
-          <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-3">
+          <span aria-hidden="true" className="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-ink-2">
             {icon}
           </span>
         )}
@@ -25,22 +38,22 @@ export default function Field({ id, label, hint, error, icon, className = '', ..
           {...rest}
           id={id}
           aria-invalid={invalid ? 'true' : undefined}
-          aria-describedby={invalid === true ? id + '-error' : hint === undefined ? undefined : id + '-hint'}
+          aria-describedby={invalid ? id + '-error' : hint === undefined ? undefined : id + '-hint'}
           className={[
-            'min-h-11 w-full rounded-panel border bg-surface-2 px-3.5 text-[0.9375rem] text-ink',
+            'min-h-11 w-full rounded-media border bg-surface px-3.5 text-[0.875rem] text-ink',
             'placeholder:text-ink-3',
-            'transition-[border-color,box-shadow] duration-(--duration-fast) ease-(--ease-console)',
-            'focus:outline-none focus-visible:outline-none',
-            invalid === true ? 'border-danger focus:border-danger' : 'border-line focus:border-signal',
+            'transition-[border-color,background-color] duration-(--duration-fast) ease-(--ease-console)',
+            'focus:border-signal focus:outline-none focus-visible:outline-none',
+            invalid ? 'border-danger' : 'border-line hover:border-line-strong',
             icon === undefined ? '' : 'pl-10',
             className,
           ].join(' ')}
         />
       </div>
-      {invalid === true ? (
-        <p id={id + '-error'} role="alert" className="mt-2 text-[0.8125rem] text-danger">{error}</p>
+      {invalid ? (
+        <p id={id + '-error'} role="alert" className="mt-2 text-[0.75rem] text-danger">{error}</p>
       ) : hint === undefined ? null : (
-        <p id={id + '-hint'} className="mt-2 text-[0.8125rem] text-ink-3">{hint}</p>
+        <p id={id + '-hint'} className="mt-2 text-[0.6875rem] leading-[1.5] text-ink-2">{hint}</p>
       )}
     </div>
   );

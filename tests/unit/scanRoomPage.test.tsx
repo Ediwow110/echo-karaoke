@@ -39,7 +39,7 @@ describe('scan room screen', () => {
     mockCamera('granted');
     renderScan();
     expect(await screen.findByText(/point at the code on the host screen/i)).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /back/i })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /type a code/i })).toBeInTheDocument();
   });
 
   it('explains a blocked camera and offers the typed code', async () => {

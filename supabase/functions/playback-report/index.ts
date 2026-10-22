@@ -24,9 +24,20 @@ Deno.serve(async (req) => {
     const body = await readJsonObject(req);
     const roomId = requireRoomId(body.roomId);
     const position = body.positionSeconds;
+    const duration = body.durationSeconds;
+    const songId = body.songId;
 
     if (typeof position !== 'number' || !Number.isFinite(position) || position < 0 || position > 86400) {
       throw new HttpError('VALIDATION_ERROR', 400, 'A playback position is required');
+    }
+    if (duration !== undefined && duration !== null) {
+      if (typeof duration !== 'number' || !Number.isFinite(duration) || duration < 0 || duration > 86400) {
+        throw new HttpError('VALIDATION_ERROR', 400, 'A playback duration is invalid');
+      }
+    }
+    if (songId !== undefined && songId !== null
+      && (typeof songId !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(songId))) {
+      throw new HttpError('VALIDATION_ERROR', 400, 'The playback song is invalid');
     }
 
     const { data, error } = await serviceClient().rpc('playback_report', {
@@ -34,6 +45,8 @@ Deno.serve(async (req) => {
       p_user_id: caller.userId,
       p_host_token: hostToken,
       p_position_seconds: Math.floor(position),
+      p_duration_seconds: duration === undefined || duration === null ? null : Math.floor(duration),
+      p_song_id: songId ?? null,
     });
 
     if (error !== null || data === null) throw mapDatabaseError(error);

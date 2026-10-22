@@ -6,8 +6,10 @@ import {
   jsonResponse,
   mapDatabaseError,
   normalizeDisplayName,
+  normalizeRoomName,
   optionsResponse,
   readJsonObject,
+  readOptionalBoolean,
   requireAnonymousCaller,
   serviceClient,
 } from '../_shared/room.ts';
@@ -25,6 +27,9 @@ Deno.serve(async (req) => {
     const caller = await requireAnonymousCaller(req);
     const body = await readJsonObject(req);
     const displayName = normalizeDisplayName(body.displayName);
+    const roomName = normalizeRoomName(body.roomName);
+    const guestsCanAdd = readOptionalBoolean(body.guestsCanAdd, true);
+    const guestsCanControlPlayback = readOptionalBoolean(body.guestsCanControlPlayback, false);
     const admin = serviceClient();
 
     for (let attempt = 0; attempt < MAX_ATTEMPTS; attempt += 1) {
@@ -37,6 +42,9 @@ Deno.serve(async (req) => {
         p_display_name: displayName,
         p_guest_token: guestToken,
         p_host_token: hostToken,
+        p_name: roomName,
+        p_guest_control_locked: !guestsCanAdd,
+        p_guest_playback_locked: !guestsCanControlPlayback,
       });
 
       if (error === null && data !== null) {

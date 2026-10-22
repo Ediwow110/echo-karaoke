@@ -1,4 +1,4 @@
-import { createClient } from 'npm:@supabase/supabase-js@2';
+import { createClient } from 'npm:@supabase/supabase-js@2.118.0';
 
 export type EdgeError = {
   code: string;
@@ -10,11 +10,15 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
   UNAUTHORIZED: { status: 401, message: 'A valid room token is required' },
   ROOM_NOT_FOUND: { status: 404, message: 'No room uses that code' },
   ROOM_ENDED: { status: 409, message: 'This room has ended' },
+  HOST_ALREADY_IN_ROOM: { status: 409, message: 'This browser is already hosting this room. Open the host screen instead of joining.' },
   GUEST_CONTROLS_LOCKED: { status: 403, message: 'The host locked guest controls' },
   VALIDATION_ERROR: { status: 400, message: 'The request is invalid' },
   RATE_LIMITED: { status: 429, message: 'Slow down: five songs per minute' },
+  ROOM_CREATE_RATE_LIMITED: { status: 429, message: 'Too many rooms created from this session. Try again in an hour.' },
   FORBIDDEN: { status: 403, message: 'That action is not allowed for this room' },
   METADATA_UNAVAILABLE: { status: 422, message: 'That video could not be read' },
+  DUPLICATE_SONG: { status: 409, message: 'That song is already in the queue' },
+  SONG_PLAYING: { status: 409, message: 'Skip the current song before removing it' },
 };
 
 export class HttpError extends Error {
@@ -56,6 +60,9 @@ export function jsonResponse(
     headers: {
       ...corsHeaders(origin),
       'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+      'X-Content-Type-Options': 'nosniff',
+      'Referrer-Policy': 'no-referrer',
     },
   });
 }
@@ -76,6 +83,63 @@ export function serviceClient() {
   return createClient(requireEnv('SUPABASE_URL'), requireEnv('SUPABASE_SERVICE_ROLE_KEY'), {
     auth: { persistSession: false, autoRefreshToken: false },
   });
+}
+
+export type RateLimitResult = {
+  allowed: boolean;
+  count: number;
+  limit: number;
+  retryAfterSeconds: number;
+};
+
+export async function consumeRateLimit(
+  subject: string,
+  bucket: string,
+  limit: number,
+  windowSeconds: number,
+): Promise<RateLimitResult> {
+  const { data, error } = await serviceClient().rpc('consume_rate_limit', {
+    p_subject: subject,
+    p_bucket: bucket,
+    p_limit: limit,
+    p_window_seconds: windowSeconds,
+  });
+  if (error !== null || data === null) throw mapDatabaseError(error);
+  return data as RateLimitResult;
+}
+
+export async function consumeDailyRateLimit(
+  subject: string,
+  bucket: string,
+  limit: number,
+): Promise<RateLimitResult> {
+  const { data, error } = await serviceClient().rpc('consume_daily_rate_limit', {
+    p_subject: subject,
+    p_bucket: bucket,
+    p_limit: limit,
+    p_time_zone: 'America/Los_Angeles',
+    p_now: null,
+  });
+  if (error !== null || data === null) throw mapDatabaseError(error);
+  return data as RateLimitResult;
+}
+
+export async function readSearchCache<T>(query: string): Promise<T[] | null> {
+  const { data, error } = await serviceClient().rpc('youtube_search_cache_get', { p_query: query });
+  if (error !== null || !Array.isArray(data)) return null;
+  return data as T[];
+}
+
+export async function writeSearchCache<T>(query: string, results: T[], ttlSeconds: number): Promise<void> {
+  try {
+    await serviceClient().rpc('youtube_search_cache_put', {
+      p_query: query,
+      p_payload: results,
+      p_ttl_seconds: ttlSeconds,
+    });
+  } catch {
+    // The cache is an optimization; the search result is already available.
+  }
 }
 
 export type Caller = {
@@ -143,6 +207,30 @@ export function normalizeDisplayName(value: unknown): string {
   return Array.from(trimmed).slice(0, 32).join('').trim();
 }
 
+export function normalizeRoomName(value: unknown): string {
+  if (value === undefined || value === null) {
+    return 'Karaoke room';
+  }
+  if (typeof value !== 'string') {
+    throw new HttpError('VALIDATION_ERROR', 400, 'A room name is required');
+  }
+  const trimmed = value.trim().replace(/\s+/g, ' ');
+  if (trimmed.length === 0) {
+    return 'Karaoke room';
+  }
+  return Array.from(trimmed).slice(0, 48).join('').trim();
+}
+
+export function readOptionalBoolean(value: unknown, fallback: boolean): boolean {
+  if (value === undefined) {
+    return fallback;
+  }
+  if (typeof value !== 'boolean') {
+    throw new HttpError('VALIDATION_ERROR', 400, 'A permission must be true or false');
+  }
+  return value;
+}
+
 export function requireRoomId(value: unknown): string {
   if (typeof value !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(value)) {
     throw new HttpError('VALIDATION_ERROR', 400, 'A room identifier is required');
@@ -177,7 +265,12 @@ export async function readJsonObject(req: Request): Promise<Record<string, unkno
 
 export function mapDatabaseError(error: { message?: string } | null): HttpError {
   const raw = error?.message ?? '';
-  for (const code of Object.keys(ERROR_MAP)) {
+  if (raw.includes('queue_songs_active_video_key')) {
+    return new HttpError('DUPLICATE_SONG', 409, ERROR_MAP.DUPLICATE_SONG.message);
+  }
+  // Prefer the most specific code: RATE_LIMITED is a substring of
+  // ROOM_CREATE_RATE_LIMITED.
+  for (const code of Object.keys(ERROR_MAP).sort((a, b) => b.length - a.length)) {
     if (raw.includes(code)) {
       const mapped = ERROR_MAP[code];
       return new HttpError(code, mapped.status, mapped.message);

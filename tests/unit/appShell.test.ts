@@ -17,7 +17,7 @@ describe('application shell', () => {
 
   it('matches the browser chrome to the dark stage', () => {
     expect(html).toContain('name="theme-color"');
-    expect(html).toContain('content="#0A0B0E"');
+    expect(html).toContain('content="#100D18"');
   });
 
   it('keeps each screen in its own bundle chunk', () => {

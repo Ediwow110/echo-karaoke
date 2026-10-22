@@ -1,0 +1,15 @@
+# ECHO
+
+ECHO is a login-free YouTube karaoke room. One host screen plays the music while guests use their phones as search and queue remotes.
+
+## Entry points
+
+- [Create a room](/): Start a named host room and receive a scannable invitation QR.
+- [Join a room](/join): Enter a sixteen-character room code and a display name.
+- [Scan a QR](/scan): Use the phone camera to open the room invitation.
+
+## Notes
+
+- Room screens are not public directories and are excluded from crawling in robots.txt.
+- YouTube search requires a server-side API key. The app always explains this and offers the paste-link fallback.
+- Guest permissions for requests and playback are independent. Skipping, removing and reordering are host-only.

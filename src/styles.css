@@ -2,9 +2,26 @@
 
 /* ---------------------------------------------------------------------------
    Self-hosted typefaces
-   Each family ships as a subset woff2 so the browser only downloads the
-   ranges a page actually renders. Nothing here reaches a third-party host.
+   Inter carries the interface. Space Grotesk carries the room's voice.
    --------------------------------------------------------------------------- */
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin.woff2') format('woff2');
+  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+}
+
+@font-face {
+  font-family: 'Inter';
+  font-style: normal;
+  font-weight: 100 900;
+  font-display: swap;
+  src: url('/fonts/inter-latin-ext.woff2') format('woff2');
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
+}
 
 @font-face {
   font-family: 'Space Grotesk';
@@ -21,25 +38,7 @@
   font-weight: 300 700;
   font-display: swap;
   src: url('/fonts/space-grotesk-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'Manrope';
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url('/fonts/manrope-latin.woff2') format('woff2');
-  unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'Manrope';
-  font-style: normal;
-  font-weight: 200 800;
-  font-display: swap;
-  src: url('/fonts/manrope-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
+  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+1E00-1EFF, U+2020, U+20A0-20AB, U+20AD-20C4, U+2113, U+2C60-2C7F, U+A720-A7FF;
 }
 
 @font-face {
@@ -54,61 +53,52 @@
 @font-face {
   font-family: 'DM Mono';
   font-style: normal;
-  font-weight: 400;
-  font-display: swap;
-  src: url('/fonts/dm-mono-400-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
-@font-face {
-  font-family: 'DM Mono';
-  font-style: normal;
   font-weight: 500;
   font-display: swap;
   src: url('/fonts/dm-mono-500-latin.woff2') format('woff2');
   unicode-range: U+0000-00FF, U+0131, U+0152-0153, U+02BB-02BC, U+02C6, U+02DA, U+02DC, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
 }
 
-@font-face {
-  font-family: 'DM Mono';
-  font-style: normal;
-  font-weight: 500;
-  font-display: swap;
-  src: url('/fonts/dm-mono-500-latin-ext.woff2') format('woff2');
-  unicode-range: U+0100-02BA, U+02BD-02C5, U+02C7-02CC, U+02CE-02D7, U+02DD-02FF, U+0304, U+0308, U+0329, U+2000-206F, U+20AC, U+2122, U+2191, U+2193, U+2212, U+2215, U+FEFF, U+FFFD;
-}
-
 /* ---------------------------------------------------------------------------
-   Design tokens
-   The color and font namespaces generate the matching Tailwind utilities.
+   ECHO design tokens
+   The canvas is the room after dark. Lavender is the signal, gold is the
+   stage light, and green is presence. No other accent earns a place.
    --------------------------------------------------------------------------- */
 
 @theme {
-  --color-graphite: #0A0B0E;
-  --color-graphite-soft: #0E1014;
-  --color-surface: #14171D;
-  --color-surface-2: #1B1F27;
-  --color-surface-3: #232833;
-  --color-line: rgba(255, 255, 255, 0.08);
-  --color-line-strong: rgba(255, 255, 255, 0.14);
-  --color-ink: #F5F7FA;
-  --color-ink-2: #A6AFBD;
-  --color-ink-3: #737C8B;
-  --color-signal: #4E82FF;
-  --color-signal-fill: #1F52D6;
-  --color-signal-fill-hover: #2A63E8;
-  --color-signal-fill-press: #1A47BC;
-  --color-signal-soft: rgba(78, 130, 255, 0.14);
-  --color-live: #35D6A4;
-  --color-danger: #FF5C5C;
+  --color-graphite: #100d18;
+  --color-graphite-deep: #0a0a0d;
+  --color-graphite-soft: #141217;
+  --color-surface: #18171d;
+  --color-surface-2: #211f28;
+  --color-surface-3: #292238;
+  --color-line: #2a2832;
+  --color-line-strong: #3b3846;
+  --color-ink: #f5f2ee;
+  --color-ink-2: #99959f;
+  /* Kept light enough for small tertiary labels to clear WCAG AA on the
+     graphite and surface backgrounds. */
+  --color-ink-3: #8a8494;
+  --color-ink-4: #625e6b;
+  --color-signal: #b6a0ff;
+  --color-signal-fill: #b6a0ff;
+  --color-signal-fill-hover: #c7b6ff;
+  --color-signal-fill-press: #a58aff;
+  --color-signal-soft: #292238;
+  --color-signal-ink: #100d18;
+  --color-gold: #e6b788;
+  --color-live: #a8c8ab;
+  --color-danger: #ff9d9d;
+  --color-danger-soft: #3a2026;
 
-  --font-display: "Space Grotesk", "Manrope", sans-serif;
-  --font-sans: "Manrope", system-ui, sans-serif;
+  --font-display: "Space Grotesk", "Inter", sans-serif;
+  --font-sans: "Inter", system-ui, sans-serif;
   --font-mono: "DM Mono", ui-monospace, monospace;
 
-  --radius-panel: 14px;
-  --radius-badge: 8px;
+  --radius-panel: 12px;
   --radius-media: 10px;
+  --radius-badge: 6px;
+  --radius-pill: 999px;
 
   --ease-console: cubic-bezier(0.2, 0.8, 0.2, 1);
   --duration-fast: 140ms;
@@ -118,6 +108,11 @@
   --animate-console-in: console-in var(--duration-slow) var(--ease-console) backwards;
   --animate-queue-in: queue-in var(--duration-base) var(--ease-console) backwards;
   --animate-presence-pulse: presence-pulse 2s ease-in-out infinite;
+  --animate-toast-in: toast-in var(--duration-base) var(--ease-console) backwards;
+  --animate-equalizer: equalizer 900ms ease-in-out infinite alternate;
+  --animate-page-in: page-in 380ms var(--ease-console) both;
+  --animate-list-in: list-in 320ms var(--ease-console) both;
+  --animate-stage-drift: stage-drift 26s ease-in-out infinite alternate;
 }
 
 /* ---------------------------------------------------------------------------
@@ -146,6 +141,32 @@
   50% { opacity: 0.85; }
 }
 
+@keyframes toast-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes equalizer {
+  from { transform: scaleY(0.35); }
+  to { transform: scaleY(1); }
+}
+
+@keyframes page-in {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+@keyframes list-in {
+  from { opacity: 0; transform: translateY(7px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* A slow, almost imperceptible camera move on still stage imagery. */
+@keyframes stage-drift {
+  from { transform: scale(1.025) translate3d(-0.6%, -0.35%, 0); }
+  to { transform: scale(1.065) translate3d(0.6%, 0.35%, 0); }
+}
+
 /* ---------------------------------------------------------------------------
    Base
    --------------------------------------------------------------------------- */
@@ -162,8 +183,16 @@
     background-color: var(--color-graphite);
     color: var(--color-ink);
     font-family: var(--font-sans);
+    font-size: 14px;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
+    text-rendering: optimizeLegibility;
+  }
+
+  button,
+  input,
+  textarea {
+    font: inherit;
   }
 
   :focus-visible {
@@ -173,7 +202,23 @@
 
   ::selection {
     background: var(--color-signal);
-    color: #ffffff;
+    color: var(--color-signal-ink);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    border: 3px solid transparent;
+    border-radius: var(--radius-pill);
+    background-clip: content-box;
+    background-color: var(--color-line-strong);
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
   }
 }
 
@@ -197,10 +242,9 @@
     z-index: 60;
     padding: 4px 9px;
     border: 1px solid var(--color-line);
-    border-radius: 6px;
+    border-radius: var(--radius-badge);
     background: var(--color-surface-2);
     color: var(--color-ink);
-    font-family: var(--font-mono);
     font-size: 0.6875rem;
     white-space: nowrap;
     opacity: 0;
@@ -213,7 +257,6 @@
     opacity: 1;
   }
 
-  /* A control at the top of the screen opens its label downward. */
   .tooltip-below::after {
     top: calc(100% + 8px);
     bottom: auto;
@@ -224,13 +267,73 @@
     animation: skeleton-pulse 1.6s ease-in-out infinite;
   }
 
-  /* A rail of cards scrolls by touch, so the bar itself only adds noise. */
   .no-scrollbar {
     scrollbar-width: none;
   }
 
   .no-scrollbar::-webkit-scrollbar {
     display: none;
+  }
+
+  .eyebrow {
+    font-family: var(--font-sans);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+  }
+
+  .label {
+    font-family: var(--font-sans);
+    font-size: 0.625rem;
+    font-weight: 600;
+    letter-spacing: 0.08em;
+    line-height: 1.2;
+    text-transform: uppercase;
+    color: var(--color-ink-2);
+  }
+
+  .hairline {
+    border-color: var(--color-line);
+  }
+
+  .stage-sheen {
+    background:
+      linear-gradient(180deg, rgba(16, 13, 24, 0.12) 0%, rgba(16, 13, 24, 0.65) 62%, rgba(16, 13, 24, 0.96) 100%),
+      radial-gradient(120% 90% at 70% 0%, rgba(182, 160, 255, 0.18), transparent 60%);
+  }
+
+  .card-hover {
+    transition: background-color var(--duration-fast) var(--ease-console),
+      border-color var(--duration-fast) var(--ease-console),
+      transform var(--duration-fast) var(--ease-console);
+  }
+
+  .card-hover:hover {
+    border-color: var(--color-line-strong);
+    background-color: var(--color-surface-2);
+  }
+
+  .tabular {
+    font-variant-numeric: tabular-nums;
+  }
+
+  .balance {
+    text-wrap: balance;
+  }
+
+  .page-enter {
+    animation: var(--animate-page-in);
+  }
+
+  .stagger-in {
+    animation: var(--animate-list-in);
+  }
+
+  .stage-drift {
+    animation: var(--animate-stage-drift);
+    transform-origin: 50% 50%;
   }
 }
 

@@ -1,16 +1,32 @@
 import {
+  consumeDailyRateLimit,
+  consumeRateLimit,
   handleThrown,
   HttpError,
   jsonResponse,
   mapDatabaseError,
   optionsResponse,
   readJsonObject,
+  readSearchCache,
   requireAnonymousCaller,
   requireRoomId,
   requireTokenHeader,
   serviceClient,
+  writeSearchCache,
 } from '../_shared/room.ts';
-import { mapSearchResponse } from '../_shared/youtube.ts';
+import { mapSearchResponse, type SearchResult } from '../_shared/youtube.ts';
+
+const MEMBER_SEARCH_LIMIT = 20;
+const USER_DAILY_SEARCH_LIMIT = 30;
+const ROOM_DAILY_SEARCH_LIMIT = 60;
+const SEARCH_WINDOW_SECONDS = 60;
+const CACHE_TTL_SECONDS = 600;
+const DEFAULT_DAILY_SEARCH_BUDGET = 90;
+
+function dailySearchBudget(): number {
+  const raw = Number(Deno.env.get('YOUTUBE_DAILY_SEARCH_BUDGET') ?? String(DEFAULT_DAILY_SEARCH_BUDGET));
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : DEFAULT_DAILY_SEARCH_BUDGET;
+}
 
 function requireQuery(value: unknown): string {
   if (typeof value !== 'string') {
@@ -63,6 +79,65 @@ Deno.serve(async (req) => {
       );
     }
 
+    const memberLimit = await consumeRateLimit(
+      caller.userId,
+      'youtube-search-member',
+      MEMBER_SEARCH_LIMIT,
+      SEARCH_WINDOW_SECONDS,
+    );
+    if (!memberLimit.allowed) {
+      throw new HttpError('RATE_LIMITED', 429, 'Search is busy. Try again in a moment.');
+    }
+
+    const cacheKey = query.trim().toLowerCase().replace(/\s+/g, ' ');
+    const cached = await readSearchCache<SearchResult>(cacheKey);
+    if (cached !== null) {
+      return jsonResponse({ available: true, results: cached }, 200, origin);
+    }
+
+    const userDaily = await consumeDailyRateLimit(
+      'user:' + caller.userId,
+      'youtube-search-day',
+      USER_DAILY_SEARCH_LIMIT,
+    );
+    if (!userDaily.allowed) {
+      throw new HttpError('RATE_LIMITED', 429, 'You have reached today\'s search limit. Paste a link or try tomorrow.');
+    }
+
+    const roomDaily = await consumeDailyRateLimit(
+      'room:' + roomId,
+      'youtube-search-day',
+      ROOM_DAILY_SEARCH_LIMIT,
+    );
+    if (!roomDaily.allowed) {
+      return jsonResponse(
+        {
+          available: false,
+          results: [],
+          message: 'This room has reached its search limit for today. Paste a YouTube link instead.',
+        },
+        200,
+        origin,
+      );
+    }
+
+    const dailyBudget = await consumeDailyRateLimit(
+      'global',
+      'youtube-search-day',
+      dailySearchBudget(),
+    );
+    if (!dailyBudget.allowed) {
+      return jsonResponse(
+        {
+          available: false,
+          results: [],
+          message: 'Search is resting for today. Paste a YouTube link instead.',
+        },
+        200,
+        origin,
+      );
+    }
+
     const target = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&key=' +
       encodeURIComponent(apiKey) + '&q=' + encodeURIComponent(query);
 
@@ -84,7 +159,9 @@ Deno.serve(async (req) => {
       throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube search returned an unreadable response');
     }
 
-    return jsonResponse({ available: true, results: mapSearchResponse(payload) }, 200, origin);
+    const results = mapSearchResponse(payload);
+    await writeSearchCache(cacheKey, results, CACHE_TTL_SECONDS);
+    return jsonResponse({ available: true, results }, 200, origin);
   } catch (error) {
     return handleThrown(error, origin);
   }

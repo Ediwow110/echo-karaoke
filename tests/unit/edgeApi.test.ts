@@ -52,6 +52,23 @@ describe('edge api client', () => {
     expect(headersOf(calls[0])['x-room-host-token']).toBeUndefined();
   });
 
+  it('uses the cached token and keepalive for exit requests', async () => {
+    const getAccessToken = vi.fn(async () => 'fresh-token');
+    const { calls, impl } = fakeFetch({ status: 200, body: {} });
+    const api = createEdgeApi({
+      ...base,
+      getAccessToken,
+      getCachedAccessToken: () => 'cached-token',
+      fetchImpl: impl,
+    });
+
+    await api.invoke('playback-command', { roomId: 'r', action: 'pause' }, { hostToken: 'host-secret' }, { keepalive: true });
+
+    expect(getAccessToken).not.toHaveBeenCalled();
+    expect(headersOf(calls[0]).Authorization).toBe('Bearer cached-token');
+    expect(calls[0].init.keepalive).toBe(true);
+  });
+
   it('sends the host token only when supplied', async () => {
     const { calls, impl } = fakeFetch({ status: 200, body: {} });
     const api = createEdgeApi({ ...base, fetchImpl: impl });

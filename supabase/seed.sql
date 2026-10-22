@@ -1,0 +1,2 @@
+-- Intentionally empty. The pgTAP suites create their own fixtures inside
+-- transactions, and the application creates real rooms through Edge Functions.

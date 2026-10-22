@@ -35,7 +35,7 @@ describe('console design tokens', () => {
   });
 
   it('keeps the primary button label readable', () => {
-    expect(contrast('#ffffff', color('signal-fill'))).toBeGreaterThanOrEqual(4.5);
+    expect(contrast(color('signal-ink'), color('signal-fill'))).toBeGreaterThanOrEqual(4.5);
   });
 
   it('keeps the accent readable on graphite', () => {
@@ -62,8 +62,8 @@ describe('console design tokens', () => {
   });
 
   it('defines one radius scale', () => {
-    expect(css).toMatch(/--radius-panel:\s*14px/);
-    expect(css).toMatch(/--radius-badge:\s*8px/);
+    expect(css).toMatch(/--radius-panel:\s*12px/);
+    expect(css).toMatch(/--radius-badge:\s*6px/);
     expect(css).toMatch(/--radius-media:\s*10px/);
   });
 

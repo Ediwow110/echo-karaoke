@@ -22,7 +22,15 @@ const env = import.meta.env as unknown as Record<string, string | undefined>;
  */
 async function accessToken(): Promise<string> {
   const { ensureAnonymousSession, getSupabaseClient } = await import('./lib/supabase');
-  return ensureAnonymousSession(getSupabaseClient(env));
+  const token = await ensureAnonymousSession(getSupabaseClient(env));
+  cachedAccessToken = token;
+  return token;
+}
+
+let cachedAccessToken: string | null = null;
+
+function getCachedAccessToken(): string | null {
+  return cachedAccessToken;
 }
 
 /**
@@ -47,6 +55,7 @@ try {
     url: config.url,
     anonKey: config.anonKey,
     getAccessToken: accessToken,
+    getCachedAccessToken,
   });
 
   root.render(

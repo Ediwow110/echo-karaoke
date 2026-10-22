@@ -1,23 +1,13 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { PlayIcon } from '@phosphor-icons/react';
-import { Button, Chip, Field, IconButton, Panel, QueueRow, RosterRow, TransportButton } from '../../src/ui';
+import { Button, Chip, Field, IconButton, Panel, Toggle, TransportButton } from '../../src/ui';
 import '@testing-library/jest-dom/vitest';
 
 afterEach(() => {
   cleanup();
 });
-
-const song = {
-  songId: 's1',
-  title: 'Dancing Queen',
-  channelTitle: 'ABBA',
-  thumbnailUrl: null,
-  position: 1,
-  addedBy: 'Ana',
-  voteCount: 3,
-};
 
 describe('ui primitives', () => {
   it('pairs an icon with the label of a button', () => {
@@ -50,24 +40,6 @@ describe('ui primitives', () => {
     expect(screen.getByRole('heading', { name: /up next/i })).toBeInTheDocument();
   });
 
-  it('shows the title and the attribution of a queue row', () => {
-    render(createElement(QueueRow, { song }));
-    expect(screen.getByText('Dancing Queen')).toBeInTheDocument();
-    expect(screen.getByText(/added by Ana/i)).toBeInTheDocument();
-    expect(screen.getByLabelText('3 votes')).toBeInTheDocument();
-  });
-
-  it('offers a vote control when voting is wired up', () => {
-    render(createElement(QueueRow, { song, onVote: () => {} }));
-    expect(screen.getByRole('button', { name: /vote for dancing queen/i })).toBeInTheDocument();
-  });
-
-  it('shows the presence of a participant and marks the host', () => {
-    render(createElement(RosterRow, { name: 'Ana', online: true, isHost: true }));
-    expect(screen.getByText('Ana')).toBeInTheDocument();
-    expect(screen.getByText('Host')).toBeInTheDocument();
-  });
-
   it('gives a transport button an accessible name', () => {
     render(createElement(TransportButton, { icon: createElement(PlayIcon, { 'aria-hidden': true }), label: 'Play', onClick: () => {} }));
     expect(screen.getByRole('button', { name: 'Play' })).toBeInTheDocument();
@@ -76,5 +48,20 @@ describe('ui primitives', () => {
   it('renders a chip with its text', () => {
     render(createElement(Chip, null, 'ABCD EFGH'));
     expect(screen.getByText('ABCD EFGH')).toBeInTheDocument();
+  });
+
+  it('exposes permissions as a labelled switch', () => {
+    const changes: boolean[] = [];
+    render(createElement(Toggle, {
+      checked: false,
+      onChange: (next: boolean) => changes.push(next),
+      label: 'Guests can add songs',
+      description: 'Let everyone add to the queue.',
+    }));
+
+    const toggle = screen.getByRole('switch', { name: 'Guests can add songs' });
+    expect(toggle).not.toBeChecked();
+    fireEvent.click(toggle);
+    expect(changes).toEqual([true]);
   });
 });

@@ -22,6 +22,7 @@ export type EdgeApiConfig = {
   url: string;
   anonKey: string;
   getAccessToken: () => Promise<string | null>;
+  getCachedAccessToken?: () => string | null;
   fetchImpl?: typeof fetch;
 };
 
@@ -59,8 +60,12 @@ function parseError(status: number, payload: unknown): RoomApiError {
   );
 }
 
+export type EdgeInvokeOptions = {
+  keepalive?: boolean;
+};
+
 export type EdgeApi = {
-  invoke: <T>(name: EdgeFunctionName, body: unknown, tokens?: RoomTokens) => Promise<T>;
+  invoke: <T>(name: EdgeFunctionName, body: unknown, tokens?: RoomTokens, options?: EdgeInvokeOptions) => Promise<T>;
 };
 
 export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
@@ -68,8 +73,9 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
   const baseUrl = trimTrailingSlash(config.url);
 
   return {
-    async invoke<T>(name: EdgeFunctionName, body: unknown, tokens: RoomTokens = {}): Promise<T> {
-      const accessToken = await config.getAccessToken();
+    async invoke<T>(name: EdgeFunctionName, body: unknown, tokens: RoomTokens = {}, options: EdgeInvokeOptions = {}): Promise<T> {
+      const cached = options.keepalive === true ? config.getCachedAccessToken?.() ?? null : null;
+      const accessToken = cached !== null && cached.length > 0 ? cached : await config.getAccessToken();
       if (accessToken === null || accessToken.length === 0) {
         throw new RoomApiError('NO_SESSION', 401, 'Sign in is required before joining a room');
       }
@@ -92,6 +98,7 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
+          ...(options.keepalive === true ? { keepalive: true } : {}),
         });
       } catch {
         throw new RoomApiError('NETWORK_ERROR', 0, 'The room service could not be reached');
