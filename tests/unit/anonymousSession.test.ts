@@ -120,6 +120,26 @@ describe('the anonymous session', () => {
     expect(tokenCalls).toBe(1);
   });
 
+  it('reports the server reason when sign-in is rate limited', async () => {
+    stubFetch((url) => {
+      if (url.endsWith('/api/auth/token')) return jsonResponse({}, 401);
+      if (url.endsWith('/api/auth/sign-in/anonymous')) {
+        return jsonResponse({
+          error: {
+            code: 'RATE_LIMITED',
+            message: 'Too many guest sessions from this network. Try again later.',
+          },
+        }, 429);
+      }
+      return jsonResponse({}, 404);
+    });
+    const { ensureAnonymousSession } = await loadAuth();
+
+    await expect(ensureAnonymousSession()).rejects.toThrow(
+      'Too many guest sessions from this network. Try again later.',
+    );
+  });
+
   it('reports a failed sign-in and token exchange', async () => {
     stubFetch((url) => {
       if (url.endsWith('/api/auth/token')) return jsonResponse({}, 401);

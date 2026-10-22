@@ -30,12 +30,27 @@ async function toFetchRequest(request: IncomingMessage): Promise<Request> {
   return new Request(BASE + (request.url ?? '/'), { method: request.method, headers, body });
 }
 
-async function signIn(): Promise<string> {
-  const response = await fetch(BASE + '/api/auth/sign-in/anonymous', {
+let signInSequence = 0;
+
+function testNetwork(): string {
+  signInSequence += 1;
+  return 'test-' + process.pid + '-' + Date.now() + '-' + signInSequence;
+}
+
+async function signInResponse(network: string): Promise<Response> {
+  return fetch(BASE + '/api/auth/sign-in/anonymous', {
     method: 'POST',
-    headers: { 'content-type': 'application/json', origin: BASE },
+    headers: {
+      'content-type': 'application/json',
+      origin: BASE,
+      'x-forwarded-for': network,
+    },
     body: '{}',
   });
+}
+
+async function signIn(): Promise<string> {
+  const response = await signInResponse(testNetwork());
   expect(response.status).toBe(200);
   const cookies = response.headers.getSetCookie().map((cookie) => cookie.split(';')[0]);
   const tokenResponse = await fetch(BASE + '/api/auth/token', {
@@ -272,6 +287,68 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
       'x-room-host-token': room.hostToken,
     });
     expect(read.status).toBe(200);
+  });
+
+  it('limits anonymous sign-ins per network', async () => {
+    const previous = process.env.ANON_SIGNIN_LIMIT_PER_HOUR;
+    process.env.ANON_SIGNIN_LIMIT_PER_HOUR = '2';
+    try {
+      const network = 'test-limit-' + Date.now();
+      expect((await signInResponse(network)).status).toBe(200);
+      expect((await signInResponse(network)).status).toBe(200);
+      const denied = await signInResponse(network);
+      expect(denied.status).toBe(429);
+      expect(await denied.json()).toMatchObject({ error: { code: 'RATE_LIMITED' } });
+      expect(denied.headers.get('retry-after')).toMatch(/^\d+$/);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ANON_SIGNIN_LIMIT_PER_HOUR;
+      } else {
+        process.env.ANON_SIGNIN_LIMIT_PER_HOUR = previous;
+      }
+    }
+  });
+
+  it('rejects a new guest when the room is full', async () => {
+    const previous = process.env.ROOM_MEMBER_LIMIT;
+    process.env.ROOM_MEMBER_LIMIT = '2';
+    try {
+      const hostAuth = await signIn();
+      const created = await call('create-room', hostAuth, { displayName: 'Cap Host' });
+      expect(created.status).toBe(201);
+      const room = (await created.json()) as { roomId: string; roomCode: string; hostToken: string };
+
+      const guestAuth = await signIn();
+      const joined = await call('join-room', guestAuth, {
+        code: room.roomCode,
+        displayName: 'Cap Guest One',
+      });
+      expect(joined.status).toBe(200);
+
+      const extraAuth = await signIn();
+      const full = await call('join-room', extraAuth, {
+        code: room.roomCode,
+        displayName: 'Cap Guest Two',
+      });
+      expect(full.status).toBe(409);
+      expect(await full.json()).toMatchObject({ error: { code: 'ROOM_FULL' } });
+
+      const rejoin = await call('join-room', guestAuth, {
+        code: room.roomCode,
+        displayName: 'Cap Guest One',
+      });
+      expect(rejoin.status).toBe(200);
+
+      await call('host-command', hostAuth, { roomId: room.roomId, action: 'end' }, {
+        'x-room-host-token': room.hostToken,
+      });
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ROOM_MEMBER_LIMIT;
+      } else {
+        process.env.ROOM_MEMBER_LIMIT = previous;
+      }
+    }
   });
 
   it('sweeps an abandoned room when the next room is created', async () => {

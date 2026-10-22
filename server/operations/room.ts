@@ -1,5 +1,6 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
 import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
+import { resolveRoomMemberLimit } from './limits.js';
 import { generateToken, normalizeDisplayName, readJsonObject } from './tokens.js';
 
 export type Caller = { userId: string; accessToken: string };
@@ -72,7 +73,13 @@ export async function joinRoom(request: Request, caller: Caller): Promise<Respon
   const code = normalizeRoomCode(body.code);
   const displayName = normalizeDisplayName(body.displayName);
   const guestToken = generateToken();
-  const result = await callOperation('join_room', [code, caller.userId, displayName, guestToken]);
+  const result = await callOperation('join_room', [
+    code,
+    caller.userId,
+    displayName,
+    guestToken,
+    resolveRoomMemberLimit(),
+  ]);
   return jsonResponse(result);
 }
 

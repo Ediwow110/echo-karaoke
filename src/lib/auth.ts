@@ -18,28 +18,38 @@ async function fetchToken(): Promise<string | null> {
   }
 }
 
-async function signIn(): Promise<void> {
+async function signIn(): Promise<string | null> {
   try {
-    await fetch('/api/auth/sign-in/anonymous', {
+    const response = await fetch('/api/auth/sign-in/anonymous', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
       credentials: 'include',
       signal: AbortSignal.timeout(10_000),
     });
+    if (response.status === 429 || response.status === 503) {
+      const body = (await response.json().catch(() => null)) as
+        { error?: { message?: unknown } } | null;
+      const message = body?.error?.message;
+      return typeof message === 'string' && message.length > 0 ? message : null;
+    }
   } catch {
     // The second token request reports whether a usable session exists.
   }
+  return null;
 }
 
 async function requestToken(): Promise<string> {
   let token = await fetchToken();
+  let signInError: string | null = null;
   if (token === null) {
-    await signIn();
+    signInError = await signIn();
     token = await fetchToken();
   }
   if (token === null) {
-    throw new Error('Could not start a guest session. Try reloading the page.');
+    throw new Error(
+      signInError ?? 'Could not start a guest session. Try reloading the page.',
+    );
   }
   bearerToken = token;
   tokenFetchedAt = Date.now();
