@@ -603,5 +603,6 @@ Gates on 2026-10-23: 226 unit tests, 225 database assertions on Neon, 3 operatio
 integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
 (sign-in 200, token 200, create-room 201). Production is deployed at
 `https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production
-sign-in, token, and create-room flow returned 200, 200, and 201. The CI workflow has
-not run yet and needs the repository secrets and a push.
+sign-in, token, and create-room flow returned 200, 200, and 201. CI run 39868480083
+passed `verify`, `database`, and `integration` on `master`. The remaining work is the
+phone flow and the open items in the report.

@@ -3,8 +3,8 @@
 Date: 2026-10-23
 Scope: the identity path, the two Neon credentials, the Vercel Function boundary,
 and the parts of the room authorization SQL that did not move.
-Verdict: **deployed and verified** at `https://echo-karaoke-mocha.vercel.app` on
-2026-10-23. CI has not run yet.
+Verdict: **deployed, verified, and CI green** at
+`https://echo-karaoke-mocha.vercel.app` on 2026-10-23.
 
 ## Evidence
 
@@ -20,6 +20,7 @@ Verdict: **deployed and verified** at `https://echo-karaoke-mocha.vercel.app` on
 | Production deploy | `vercel deploy --prod` | ready; alias `echo-karaoke-mocha.vercel.app` |
 | Production verifier | `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` | passed |
 | Production auth and room | curl against the alias | sign-in 200, token 200, create-room 201 |
+| CI | GitHub Actions run 39868480083 | verify, database, integration passed |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
 exercises create, join, reads, touch, lock, queue add/vote/remove, playback
@@ -115,6 +116,14 @@ The project's production alias is `echo-karaoke-mocha.vercel.app`, not the
 `ALLOWED_ORIGINS` were corrected and the deployment was repeated. The docs now use the
 confirmed alias.
 
+### 13. Low, fixed: CI branch URLs carried `channel_binding`
+
+The first CI run created its Neon branch and then failed at `db push` with
+`unrecognized configuration parameter "channel_binding"`. The Supabase CLI connector
+sends that URL parameter to the server. The branch helper now removes
+`channel_binding` while keeping `sslmode`. The rerun passed `verify`, `database`, and
+`integration`.
+
 ## The boundary that did not move
 
 - The authorized SQL is unchanged. The 225 database assertions cover grants, RLS,
@@ -130,9 +139,6 @@ confirmed alias.
 
 ## Not covered
 
-- No CI run yet. The CI workflow is committed and needs `NEON_API_KEY`,
-  `NEON_DATABASE_URL`, `NEON_SERVICE_DATABASE_URL`, `NEON_AUTH_DATABASE_URL`,
-  `BETTER_AUTH_SECRET`, and the `NEON_PROJECT_ID` variable.
 - Phone camera scanning and the real guest/host flow on a phone.
 - The YouTube Data API key path. The no-key path is tested; the live quota path is not.
 - Neon connection limits and function concurrency under a full room.
@@ -144,11 +150,9 @@ confirmed alias.
 
 ## Order to finish
 
-1. Add the repository secrets and run the Neon-branch CI workflow. The production
-   environment and deployment are complete and verified.
-2. Run a real phone host/guest flow against the production alias.
-3. Fix the host heartbeat across auth session replacement, with a test that would fail
+1. Run a real phone host/guest flow against the production alias.
+2. Fix the host heartbeat across auth session replacement, with a test that would fail
    without it.
-4. Add a per-IP sign-in throttle and an explicit room-size limit before a public party.
-5. Decide whether the dev tunnel is updated for `/api` or retired.
-6. Decide whether the YouTube key is configured or left as the paste-link fallback.
+3. Add a per-IP sign-in throttle and an explicit room-size limit before a public party.
+4. Decide whether the dev tunnel is updated for `/api` or retired.
+5. Decide whether the YouTube key is configured or left as the paste-link fallback.

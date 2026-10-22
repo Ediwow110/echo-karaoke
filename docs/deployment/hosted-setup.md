@@ -2,8 +2,8 @@
 
 Date: 2026-10-23
 Status: Deployed and verified at `https://echo-karaoke-mocha.vercel.app` on
-2026-10-23. The remaining gate is the first CI run, which needs the repository
-secrets and a push. Every hosted value below is named, never printed.
+2026-10-23. The CI workflow is green on `master`: verify, database, and integration
+all passed. Every hosted value below is named, never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The local
 gates are already green: 226 unit tests, 225 database assertions against Neon, 3
@@ -277,8 +277,12 @@ Branches copy the parent's data. The CI secret can differ from production becaus
 integration job removes the inherited encrypted keys first. Branch names include the
 run id and attempt, so two runs never collide.
 
-The workflow has not run yet: nothing has been pushed. A push is a separate approval
-gate.
+The workflow ran green on `master` on 2026-10-23
+([run 39868480083](https://github.com/Ediwow110/echo-karaoke/actions/runs/39868480083)):
+`verify`, `database`, and `integration` all passed. The first CI attempt failed at
+`db push` because Neon's branch URI carries `channel_binding`, which the Supabase CLI
+connector sends as a server parameter. `scripts/neon-branch.mjs` now removes that
+parameter from the branch URIs.
 
 ## Step 7: The room sweep
 
@@ -301,7 +305,7 @@ five-minute guarantee; the interval is opportunistic.
 - [x] `vercel deploy --prod` builds with the guard enabled.
 - [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
 - [ ] A real host/guest flow works on a phone.
-- [ ] The CI workflow runs green on `master` after a push.
+- [x] The CI workflow runs green on `master` after a push.
 
 ## Not covered here
 
