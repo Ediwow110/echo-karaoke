@@ -2,8 +2,9 @@
 
 Date: 2026-10-23
 Status: Deployed and verified at `https://echo-karaoke-mocha.vercel.app` on
-2026-10-23. The CI workflow is green on `master`: verify, database, and integration
-all passed. Every hosted value below is named, never printed.
+2026-10-23, including the host-heartbeat fix. The CI workflow is green on `master`:
+verify, database, and integration all passed. Every hosted value below is named,
+never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The local
 gates are already green: 229 unit tests, 234 database assertions against Neon, 4
@@ -247,6 +248,8 @@ Deployment evidence from 2026-10-23:
   token, and role `host`.
 - A Playwright flow created a room on desktop, joined it from a 390px guest viewport,
   saw the room name and queue, and appeared in the host roster.
+- After a second anonymous session replaced the first, `touch-member` with the host
+  pass returned 200, `host-room-read` returned 200, and the host ended the room.
 
 ## Step 6: CI
 
@@ -279,8 +282,8 @@ Branches copy the parent's data. The CI secret can differ from production becaus
 integration job removes the inherited encrypted keys first. Branch names include the
 run id and attempt, so two runs never collide.
 
-The workflow ran green on `master` on 2026-10-23
-([run 39868480083](https://github.com/Ediwow110/echo-karaoke/actions/runs/39868480083)):
+The workflow ran green on `master` on 2026-10-23, including the heartbeat fix
+([run 39870306564](https://github.com/Ediwow110/echo-karaoke/actions/runs/39870306564)):
 `verify`, `database`, and `integration` all passed. The first CI attempt failed at
 `db push` because Neon's branch URI carries `channel_binding`, which the Supabase CLI
 connector sends as a server parameter. `scripts/neon-branch.mjs` now removes that
@@ -307,6 +310,7 @@ five-minute guarantee; the interval is opportunistic.
 - [x] `vercel deploy --prod` builds with the guard enabled.
 - [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
 - [x] A browser host/guest flow works with a 390px guest viewport.
+- [x] A host heartbeat survives an auth session replacement on the live site.
 - [ ] A physical phone can scan the camera QR and run the same flow.
 - [x] The CI workflow runs green on `master` after a push.
 
@@ -314,6 +318,4 @@ five-minute guarantee; the interval is opportunistic.
 
 - The YouTube Data API key. Without it, search reports that it is not configured and
   the paste-a-link path keeps working.
-- A heartbeat is now bound to the room capability: a host whose auth session is
-  replaced still refreshes the host member. Both heartbeat paths reject ended rooms.
 - Per-IP sign-in throttling in front of Better Auth.

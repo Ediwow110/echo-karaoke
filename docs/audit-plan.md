@@ -616,7 +616,8 @@ integration tests, `npm run build`, `vercel build`, and a local hosted-style flo
 `https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production
 sign-in, token, and create-room flow returned 200, 200, and 201. A Playwright flow
 created a room on desktop, joined from a 390px guest viewport, saw the queue, and
-appeared in the host roster. CI runs 39868480083 and 39868803159 passed `verify`,
-`database`, and `integration` on `master` before the heartbeat fix; the fix is
-committed locally and awaits its own deployment and CI run. The remaining work is the
-physical-phone camera run and the open items in the report.
+appeared in the host roster. CI run 39870306564 passed `verify`, `database`, and
+`integration` with the heartbeat fix on `master`; production was redeployed, and a
+second anonymous session used the original host pass to touch (200), read (200), and
+end (200) the room. The remaining work is the physical-phone camera run and the open
+items in the report.

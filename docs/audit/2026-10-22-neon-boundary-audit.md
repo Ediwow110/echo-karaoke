@@ -4,7 +4,8 @@ Date: 2026-10-23
 Scope: the identity path, the two Neon credentials, the Vercel Function boundary,
 and the parts of the room authorization SQL that did not move.
 Verdict: **deployed, verified, and CI green** at
-`https://echo-karaoke-mocha.vercel.app` on 2026-10-23.
+`https://echo-karaoke-mocha.vercel.app` on 2026-10-23, including the host-heartbeat
+fix.
 
 ## Evidence
 
@@ -22,7 +23,8 @@ Verdict: **deployed, verified, and CI green** at
 | Production auth and room | curl against the alias | sign-in 200, token 200, create-room 201 |
 | Production browser flow | Playwright, desktop host plus 390px guest | room created, guest joined, queue visible, guest in the host roster |
 | Heartbeat after session swap | integration test plus `heartbeat_test.sql` | 401 before; 200 after; host member refreshed without an auth user id |
-| CI | GitHub Actions runs 39868480083 and 39868803159 | verify, database, integration passed |
+| Production heartbeat | new anonymous session plus the original host pass | touch 200, host read 200, end 200 |
+| CI | GitHub Actions runs 39868480083, 39868803159, and 39870306564 | verify, database, integration passed |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
 exercises create, join, reads, touch, lock, queue add/vote/remove, playback
@@ -140,7 +142,9 @@ and refreshes the host member without reading the auth user id. Both heartbeat p
 now reject ended rooms (`0023_host_heartbeat.sql`). The regression is covered by an
 integration test that swaps the auth session (401 before the fix, 200 after), a client
 unit test that checks the selected pass, and the `heartbeat_test.sql` suite. Database
-assertions are now 234.
+assertions are now 234. The production deployment was repeated; a second anonymous
+session used the original host pass to touch the member (200), read the room (200),
+and end it (200).
 
 ## The boundary that did not move
 
