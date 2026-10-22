@@ -62,7 +62,8 @@ async function call(name: string, token: string, body: unknown, headers: Record<
 
 describe.skipIf(!runsHere)('Vercel operation router', () => {
   beforeAll(async () => {
-    handler = (await import('../../api/[...path]')).default;
+    const entry = (await import('../../api/router')).default;
+    handler = (request) => entry.fetch(request);
     server = createServer(async (request, response) => {
       const result = await handler!(await toFetchRequest(request));
       response.statusCode = result.status;
@@ -225,6 +226,34 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
       'x-room-guest-token': guestToken,
     });
     expect(suggest.status).toBe(400);
+  });
+
+  it('serves auth and operations through the Vercel rewrite', async () => {
+    const jwks = await fetch(BASE + '/api/router?path=auth/jwks');
+    expect(jwks.status).toBe(200);
+    const keys = (await jwks.json()) as { keys?: unknown[] };
+    expect(Array.isArray(keys.keys)).toBe(true);
+    expect((keys.keys ?? []).length).toBeGreaterThan(0);
+
+    const hostAuth = await signIn();
+    const created = await fetch(BASE + '/api/router?path=create-room', {
+      method: 'POST',
+      headers: {
+        authorization: 'Bearer ' + hostAuth,
+        'content-type': 'application/json',
+        origin: BASE,
+      },
+      body: JSON.stringify({ displayName: 'Rewrite Host' }),
+    });
+    expect(created.status).toBe(201);
+
+    const missing = await fetch(BASE + '/api/router?path=__preview_check__', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', origin: BASE },
+      body: '{}',
+    });
+    expect(missing.status).toBe(404);
+    expect(missing.headers.get('content-type')).toContain('application/json');
   });
 
   it('sweeps an abandoned room when the next room is created', async () => {

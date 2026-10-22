@@ -23,7 +23,7 @@ describe('Vercel deployment configuration', () => {
   });
 
   it('uses the default Node runtime and pins Node 24 through package metadata', () => {
-    const handler = readFileSync('api/[...path].ts', 'utf8');
+    const handler = readFileSync('api/router.ts', 'utf8');
     const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { engines?: { node?: string } };
     expect(handler).not.toContain('config = { runtime:');
     expect(packageJson.engines?.node).toBe('24.x');
@@ -33,22 +33,23 @@ describe('Vercel deployment configuration', () => {
     expect(config.regions).toEqual(['sin1']);
   });
 
+  it('sends every API path to the single router with its path', () => {
+    const api = config.rewrites?.[0];
+    expect(api).toEqual({ source: '/api/(.*)', destination: '/api/router?path=$1' });
+    const route = new RegExp('^' + (api?.source ?? '') + '$');
+    expect(route.test('/api/create-room')).toBe(true);
+    expect(route.test('/api/auth/sign-in/anonymous')).toBe(true);
+  });
+
   it('rewrites SPA routes but leaves static files alone', () => {
-    const source = config.rewrites?.[0]?.source ?? '';
+    const source = config.rewrites?.[1]?.source ?? '';
     const route = new RegExp('^' + source + '$');
     expect(route.test('/room/abc/host')).toBe(true);
     expect(route.test('/join/CODE')).toBe(true);
+    expect(route.test('/api/create-room')).toBe(false);
     expect(route.test('/assets/index.js')).toBe(false);
     expect(route.test('/fonts/inter-latin.woff2')).toBe(false);
     expect(route.test('/favicon.svg')).toBe(false);
-  });
-
-  it('sends the API routes to the function and the rest to the app', () => {
-    const source = config.rewrites?.[0]?.source ?? '';
-    const route = new RegExp('^' + source + '$');
-    expect(route.test('/api/create-room')).toBe(false);
-    expect(route.test('/api/auth/token')).toBe(false);
-    expect(route.test('/room/abc/host')).toBe(true);
   });
 
   it('sets a restrictive CSP for the same-origin API and YouTube', () => {
