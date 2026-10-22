@@ -25,6 +25,22 @@ select ok(
   not has_function_privilege('echo_auth', 'public.queue_add(uuid, text, text, text, text, text, text, text, integer)', 'execute'),
   'the auth role cannot run the queue operations'
 );
+select ok(
+  not has_table_privilege('echo_auth', 'public.rooms', 'select'),
+  'the auth role cannot read rooms'
+);
+select ok(
+  not has_table_privilege('echo_auth', 'public.members', 'insert'),
+  'the auth role cannot write members'
+);
+select ok(
+  not has_table_privilege('service_role', 'public.user', 'select'),
+  'the service role cannot read auth users'
+);
+select ok(
+  not has_table_privilege('service_role', 'public.jwks', 'select'),
+  'the service role cannot read the auth keys'
+);
 
 select * from finish();
 rollback;
