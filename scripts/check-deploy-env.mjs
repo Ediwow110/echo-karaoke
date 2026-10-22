@@ -2,6 +2,32 @@
 import { pathToFileURL } from 'node:url';
 
 const TUNNEL_SUFFIX = '.trycloudflare.com';
+const PUBLISHABLE_PREFIX = 'sb_publishable_';
+
+/**
+ * Reads the role out of a legacy Supabase key, which is a JWT whose payload
+ * carries it. The browser only ever gets the anon key, so anything that names
+ * a stronger role must never reach the bundle.
+ */
+export function keyRole(key) {
+  const trimmed = key.trim();
+  if (trimmed.startsWith(PUBLISHABLE_PREFIX)) {
+    return 'anon';
+  }
+  if (trimmed.startsWith('sb_secret_')) {
+    return 'secret';
+  }
+  const parts = trimmed.split('.');
+  if (parts.length !== 3) {
+    return null;
+  }
+  try {
+    const payload = JSON.parse(Buffer.from(parts[1], 'base64url').toString('utf8'));
+    return typeof payload.role === 'string' ? payload.role : null;
+  } catch {
+    return null;
+  }
+}
 
 export function checkDeployEnv(env = process.env) {
   const errors = [];
@@ -36,6 +62,11 @@ export function checkDeployEnv(env = process.env) {
 
   if (anonKey.length === 0) {
     errors.push('VITE_SUPABASE_ANON_KEY is required.');
+  } else {
+    const role = keyRole(anonKey);
+    if (role !== 'anon') {
+      errors.push('VITE_SUPABASE_ANON_KEY must be the anon or publishable key, not a privileged key.');
+    }
   }
 
   if (origins.length === 0) {

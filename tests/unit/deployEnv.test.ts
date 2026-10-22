@@ -1,15 +1,49 @@
 import { describe, expect, it } from 'vitest';
 import { checkDeployEnv } from '../../scripts/check-deploy-env.mjs';
 
+// A legacy Supabase key is a JWT whose payload carries the role.
+function legacyKey(role: string): string {
+  const encode = (value: object): string =>
+    btoa(JSON.stringify(value)).replace(/\+/g, '-').replace(/\//g, '_').replace(/=+$/, '');
+  return `${encode({ alg: 'HS256', typ: 'JWT' })}.${encode({ iss: 'supabase', role })}.signature`;
+}
+
 const valid = {
   VITE_SUPABASE_URL: 'https://project.supabase.co',
-  VITE_SUPABASE_ANON_KEY: 'anon',
+  VITE_SUPABASE_ANON_KEY: legacyKey('anon'),
   ALLOWED_ORIGINS: 'https://app.example',
 };
 
 describe('deployment environment guard', () => {
   it('accepts a stable HTTPS Supabase URL and explicit origin', () => {
     expect(checkDeployEnv(valid)).toEqual([]);
+  });
+
+  it('accepts the publishable key form', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      VITE_SUPABASE_ANON_KEY: 'sb_publishable_abcdefghijklmnopqrstuvwxyz0123456789',
+    })).toEqual([]);
+  });
+
+  it('refuses a key that carries a privileged role', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VITE_SUPABASE_ANON_KEY: legacyKey('service_role'),
+    });
+    expect(errors).toContain(
+      'VITE_SUPABASE_ANON_KEY must be the anon or publishable key, not a privileged key.',
+    );
+  });
+
+  it('refuses a key that is neither a readable anon key nor a publishable key', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VITE_SUPABASE_ANON_KEY: 'not-a-key',
+    });
+    expect(errors).toContain(
+      'VITE_SUPABASE_ANON_KEY must be the anon or publishable key, not a privileged key.',
+    );
   });
 
   it('rejects an ephemeral tunnel and an empty origin allowlist', () => {
