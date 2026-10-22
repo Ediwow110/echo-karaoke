@@ -603,6 +603,8 @@ Gates on 2026-10-23: 226 unit tests, 225 database assertions on Neon, 3 operatio
 integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
 (sign-in 200, token 200, create-room 201). Production is deployed at
 `https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production
-sign-in, token, and create-room flow returned 200, 200, and 201. CI run 39868480083
-passed `verify`, `database`, and `integration` on `master`. The remaining work is the
-phone flow and the open items in the report.
+sign-in, token, and create-room flow returned 200, 200, and 201. A Playwright flow
+created a room on desktop, joined from a 390px guest viewport, saw the queue, and
+appeared in the host roster. CI runs 39868480083 and 39868803159 passed `verify`,
+`database`, and `integration` on `master`. The remaining work is the physical-phone
+camera run and the open items in the report.

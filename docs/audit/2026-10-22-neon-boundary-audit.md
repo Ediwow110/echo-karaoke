@@ -20,7 +20,8 @@ Verdict: **deployed, verified, and CI green** at
 | Production deploy | `vercel deploy --prod` | ready; alias `echo-karaoke-mocha.vercel.app` |
 | Production verifier | `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` | passed |
 | Production auth and room | curl against the alias | sign-in 200, token 200, create-room 201 |
-| CI | GitHub Actions run 39868480083 | verify, database, integration passed |
+| Production browser flow | Playwright, desktop host plus 390px guest | room created, guest joined, queue visible, guest in the host roster |
+| CI | GitHub Actions runs 39868480083 and 39868803159 | verify, database, integration passed |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
 exercises create, join, reads, touch, lock, queue add/vote/remove, playback
@@ -139,7 +140,8 @@ sends that URL parameter to the server. The branch helper now removes
 
 ## Not covered
 
-- Phone camera scanning and the real guest/host flow on a phone.
+- Phone camera scanning and a physical-device run. A 390px mobile browser viewport
+  completed the host/guest flow, but the camera and OS share sheet were not exercised.
 - The YouTube Data API key path. The no-key path is tested; the live quota path is not.
 - Neon connection limits and function concurrency under a full room.
 - Per-IP throttling in front of Better Auth.
@@ -150,7 +152,7 @@ sends that URL parameter to the server. The branch helper now removes
 
 ## Order to finish
 
-1. Run a real phone host/guest flow against the production alias.
+1. Run a physical phone camera QR flow against the production alias.
 2. Fix the host heartbeat across auth session replacement, with a test that would fail
    without it.
 3. Add a per-IP sign-in throttle and an explicit room-size limit before a public party.

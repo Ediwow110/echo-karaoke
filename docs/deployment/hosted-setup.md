@@ -245,6 +245,8 @@ Deployment evidence from 2026-10-23:
 - `/api/auth/token` returned 200 with a 739-character JWT.
 - `/api/create-room` returned 201 with a 16-character room code, a 43-character host
   token, and role `host`.
+- A Playwright flow created a room on desktop, joined it from a 390px guest viewport,
+  saw the room name and queue, and appeared in the host roster.
 
 ## Step 6: CI
 
@@ -304,7 +306,8 @@ five-minute guarantee; the interval is opportunistic.
 - [x] `npm run build` passes.
 - [x] `vercel deploy --prod` builds with the guard enabled.
 - [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
-- [ ] A real host/guest flow works on a phone.
+- [x] A browser host/guest flow works with a 390px guest viewport.
+- [ ] A physical phone can scan the camera QR and run the same flow.
 - [x] The CI workflow runs green on `master` after a push.
 
 ## Not covered here
