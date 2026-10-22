@@ -34,12 +34,21 @@ sends the key to the browser.
 
 ## Step 1: Create the hosted Supabase project
 
-Create a project in the Supabase dashboard, or with the CLI once the access token is
-in place:
+A free plan allows two active free projects per organization member. A paused project
+does not count, and a second free organization carries its own quota of two, so a
+product with its own database belongs in its own organization rather than sharing one
+with another product. The ECHO project goes in a second free organization.
+
+Create the organization with the CLI, once the access token is in place:
 
 ```bash
-npx supabase projects create echo-karaoke --org-id <org-id> --region <region> --db-password <password>
+npx supabase orgs create ECHO
+npx supabase projects create echo-karaoke --org-id <new-org-id> --region ap-northeast-1 --db-password <password>
 ```
+
+The project creation also works through the Supabase platform API, which takes the
+organization id, the region, and no password. The CLI needs the password only so that
+later `db push` runs can connect directly.
 
 The local stack and the hosted project must agree on the Postgres major version. The
 local `supabase/config.toml` pins `major_version = 17`, so read the hosted project's
