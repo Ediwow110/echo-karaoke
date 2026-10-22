@@ -312,6 +312,181 @@ search budget of 200 against a bucket of 100 calls a day exhausts YouTube for th
 day, and `youtube-search/index.ts:151-153` reports that as a generic unavailable
 search, so the cause is invisible.
 
+### ARCH-1: the approved device classification is not implemented, and the home screen branches in JavaScript
+Pass 1 severity: Medium. Auditor confidence: High. Confirmed independently by three
+reviewers, the reviewer also measuring the deployed preview.
+`src/app/HomePage.tsx:39` uses `useMediaQuery('(min-width: 1024px)')` and branches into
+two separate trees at `:116` and `:238`, while
+`docs/superpowers/specs/2026-10-22-device-aware-home-and-live-suggestions.md:20-26`
+requires the shorter edge under 640 pixels to mean phone, with the classification
+expressed in the stylesheet through order utilities, one markup tree, and no resize
+listener. Two things break beyond the boundary itself: the two trees are different
+DOM, so the markup order does change for a screen reader, which the spec forbids at
+`:110`; and there are two scan actions in the source, `:168` inside the narrow join
+form and `:243` as the wide tree's mobile action, where the spec asks for one at
+`:38-40`.
+Fix: one markup tree with order utilities and a container query that can express the
+shorter edge, or at minimum change the query to
+`(min-width: 640px) and (min-height: 640px)` and make both trees emit the same order.
+
+### ARCH-2: the suggestion strip can never show the twelve songs the spec claims and verifies
+Pass 1 severity: Low. Auditor confidence: High. The same drift as API-11.
+`supabase/functions/youtube-popular/index.ts:20` asks for twelve,
+`supabase/functions/_shared/youtube.ts:85` caps the mapping at ten, and
+`src/features/queue/PopularSongs.tsx:84` renders eight. The spec's own verification
+step, "the strip shows twelve songs", can therefore never pass.
+
+### ARCH-3: one song carries two different queue numbers on the same screen
+Pass 1 severity: Low. Auditor confidence: High.
+`src/features/queue/SongSearchPanel.tsx:191` prints the raw database position, while
+`:82-85` and `:266-268` compute a one-based index over the sorted queue, and
+`src/features/queue/QueueRows.tsx:160` and `:107` number the up-next list from a
+different slice again. With one song playing, the list says 01 and the search result
+for the same song says 2, and the confirmation says 2.
+
+### ARCH-4: dead code, and the client room-code generator has already drifted from the server
+Pass 1 severity: Info. Auditor confidence: High.
+`src/features/rooms/roomCode.ts:28-30` generates room codes on the client although the
+server owns that, and the client version rejects bytes at or above 224 while the server
+uses `byte % 32`, so the two disagree for one byte value in four. Only the unit test
+references the client generator, and that test asserts the client copy, so a future
+change to the server alphabet would leave the suite green and the client wrong.
+Also unused: `readJoinCodeFromPath` and `readRoomIdFromPath`
+(`src/features/rooms/roomUrl.ts:10`, `:20`), `readQueue`
+(`src/features/queue/queueApi.ts:75-78`), `clearRoomTokens`
+(`src/features/rooms/tokenStore.ts:66`), and `src/ui/Panel.tsx`, which is exported from
+the barrel and imported nowhere. The vote and suggest endpoints are named in
+`src/lib/edgeApi.ts` but no screen calls them, so the voting feature in the console
+redesign spec and the autocomplete have no reachable screen.
+
+### ARCH-5: the heartbeat runs at the full poll rate, so the throttle only applies to a hidden tab
+Pass 1 severity: Info. Auditor confidence: High.
+`src/features/rooms/useRoomData.ts:95-99` sends a touch before every read, four seconds
+apart, and the thirty second cadence at `:67` applies only to the hidden path. A room
+of thirty guests plus a host costs about 900 Edge invocations a minute, half of them
+heartbeats the database would have skipped anyway
+(`supabase/migrations/0001_room_core.sql:555-558`).
+
+### ARCH-6: the specs on disk describe a different product, palette and sync model
+Pass 1 severity: Info. Auditor confidence: High.
+`docs/superpowers/specs/2026-10-22-encore-console-redesign.md:78-96` specifies
+graphite `#0A0B0E`, cobalt `#4E82FF` and Manrope, while `src/styles.css:68-96`
+implements graphite `#100d18`, a violet signal and Inter, and `public/fonts/` has no
+Manrope. That spec names two images that no longer exist and three primitives that
+are gone. `docs/superpowers/specs/2026-10-18-online-karaoke-design.md:37-50` still
+describes Realtime and Presence as the sync mechanism while `README.md:32` states
+Realtime is not used and the code polls. A reader is handed a false contract, which
+is what produced ARCH-1.
+
+### QA-1: the Playwright suite never runs in CI, so the client to Edge seam is untested
+Pass 1 severity: Medium. Auditor confidence: High.
+`.github/workflows/ci.yml:16-88` has three jobs and none runs `npm run test:e2e`,
+although `docs/superpowers/plans/2026-10-18-online-karaoke-implementation.md:192`
+promised browser tests in CI. The unit tests replace the whole Edge API with a fake
+that accepts any call (`tests/unit/guestRoomPage.test.tsx:41-59`), and the
+integration suite drives the functions over raw HTTP without the React client
+(`tests/integration/edgeRoomAuth.test.ts:31-58`). A break in the seam between them,
+for example the guest remote stopping sending the guest pass, is invisible to CI.
+`playwright.config.ts` has no `webServer`, so the suite cannot start on a clean runner
+even if the step were added.
+
+### QA-2: the database job hit the image pull rate limit on the very first run
+Pass 1 severity: Medium. Auditor confidence: High.
+The log of run 39779181642 shows `toomanyrequests: Rate exceeded` and retries for
+nine of the ten Supabase images from `public.ecr.aws`, and the stack only came up 92
+seconds after the step began. GitHub runners share address ranges and pull
+anonymously, so a throttled registry turns a correct commit red for a reason that has
+nothing to do with the code. No step caches the images; only npm is cached.
+
+### QA-3: the Edge integration suite skips itself and still reports success
+Pass 1 severity: Low. Auditor confidence: High.
+`tests/integration/edgeRoomAuth.test.ts:6-8` decides whether to run from two
+environment variables and wraps every block in `describe.skipIf(!runsLocally)`. Run
+with the variables absent it prints 17 skipped tests and exits 0. If the extraction in
+`.github/workflows/ci.yml:56-57` ever yields an empty value, the step goes green and
+the only job that exercises the thirteen Edge Functions against a real Postgres stops
+doing so, with nothing reporting it.
+
+### QA-4: the test suites spend 23 of the 30 local anonymous sign-ins an hour
+Pass 1 severity: Medium. Auditor confidence: Medium.
+`supabase/config.toml:204` sets `anonymous_users = 30`. The integration suite alone
+calls `anonymousSession()` 23 times and the Playwright suite adds roughly one per
+browser context, about 14 per run. A second run inside the same hour, or an
+integration run followed by a Playwright run, exceeds the budget and the client reports
+"Could not start a guest session". The same limit is the venue network limit in
+production.
+
+### QA-5: the production artifact is a bundle nothing deploys, and it is not gated
+Pass 1 severity: Low. Auditor confidence: High.
+`.github/workflows/ci.yml:59-88` gives `production-artifact` no `needs:`, so it runs
+beside the `verify` job rather than after it, and nothing in `vercel.json` or the
+workflow consumes the uploaded `dist`. The headers live in `vercel.json` and are
+applied at the Vercel edge, not in the bundle, so the README sentence that suggested
+the artifact needed no further headers was wrong. Corrected during the audit.
+
+### QA-6: the thirteen Edge Functions are never type-checked
+Pass 1 severity: Low. Auditor confidence: High.
+`tsconfig.json:19` includes only `src`, `tests` and the config files, so `tsc` never
+sees `supabase/functions/`, Deno strips types without checking them, and
+`supabase functions deploy` does not type-check either. A wrong field name inside a
+function deploys, leaves the job green, and appears only when that path runs.
+
+### QA-7: the documented procedure left the Edge allowlist with one origin
+Pass 1 severity: Medium. Auditor confidence: Medium.
+**This was a defect in the runbook written during this audit**, and it is fixed. The
+procedure set the Edge secret with a single production origin while telling the
+operator to give the preview environment the preview origin as a Vercel build
+variable. The two are read in different places: the Edge secret is what the functions
+enforce and the build variable is what the deploy guard checks. A preview whose
+origin was missing from the Edge secret passes `npm run verify:preview`, loads the
+app shell, and fails every function call with a CORS error. The procedure now sets
+both origins in one comma separated list, gives the preview a stable alias so the
+origin does not change on every deploy, and says which value goes where.
+
+### QA-8: several unit tests assert source text, and one can be defeated by a quote
+Pass 1 severity: Low. Auditor confidence: High.
+`tests/unit/appShell.test.tsx:33-36` asserts the entry point contains
+`await import('./lib/supabase')` and that no single quoted static import of it
+exists. Rewriting the import with double quotes keeps the test green while the
+Supabase client is statically bundled into the first download, which is the exact
+regression the test exists to prevent. `tests/unit/styles.test.ts:5` and
+`tests/unit/consoleDesign.test.ts:5` grep the stylesheet text, so they break on a
+renamed custom property and stay green when the stylesheet is never loaded.
+
+### QA-9: the host stage and party screens have no test at all
+Pass 1 severity: Low. Auditor confidence: High.
+`src/app/HostStagePage.tsx:55-83` and `src/app/HostPartyPage.tsx:50-82` implement the
+keyboard map, the transport, the ten second seek, the volume and fullscreen, and
+neither has a test file. The Playwright suite never opens `/host/stage` or
+`/host/party`, while `README.md:12` claims the stage view has all of it.
+
+### QA-10: the claim that one player stays mounted across host route changes is asserted nowhere
+Pass 1 severity: Info. Auditor confidence: High.
+`README.md:33` states the player stays mounted while the host moves between the host
+routes. The only browser test that touches the player
+(`tests/e2e/room-flow.spec.ts:185-206`) asserts the iframe changes when the host
+moves to a **different room**. No test navigates between host routes of the same room
+and compares the iframe identity, so a re-keyed player that restarts the song on the
+television would pass CI.
+
+### QA-11: the integration and Playwright suites depend on the live YouTube oEmbed endpoint
+Pass 1 severity: Low. Auditor confidence: Medium.
+`supabase/functions/_shared/youtube.ts:29-40` resolves metadata from
+`https://www.youtube.com/oembed`, and
+`tests/integration/edgeRoomAuth.test.ts:317-326` expects a 201 with a server resolved
+title while `tests/e2e/room-flow.spec.ts:134` expects the literal YouTube title for
+one video. When the network cannot reach YouTube, both suites fail even though the
+product code is correct, and the Playwright assertion is bound to wording YouTube can
+change without any code change.
+
+### QA-12: the workflow does not run on every push
+Pass 1 severity: Info. Auditor confidence: High.
+`.github/workflows/ci.yml:3-5` limits the push trigger to `master` and `feature/**`,
+while the runbook said the remote is added "so the CI workflow runs on every push". A
+push to any other branch name starts no workflow, and the commit still looks verified
+because a workflow with that name exists on the repository. **Corrected during the
+audit.**
+
 ## Findings ledger (id | severity | confidence | title)
 (appended as verified in Pass 2 and Pass 3)
 

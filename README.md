@@ -61,7 +61,7 @@ In any public deployment, set the browser origin allowlist as well. An empty val
 
     ALLOWED_ORIGINS=https://your-app.example
 
-Before shipping, run `npm run verify:deploy` with the production `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `ALLOWED_ORIGINS`. It rejects missing credentials, non-HTTPS URLs, the ephemeral trycloudflare tunnel, wildcard origins, and origins with paths or trailing slashes. The CI workflow runs the guard when the matching repository variables are configured, builds and uploads a `production-dist` artifact with those values, and also runs the Edge integration suite against the local stack. `vercel.json` applies the host-level security headers and the CSP, so the artifact needs no further headers before it is served.
+Before shipping, run `npm run verify:deploy` with the production `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, and `ALLOWED_ORIGINS`. It rejects missing credentials, non-HTTPS URLs, the ephemeral trycloudflare tunnel, wildcard origins, and origins with paths or trailing slashes. The CI workflow runs the guard when the matching repository variables are configured, builds and uploads a `production-dist` artifact with those values, and also runs the Edge integration suite against the local stack. `vercel.json` applies the host-level security headers and the CSP at the Vercel edge. Those headers are not part of `dist`, so serving the artifact from a plain static host ships the app without them.
 
 The hosted setup, step by step, is in `docs/deployment/hosted-setup.md`. It covers the Supabase project and its Auth limits, the migrations, the Edge Functions and their secrets, the Vercel environment, the git remote, the CI variables, and the preview checks.
 

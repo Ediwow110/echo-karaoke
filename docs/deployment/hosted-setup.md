@@ -145,7 +145,7 @@ deployed.
 ## Step 4: Set the Edge secrets
 
 ```bash
-npx supabase secrets set ALLOWED_ORIGINS=https://<app-origin>
+npx supabase secrets set ALLOWED_ORIGINS=https://<app-origin>,https://<preview-origin>
 npx supabase secrets set YOUTUBE_API_KEY=<youtube-data-api-key>
 ```
 
@@ -154,6 +154,25 @@ origin, which is convenient locally and too permissive in public. The list holds
 origins, comma separated, with no path and no trailing slash. A request from an origin
 that is not on the list is answered with the first allowed origin, so the browser
 blocks it.
+
+The list needs **both** the production origin and the preview origin, and the preview
+needs a stable name because the generated deployment host changes on every deploy. Set
+the alias once, before the first preview:
+
+```bash
+vercel alias set <deployment-url> echo-karaoke-preview
+```
+
+That gives the preview the fixed origin `https://echo-karaoke-preview.vercel.app`,
+which is the one to put in the list. A preview on a generated host is a different
+origin, so the browser blocks every function call from it and the room service appears
+to be broken even though the static app loads.
+
+The Edge secret and the Vercel build variable are two different things and they are
+read in two different places. The Edge secret is what the functions enforce, and the
+Vercel build variable is what the deploy guard checks. Setting one does not set the
+other, and a preview whose origin is missing from the Edge secret passes
+`npm run verify:preview` and still cannot create a room.
 
 The two YouTube budget variables have safe defaults and only need a value if the
 defaults are wrong for the account:
@@ -236,6 +255,10 @@ Vercel preview is verified.
 git push -u origin master
 ```
 
+The workflow runs on every pull request, and on every push to `master` or to a branch
+named `feature/…`. A push to any other branch name starts no workflow, so a branch
+such as `fix/guest-cors` is not verified until it is opened as a pull request.
+
 The CI workflow needs two repository variables and one secret:
 
 | Name | Kind | Value |
@@ -292,6 +315,13 @@ different values, so the target has to be named:
 
 ```bash
 vercel deploy --environment preview
+```
+
+The preview needs the stable name from Step 4, so move the alias onto the new
+deployment after each one:
+
+```bash
+vercel alias set <new-deployment-url> echo-karaoke-preview
 ```
 
 Then run the preview verifier against the deployment URL. Keep the production values in
