@@ -1,8 +1,14 @@
 # Neon Database Migration: Design Spec
 
 Date: 2026-10-22
-Status: Approved in conversation, ready for the implementation plan
+Status: Superseded by `2026-10-22-neon-full-stack-migration.md`
 Supersedes: nothing. The storage engine moves. The product does not.
+
+This spec moved the database only and kept Supabase Auth and the Supabase Edge
+Functions. The Supabase account cannot create the project that would hold them, because
+the free plan limit of two active projects is counted across every organization where
+the owner is an administrator, so a second organization does not create a fresh quota.
+The identity and the functions move as well, and that is the next spec.
 
 ---
 
