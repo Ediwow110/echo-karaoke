@@ -17,7 +17,7 @@ export default function Toggle({ checked, onChange, label, description, disabled
         )}
       </div>
       <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        <span aria-hidden="true" className={['text-[0.625rem] font-medium', checked ? 'text-signal' : 'text-ink-2'].join(' ')}>
+        <span aria-hidden="true" className={['w-6 shrink-0 text-right text-[0.625rem] font-medium', checked ? 'text-signal' : 'text-ink-2'].join(' ')}>
           {checked ? 'ON' : 'OFF'}
         </span>
         <button
@@ -37,7 +37,7 @@ export default function Toggle({ checked, onChange, label, description, disabled
           <span
             aria-hidden="true"
             className={[
-              'absolute top-1 size-4 rounded-full bg-graphite-deep transition-transform duration-(--duration-fast)',
+              'absolute left-0 top-1 size-4 rounded-full bg-graphite-deep transition-transform duration-(--duration-fast)',
               checked ? 'translate-x-6 bg-signal-ink' : 'translate-x-1',
             ].join(' ')}
           />
