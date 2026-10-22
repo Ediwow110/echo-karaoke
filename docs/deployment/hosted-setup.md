@@ -34,10 +34,16 @@ sends the key to the browser.
 
 ## Step 1: Create the hosted Supabase project
 
-Create a project in the Supabase dashboard. The local stack and the hosted project must
-agree on the Postgres major version. The local `supabase/config.toml` pins
-`major_version = 17`, so read the hosted project's major version in the dashboard
-before applying migrations.
+Create a project in the Supabase dashboard, or with the CLI once the access token is
+in place:
+
+```bash
+npx supabase projects create echo-karaoke --org-id <org-id> --region <region> --db-password <password>
+```
+
+The local stack and the hosted project must agree on the Postgres major version. The
+local `supabase/config.toml` pins `major_version = 17`, so read the hosted project's
+major version in the dashboard before applying migrations.
 
 Then turn on the two Auth settings the app needs.
 
@@ -61,6 +67,10 @@ npx supabase link --project-ref <project-ref>
 npx supabase db push --dry-run
 npx supabase db push
 ```
+
+The CLI cannot run the browser login in a non-interactive shell, and the link step
+asks for the database password. Run those two in a terminal of your own. Every later
+step reads the stored link and needs no secret.
 
 `--dry-run` prints the migrations before they run. Read that list. It must contain
 every file in `supabase/migrations`, from `0001_room_core.sql` through
