@@ -1,8 +1,9 @@
 # Hosted Setup Runbook
 
 Date: 2026-10-23
-Status: Procedure only. Nothing has been pushed or deployed from this document. Every
-hosted value below is named, never printed.
+Status: Deployed and verified at `https://echo-karaoke-mocha.vercel.app` on
+2026-10-23. The remaining gate is the first CI run, which needs the repository
+secrets and a push. Every hosted value below is named, never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The local
 gates are already green: 226 unit tests, 225 database assertions against Neon, 3
@@ -45,11 +46,11 @@ the served HTML and main asset for one.
 | Neon region | `aws-ap-southeast-1` |
 | Neon default branch | `main` (`br-curly-pine-b3bzrw7u`) |
 | Vercel project | `echo-karaoke` on `ediwow110s-projects` |
-| Expected production origin | `https://echo-karaoke.vercel.app` |
+| Expected production origin | `https://echo-karaoke-mocha.vercel.app` |
 
 The Vercel production domain is the project's default domain. Confirm it after the
 first deployment and use the confirmed value everywhere this document writes
-`https://echo-karaoke.vercel.app`.
+`https://echo-karaoke-mocha.vercel.app`.
 
 ## Credentials
 
@@ -187,8 +188,8 @@ vercel env add ALLOWED_ORIGINS production
 | `DATABASE_URL` | The pooled `service_role` connection string |
 | `AUTH_DATABASE_URL` | The direct `echo_auth` connection string |
 | `BETTER_AUTH_SECRET` | A random secret of at least 32 characters |
-| `BETTER_AUTH_URL` | `https://echo-karaoke.vercel.app` |
-| `ALLOWED_ORIGINS` | `https://echo-karaoke.vercel.app` |
+| `BETTER_AUTH_URL` | `https://echo-karaoke-mocha.vercel.app` |
+| `ALLOWED_ORIGINS` | `https://echo-karaoke-mocha.vercel.app` |
 
 `ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. It is
 not a CORS allowlist any more: the function is same-origin, so no CORS headers are
@@ -217,11 +218,11 @@ fails `npm run verify:preview` with a message naming that cause.
 
 ## Step 5: Deploy and verify
 
-Deployment is a separate approval gate. Once approved:
+The production deployment was approved and performed on 2026-10-23:
 
 ```bash
 vercel deploy --prod
-npm run verify:preview -- https://echo-karaoke.vercel.app
+npm run verify:preview -- https://echo-karaoke-mocha.vercel.app
 ```
 
 The verifier checks:
@@ -236,6 +237,14 @@ The verifier checks:
 Then verify one real flow by hand: create a room, open the guest link on a phone, add a
 song, and press play. The integration suite proves the same path against Neon, but it
 does not prove the deployed cookies or the phone camera.
+
+Deployment evidence from 2026-10-23:
+
+- `verify:preview` passed against the production alias.
+- A production sign-in returned 200 and set a session cookie.
+- `/api/auth/token` returned 200 with a 739-character JWT.
+- `/api/create-room` returned 201 with a 16-character room code, a 43-character host
+  token, and role `host`.
 
 ## Step 6: CI
 
@@ -285,12 +294,12 @@ five-minute guarantee; the interval is opportunistic.
 
 ## Verification checklist
 
-- [ ] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 225/225.
-- [ ] `npm run test:integration` reports 2/2 against Neon.
-- [ ] `npm test` reports the unit suite green.
-- [ ] `npm run build` passes.
-- [ ] `vercel deploy --prod` builds with the guard enabled.
-- [ ] `npm run verify:preview -- https://echo-karaoke.vercel.app` passes.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 225/225.
+- [x] `npm run test:integration` reports 3/3 against Neon.
+- [x] `npm test` reports 226 unit tests passing.
+- [x] `npm run build` passes.
+- [x] `vercel deploy --prod` builds with the guard enabled.
+- [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
 - [ ] A real host/guest flow works on a phone.
 - [ ] The CI workflow runs green on `master` after a push.
 

@@ -596,9 +596,12 @@ and `echo_auth`. The current report is
 | N-8 | Low | The client token and sign-in requests had no deadline | Fixed |
 | N-9 | Low | An unknown key id waited out the ten-minute JWKS cache | Fixed |
 | N-10 | Info | `clearAnonymousSession` was dead API | Removed |
+| N-11 | High | The production function imports had no ESM extensions, so every API request returned 500 | Fixed |
+| N-12 | Medium | The production alias was assumed rather than read from the project | Fixed |
 
 Gates on 2026-10-23: 226 unit tests, 225 database assertions on Neon, 3 operation
 integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
-(sign-in 200, token 200, create-room 201). No production deployment and no push were
-performed. The remaining work is the approval-gated Vercel environment, the CI
-secrets, and the four open items in the report.
+(sign-in 200, token 200, create-room 201). Production is deployed at
+`https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production
+sign-in, token, and create-room flow returned 200, 200, and 201. The CI workflow has
+not run yet and needs the repository secrets and a push.

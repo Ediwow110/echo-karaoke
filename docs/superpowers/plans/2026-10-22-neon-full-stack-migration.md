@@ -924,7 +924,7 @@ cannot be undone by a redeploy.
 
 ```bash
 vercel deploy --prod
-npm run verify:preview -- https://echo-karaoke.vercel.app
+npm run verify:preview -- https://echo-karaoke-mocha.vercel.app
 ```
 
 Expected: PASS.

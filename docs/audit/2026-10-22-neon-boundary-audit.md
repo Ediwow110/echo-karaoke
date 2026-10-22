@@ -3,7 +3,8 @@
 Date: 2026-10-23
 Scope: the identity path, the two Neon credentials, the Vercel Function boundary,
 and the parts of the room authorization SQL that did not move.
-Verdict: **ready for a gated deployment**. It is not deployed yet.
+Verdict: **deployed and verified** at `https://echo-karaoke-mocha.vercel.app` on
+2026-10-23. CI has not run yet.
 
 ## Evidence
 
@@ -16,6 +17,9 @@ Verdict: **ready for a gated deployment**. It is not deployed yet.
 | Vercel bundle | `vercel build` | passed, `.vercel/output` produced |
 | Local hosted-style flow | `vercel dev` plus curl | sign-in 200, token 200, create-room 201 |
 | Browser credential scan | `grep postgresql://` over `.vercel/output/static` | no matches |
+| Production deploy | `vercel deploy --prod` | ready; alias `echo-karaoke-mocha.vercel.app` |
+| Production verifier | `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` | passed |
+| Production auth and room | curl against the alias | sign-in 200, token 200, create-room 201 |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
 exercises create, join, reads, touch, lock, queue add/vote/remove, playback
@@ -94,6 +98,23 @@ cache is reused normally and refreshed when forced.
 
 `clearAnonymousSession` had no caller and was removed rather than left as dead API.
 
+### 11. High, fixed: the production function imports had no ESM extensions
+
+The first production deployment answered every API request with 500. The runtime log
+said `Cannot find module '/var/task/server/auth/auth' imported from
+/var/task/api/router.js`. Vercel emits one `.js` file per TS module instead of
+bundling, and Node ESM does not resolve extensionless or directory imports. Every
+relative import in `api/` and `server/` now names `.js`, with `/index.js` for
+directory imports. The production flow then returned sign-in 200, token 200, and
+create-room 201.
+
+### 12. Medium, fixed: the production alias was assumed
+
+The project's production alias is `echo-karaoke-mocha.vercel.app`, not the
+`echo-karaoke.vercel.app` used by the first environment setup. `BETTER_AUTH_URL` and
+`ALLOWED_ORIGINS` were corrected and the deployment was repeated. The docs now use the
+confirmed alias.
+
 ## The boundary that did not move
 
 - The authorized SQL is unchanged. The 225 database assertions cover grants, RLS,
@@ -109,8 +130,7 @@ cache is reused normally and refreshed when forced.
 
 ## Not covered
 
-- No production deployment, no Vercel environment change, no push, and no CI run.
-  The CI workflow is committed locally and needs `NEON_API_KEY`,
+- No CI run yet. The CI workflow is committed and needs `NEON_API_KEY`,
   `NEON_DATABASE_URL`, `NEON_SERVICE_DATABASE_URL`, `NEON_AUTH_DATABASE_URL`,
   `BETTER_AUTH_SECRET`, and the `NEON_PROJECT_ID` variable.
 - Phone camera scanning and the real guest/host flow on a phone.
@@ -124,9 +144,9 @@ cache is reused normally and refreshed when forced.
 
 ## Order to finish
 
-1. Approve the Vercel environment and the push. Set the production values, deploy,
-   and run `npm run verify:preview -- https://echo-karaoke.vercel.app`.
-2. Add the repository secrets and run the Neon-branch CI workflow.
+1. Add the repository secrets and run the Neon-branch CI workflow. The production
+   environment and deployment are complete and verified.
+2. Run a real phone host/guest flow against the production alias.
 3. Fix the host heartbeat across auth session replacement, with a test that would fail
    without it.
 4. Add a per-IP sign-in throttle and an explicit room-size limit before a public party.
