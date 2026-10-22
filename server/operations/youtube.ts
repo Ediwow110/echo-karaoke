@@ -1,7 +1,7 @@
-import { operationCall, serviceDatabase } from '../db/client';
-import { HttpError, jsonResponse, mapDatabaseError } from './errors';
-import { readJsonObject } from './tokens';
-import { requireRoomId, requireTokenHeader, type Caller } from './room';
+import { operationCall, serviceDatabase } from '../db/client.js';
+import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
+import { readJsonObject } from './tokens.js';
+import { requireRoomId, requireTokenHeader, type Caller } from './room.js';
 
 export type SearchResult = {
   videoId: string;

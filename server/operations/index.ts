@@ -1,7 +1,7 @@
-import { requireAnonymousCaller } from '../auth/identity';
-import { createRoom } from './createRoom';
-import { handleThrown, HttpError, jsonResponse } from './errors';
-import { queueCommand } from './queue';
+import { requireAnonymousCaller } from '../auth/identity.js';
+import { createRoom } from './createRoom.js';
+import { handleThrown, HttpError, jsonResponse } from './errors.js';
+import { queueCommand } from './queue.js';
 import {
   hostCommand,
   joinRoom,
@@ -11,8 +11,8 @@ import {
   readRoomHost,
   touchMember,
   voteCommand,
-} from './room';
-import { youtubePopular, youtubeSearch, youtubeSuggest } from './youtube';
+} from './room.js';
+import { youtubePopular, youtubeSearch, youtubeSuggest } from './youtube.js';
 
 const OPERATIONS = new Set([
   'create-room',

@@ -1,4 +1,4 @@
-import { serviceDatabase } from '../db/client';
+import { serviceDatabase } from '../db/client.js';
 
 export async function sweepAbandonedRooms(): Promise<number> {
   const sql = serviceDatabase();

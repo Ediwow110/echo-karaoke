@@ -1,4 +1,4 @@
-import { HttpError } from './errors';
+import { HttpError } from './errors.js';
 
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 

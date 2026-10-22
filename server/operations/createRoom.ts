@@ -1,6 +1,6 @@
-import { operationCall, serviceDatabase } from '../db/client';
-import { HttpError, jsonResponse, mapDatabaseError } from './errors';
-import { sweepAbandonedRooms, sweepEndedRooms } from './sweep';
+import { operationCall, serviceDatabase } from '../db/client.js';
+import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
+import { sweepAbandonedRooms, sweepEndedRooms } from './sweep.js';
 import {
   generateRoomCode,
   generateToken,
@@ -8,7 +8,7 @@ import {
   normalizeRoomName,
   readJsonObject,
   readOptionalBoolean,
-} from './tokens';
+} from './tokens.js';
 
 type Caller = { userId: string; accessToken: string };
 

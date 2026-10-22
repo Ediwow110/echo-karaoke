@@ -1,4 +1,4 @@
-import { resolveBaseUrl } from '../auth/origins';
+import { resolveBaseUrl } from '../auth/origins.js';
 
 const INVALID_PATH = '/api/__invalid__';
 

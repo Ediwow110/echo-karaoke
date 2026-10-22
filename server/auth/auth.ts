@@ -1,7 +1,7 @@
 import { betterAuth } from 'better-auth';
 import { Pool } from 'pg';
 import { anonymous, jwt } from 'better-auth/plugins';
-import { resolveBaseUrl, resolveTrustedOrigins } from './origins';
+import { resolveBaseUrl, resolveTrustedOrigins } from './origins.js';
 
 const baseURL = resolveBaseUrl();
 

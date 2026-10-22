@@ -1,6 +1,6 @@
-import { operationCall, serviceDatabase } from '../db/client';
-import { HttpError, jsonResponse, mapDatabaseError } from './errors';
-import { generateToken, normalizeDisplayName, readJsonObject } from './tokens';
+import { operationCall, serviceDatabase } from '../db/client.js';
+import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
+import { generateToken, normalizeDisplayName, readJsonObject } from './tokens.js';
 
 export type Caller = { userId: string; accessToken: string };
 

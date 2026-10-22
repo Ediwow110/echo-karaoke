@@ -1,7 +1,7 @@
-import { readJsonObject } from './tokens';
-import { callOperation, requireRoomId, requireSongId, type Caller } from './room';
-import { HttpError, jsonResponse } from './errors';
-import { fetchVideoMetadata, isValidVideoId } from './metadata';
+import { readJsonObject } from './tokens.js';
+import { callOperation, requireRoomId, requireSongId, type Caller } from './room.js';
+import { HttpError, jsonResponse } from './errors.js';
+import { fetchVideoMetadata, isValidVideoId } from './metadata.js';
 
 const ACTIONS = new Set(['add', 'remove', 'reorder']);
 const METADATA_DAILY_BUDGET = 1000;

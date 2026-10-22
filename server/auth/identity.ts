@@ -1,5 +1,5 @@
-import { fetchJwks } from './jwks';
-import { resolveBaseUrl } from './origins';
+import { fetchJwks } from './jwks.js';
+import { resolveBaseUrl } from './origins.js';
 
 export type VerifiedIdentity = { userId: string; isAnonymous: boolean };
 

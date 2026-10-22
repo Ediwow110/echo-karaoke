@@ -1,6 +1,6 @@
-import { auth } from '../server/auth/auth';
-import { handleOperation } from '../server/operations';
-import { restoreApiRequest } from '../server/operations/rewrite';
+import { auth } from '../server/auth/auth.js';
+import { handleOperation } from '../server/operations/index.js';
+import { restoreApiRequest } from '../server/operations/rewrite.js';
 
 async function handleRequest(request: Request): Promise<Response> {
   const restored = restoreApiRequest(request);
