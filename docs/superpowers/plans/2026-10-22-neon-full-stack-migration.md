@@ -24,24 +24,52 @@
 
 **Files:**
 - Create: `supabase/migrations/0020_auth_schema.sql`
+- Create: `server/auth/auth.ts`
 - Modify: `supabase/migrations/0000_platform_compatibility.sql`
 - Test: `supabase/tests/auth_role_test.sql`
 
 **Interfaces:**
 - Consumes: the platform compatibility migration from the data only work, already applied on Neon and on the local stack.
-- Produces: the tables `public.user`, `public.session`, `public.account`, `public.verification` and `public.jwks`; the role `echo_auth` with rights only on those five tables; the default privilege fix.
+- Produces: the tables `public.user`, `public.session`, `public.account`, `public.verification` and `public.jwks`; the role `echo_auth` with rights only on those five tables; the default privilege fix; the exported `auth` instance that later tasks mount.
 
-- [ ] **Step 1: Generate the Better Auth schema SQL**
+The auth instance is created in this task because the schema SQL is generated from its configuration, and because the function router in a later task mounts it.
 
-Run the Better Auth CLI against the Neon branch with the same configuration the function will use, and write the generated SQL to `supabase/migrations/0020_auth_schema.sql`.
+- [ ] **Step 1: Create the auth instance**
+
+Create `server/auth/auth.ts`:
+
+```ts
+import { betterAuth } from 'better-auth';
+import { Pool } from 'pg';
+import { anonymous, jwt } from 'better-auth/plugins';
+
+export const auth = betterAuth({
+  appName: 'ECHO',
+  baseURL: process.env.BETTER_AUTH_URL ?? 'http://127.0.0.1:3000',
+  secret: process.env.BETTER_AUTH_SECRET ?? '',
+  database: new Pool({ connectionString: process.env.AUTH_DATABASE_URL ?? '' }),
+  trustedOrigins: [process.env.BETTER_AUTH_URL ?? 'http://127.0.0.1:3000'],
+  advanced: { cookiePrefix: 'echo' },
+  plugins: [anonymous(), jwt()],
+});
+```
+
+The JWT plugin is last in the plugin list. The anonymous plugin creates the stable
+per-browser identity, and the JWT plugin lets the API verify it without a network hop.
+Install the two packages first: `npm install better-auth pg`.
+
+- [ ] **Step 2: Generate the Better Auth schema SQL**
+
+Run the Better Auth CLI with the same configuration the function will use, and write the
+generated SQL to `supabase/migrations/0020_auth_schema.sql`.
 
 ```bash
-npx @better-auth/cli@latest generate --config ./server/auth.ts --output supabase/migrations/0020_auth_schema.sql
+npx @better-auth/cli@latest generate --config ./server/auth/auth.ts --output supabase/migrations/0020_auth_schema.sql
 ```
 
 Expected: a file with the `user`, `session`, `account`, `verification` and `jwks` tables.
 
-- [ ] **Step 2: Write the failing test**
+- [ ] **Step 3: Write the failing test**
 
 Create `supabase/tests/auth_role_test.sql` with this shape. The suite follows the shape of the other six files: it opens a transaction, makes its assertions, and ends with a rollback.
 
@@ -78,12 +106,12 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 3: Run the test to verify it fails**
+- [ ] **Step 4: Run the test to verify it fails**
 
 Run: `npx supabase test db`
 Expected: FAIL, with the auth tables missing.
 
-- [ ] **Step 4: Add the role and the grants to the migration**
+- [ ] **Step 5: Add the role and the grants to the migration**
 
 Append to `supabase/migrations/0020_auth_schema.sql`:
 
@@ -106,7 +134,7 @@ grant select, insert, update, delete on public.user, public.session, public.acco
 revoke all on public.user, public.session, public.account, public.verification, public.jwks from anon, authenticated;
 ```
 
-- [ ] **Step 5: Fix the default privileges so a new table is never writable by a browser role**
+- [ ] **Step 6: Fix the default privileges so a new table is never writable by a browser role**
 
 Add to `supabase/migrations/0000_platform_compatibility.sql`, after the schema creation:
 
@@ -121,12 +149,12 @@ alter default privileges in schema public
   revoke usage, select, update on sequences from public, anon, authenticated;
 ```
 
-- [ ] **Step 6: Run the test to verify it passes**
+- [ ] **Step 7: Run the test to verify it passes**
 
 Run: `npx supabase db reset && npx supabase test db`
 Expected: PASS, with 210 assertions from the existing suites and the new assertions from this one.
 
-- [ ] **Step 7: Run the same chain against Neon**
+- [ ] **Step 8: Run the same chain against Neon**
 
 ```bash
 npx supabase db push --db-url "$NEON_DATABASE_URL"
@@ -135,10 +163,10 @@ npx supabase test db --db-url "$NEON_DATABASE_URL"
 
 Expected: PASS on both.
 
-- [ ] **Step 8: Commit**
+- [ ] **Step 9: Commit**
 
 ```bash
-git add supabase/migrations/0000_platform_compatibility.sql supabase/migrations/0020_auth_schema.sql supabase/tests/auth_role_test.sql
+git add supabase/migrations/0000_platform_compatibility.sql supabase/migrations/0020_auth_schema.sql supabase/tests/auth_role_test.sql server/auth/auth.ts package.json package-lock.json
 git commit -m "feat: add the auth schema, the auth role and the default privilege fix"
 ```
 
@@ -274,10 +302,15 @@ export async function requireAnonymousCaller(request: Request): Promise<{ userId
     throw new Error('a signed-in session is required');
   }
   const token = header.slice('bearer '.length).trim();
-  const identity = await verifyBearerToken(token, process.env.BETTER_AUTH_JWKS_URL ?? '');
+  const origin = new URL(request.url).origin;
+  const identity = await verifyBearerToken(token, `${origin}/api/auth/jwks`);
   return { userId: identity.userId, accessToken: token };
 }
 ```
+
+The key set is published by the auth service on the same origin as the API, so the URL
+comes from the request rather than from an environment variable. That keeps the two
+services on one host and means there is one less secret to set.
 
 - [ ] **Step 5: Run the test to verify it passes**
 
@@ -355,6 +388,17 @@ export function authDatabase() {
   return neon(process.env.AUTH_DATABASE_URL ?? '');
 }
 ```
+
+A call runs through the driver's parameterised form, which takes the statement text and
+the values separately:
+
+```ts
+const sql = serviceDatabase();
+const rows = await sql.query(call.text, call.params);
+```
+
+The driver refuses a statement that is not a single parameterised query, so the values
+never reach the statement text.
 
 - [ ] **Step 4: Run the test to verify it passes**
 
