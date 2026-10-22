@@ -7,7 +7,7 @@ export function operationCall(name: string, params: unknown[]): { text: string; 
     throw new Error(`the operation name is not a plain identifier: ${name}`);
   }
   return {
-    text: `select * from public.${name}(${params.map((_, index) => `$${index + 1}`).join(', ')})`,
+    text: `select public.${name}(${params.map((_, index) => `$${index + 1}`).join(', ')}) as result`,
     params,
   };
 }
