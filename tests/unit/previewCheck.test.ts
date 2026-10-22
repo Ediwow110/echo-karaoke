@@ -37,15 +37,21 @@ const SPA_ROUTE = 'https://app.example/room/00000000-0000-0000-0000-000000000000
 const ASSET = 'https://app.example/assets/index-abc123.js';
 
 function fakeFetch(routes: Record<string, Route>) {
-  return async (input: string | URL): Promise<Response> => {
+  return async (
+    input: string | URL,
+    init?: { redirect?: 'manual'; headers?: Record<string, string> },
+  ): Promise<Response> => {
     const url = typeof input === 'string' ? input : input.toString();
     const route = routes[url];
     if (route === undefined) {
       throw new Error('Unexpected request: ' + url);
     }
+    lastRequest = { url, headers: init?.headers ?? {} };
     return new Response(route.body, { status: route.status, headers: route.headers });
   };
 }
+
+let lastRequest: { url: string; headers: Record<string, string> } = { url: '', headers: {} };
 
 function goodRoutes(csp = DEFAULT_CSP): Record<string, Route> {
   return {
@@ -146,5 +152,37 @@ describe('preview verification', () => {
     const result = await checkPreview('http://app.example', { fetchImpl: fakeFetch({}) });
 
     expect(result.errors).toContain('Use HTTPS for a deployed preview.');
+  });
+
+  it('sends the protection bypass token so a protected preview can be checked', async () => {
+    const result = await checkPreview('https://app.example', {
+      fetchImpl: fakeFetch(goodRoutes()),
+      bypassToken: 'bx-secret-token',
+    });
+
+    expect(result.errors).toEqual([]);
+    expect(lastRequest.headers['x-vercel-protection-bypass']).toBe('bx-secret-token');
+  });
+
+  it('sends no bypass header when no token was given', async () => {
+    await checkPreview('https://app.example', { fetchImpl: fakeFetch(goodRoutes()) });
+
+    expect(lastRequest.headers['x-vercel-protection-bypass']).toBeUndefined();
+  });
+
+  it('names the sign-in wall when the deployment is behind Vercel Authentication', async () => {
+    const routes = goodRoutes();
+    routes['https://app.example/'] = {
+      status: 302,
+      headers: { location: 'https://vercel.com/sso-api?url=https%3A%2F%2Fapp.example%2F' },
+      body: '',
+    };
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain(
+      'The deployment is behind Vercel Authentication, so the check cannot read it.',
+    );
+    expect(result.errors).not.toContain('Missing x-frame-options header.');
   });
 });

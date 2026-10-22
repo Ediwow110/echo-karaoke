@@ -166,15 +166,44 @@ npx supabase secrets list
 
 ## Step 5: Create the Vercel project and set its environment
 
-Create the project in the Vercel dashboard and import the repository. The Vercel CLI is
-not installed on this machine, so the dashboard is the shorter path. The Vercel project
-needs three environment variables:
+The Vercel CLI 65.1.0 is installed globally, and the account is signed in. The project
+`echo-karaoke` already exists on the team `ediwow110s-projects`, and this directory is
+linked to it through `.vercel/project.json`. The link directory is git-ignored.
+
+Two settings on the project need attention before the first public deployment.
+
+**Vercel Authentication must be off.** A new project on a team starts with
+`ssoProtection` set to `all_except_custom_domains`, which answers every request on the
+`vercel.app` domain with a redirect to the sign-in page. Guests cannot join a room
+through that, so the setting has to be cleared:
+
+```bash
+curl -X PATCH https://api.vercel.com/v9/projects/<project-id> \
+  -H "Authorization: Bearer $VERCEL_TOKEN" \
+  -H "Content-Type: application/json" \
+  -d '{"ssoProtection": null}'
+```
+
+**The three environment variables must exist for both environments.** The project
+needs them in the build environment, because `vercel.json` runs `npm run verify:deploy`
+before the build and the guard refuses to build without them. The build stops there on
+purpose. A build that skips the guard can carry the tunnel URL.
 
 | Variable | Scope | Value |
 |---|---|---|
 | `VITE_SUPABASE_URL` | Build and runtime | The project URL from Step 1 |
 | `VITE_SUPABASE_ANON_KEY` | Build and runtime | The publishable anon key from Step 1 |
 | `ALLOWED_ORIGINS` | Build | The app origin, the same value as the Edge secret |
+
+```bash
+vercel env add VITE_SUPABASE_URL production
+vercel env add VITE_SUPABASE_ANON_KEY production
+vercel env add ALLOWED_ORIGINS production
+```
+
+The same three belong to the preview environment, with the preview origin in
+`ALLOWED_ORIGINS`. A preview build without them fails the guard exactly as a
+production build would.
 
 `ALLOWED_ORIGINS` must exist in the build environment, because `vercel.json` runs
 `npm run verify:deploy` before the build and the guard refuses to build without it. The
@@ -190,8 +219,11 @@ allows the origin the app actually calls, so run it with that variable set.
 The repository has no remote, so the CI workflow has never run. The user approves each
 push, so this step waits for that approval.
 
+The remote already points at `https://github.com/Ediwow110/echo-karaoke.git`, and the
+repository is created and public. Nothing has been pushed. The push is held until the
+Vercel preview is verified.
+
 ```bash
-git remote add origin <repository-url>
 git push -u origin master
 ```
 
@@ -202,6 +234,12 @@ The CI workflow needs two repository variables and one secret:
 | `VITE_SUPABASE_URL` | Variable | The project URL |
 | `ALLOWED_ORIGINS` | Variable | The app origin |
 | `VITE_SUPABASE_ANON_KEY` | Secret | The publishable anon key |
+
+```bash
+gh variable set VITE_SUPABASE_URL --body "<project-url>"
+gh variable set ALLOWED_ORIGINS --body "<app-origin>"
+gh secret set VITE_SUPABASE_ANON_KEY --body "<publishable-anon-key>"
+```
 
 The `production-artifact` job runs only when both variables are set. It runs the deploy
 guard, builds the bundle with the production values, and uploads `dist` as an artifact.
@@ -240,10 +278,16 @@ values from the environment, so the tunnel file can stay as it is.
 
 ## Step 8: Deploy and verify the preview
 
-Deploy through the Vercel dashboard or the CLI, then run the preview verifier against
-the deployment URL. Keep the production values in the environment, because the
-verifier reads `VITE_SUPABASE_URL` to confirm that the CSP allows the Supabase origin
-the app calls:
+Deploy from the CLI. The preview environment and the production environment hold
+different values, so the target has to be named:
+
+```bash
+vercel deploy --environment preview
+```
+
+Then run the preview verifier against the deployment URL. Keep the production values in
+the environment, because the verifier reads `VITE_SUPABASE_URL` to confirm that the CSP
+allows the Supabase origin the app calls:
 
 ```bash
 $env:VITE_SUPABASE_URL='https://<project-ref>.supabase.co'
@@ -253,6 +297,23 @@ npm run verify:preview -- https://<deployment-url>
 The verifier checks the home page, the security headers, the CSP directives, the
 Supabase origin, the SPA fallback on a deep route, the immutable caching on the hashed
 assets, and the ECHO title. It fails when the deployment is missing any of them.
+
+Two cases the verifier handles on its own. A deployment behind Vercel Authentication
+answers with a redirect to the sign-in page, and the verifier names that once instead of
+reporting every header as missing. A deployment behind Vercel Deployment Protection
+answers the same way unless the request carries a bypass token, which the verifier
+reads from `PREVIEW_BYPASS_TOKEN` and sends as the `x-vercel-protection-bypass` header.
+The token is on the project under the `protectionBypass` field.
+
+Vercel appends a feedback script to the HTML it serves, and that script opens a frame
+from `vercel.live`. The CSP in `vercel.json` allows both, because a blocked script
+reports a policy violation in the console on every page load. Vercel can already change
+the script it serves, so the allowance adds no new trust.
+
+The browser is the last judge. Open the deployment URL by hand and read the console.
+It must have no errors and no policy violations. A preview that was built with
+placeholder Supabase values renders the shell and reports a failure from the room
+service, which is the expected state until Step 3 lands.
 
 ## Step 9: The preview checks that need a human
 

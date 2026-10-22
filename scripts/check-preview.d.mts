@@ -1,8 +1,12 @@
-export type PreviewFetch = (input: string, init?: { redirect?: 'manual' }) => Promise<Response>;
+export type PreviewFetch = (
+  input: string,
+  init?: { redirect?: 'manual'; headers?: Record<string, string> },
+) => Promise<Response>;
 
 export type PreviewCheckOptions = {
   fetchImpl?: PreviewFetch;
   supabaseUrl?: string | null;
+  bypassToken?: string | null;
 };
 
 export function expectedSupabaseOrigin(env?: Record<string, string | undefined>): string | null;

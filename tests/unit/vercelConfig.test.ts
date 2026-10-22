@@ -44,6 +44,15 @@ describe('Vercel deployment configuration', () => {
     expect(csp).not.toContain('default-src *');
   });
 
+  it('allows the feedback script that Vercel injects into the served HTML', () => {
+    // Vercel appends this script to every page it serves, and the script opens
+    // a feedback frame. Without both allowances the browser reports a policy
+    // violation on every page load.
+    const csp = header('Content-Security-Policy');
+    expect(csp).toMatch(/script-src[^;]*https:\/\/vercel\.live/);
+    expect(csp).toMatch(/frame-src[^;]*https:\/\/vercel\.live/);
+  });
+
   it('sets baseline security headers and asset caching', () => {
     expect(header('X-Content-Type-Options')).toBe('nosniff');
     expect(header('Referrer-Policy')).toBe('no-referrer');

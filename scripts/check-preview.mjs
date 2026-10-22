@@ -36,10 +36,16 @@ export async function checkPreview(input, options = {}) {
   }
 
   const supabaseOrigin = options.supabaseUrl ?? null;
+  const bypassToken = options.bypassToken ?? null;
+  // A protected deployment answers with a redirect to the sign-in page, so the
+  // bypass token has to travel with every request.
+  const requestInit = bypassToken === null
+    ? { redirect: 'manual' }
+    : { redirect: 'manual', headers: { 'x-vercel-protection-bypass': bypassToken } };
 
   async function fetchOrReport(url) {
     try {
-      return await fetchImpl(url, { redirect: 'manual' });
+      return await fetchImpl(url, requestInit);
     } catch {
       errors.push('Could not reach ' + url + '.');
       return null;
@@ -60,6 +66,15 @@ export async function checkPreview(input, options = {}) {
 
   const home = await fetchOrReport(target.origin + '/');
   if (home !== null) {
+    // A protected deployment answers with a redirect to the sign-in page. Every
+    // check below would report a missing header, so name the real cause once.
+    const location = home.headers.get('location') ?? '';
+    if (location.includes('vercel.com/sso-api') || location.includes('/_vercel/')) {
+      errors.push('The deployment is behind Vercel Authentication, so the check cannot read it.');
+      errors.push('Turn off Vercel Authentication on the project, or read the deployment with a bypass token.');
+      return { errors };
+    }
+
     if (home.status !== 200) errors.push('The home page returned ' + home.status + '.');
     const type = home.headers.get('content-type') ?? '';
     if (!type.includes('text/html')) errors.push('The home page is not HTML.');
@@ -123,7 +138,11 @@ export async function main(env = process.env) {
     return;
   }
 
-  const { errors } = await checkPreview(input, { supabaseUrl: expectedSupabaseOrigin(env) });
+  const bypassToken = (env.PREVIEW_BYPASS_TOKEN ?? env.VERCEL_PROTECTION_BYPASS ?? '').trim();
+  const { errors } = await checkPreview(input, {
+    supabaseUrl: expectedSupabaseOrigin(env),
+    bypassToken: bypassToken.length === 0 ? null : bypassToken,
+  });
 
   if (errors.length > 0) {
     console.error('Preview verification failed:');
