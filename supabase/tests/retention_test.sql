@@ -113,7 +113,7 @@ begin
   for i in 1..10 loop
     perform public.create_room(
       lpad(i::text, 16, '0'),
-      '77777777-7777-7777-7777-777777777777'::uuid,
+      '77777777-7777-7777-7777-777777777777'::text,
       'Cap Host',
       repeat('a', 32),
       repeat('b', 32),

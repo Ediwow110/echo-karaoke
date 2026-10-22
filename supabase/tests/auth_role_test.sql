@@ -22,7 +22,7 @@ select ok(
   'anon cannot run the retention function'
 );
 select ok(
-  not has_function_privilege('echo_auth', 'public.queue_add(uuid, uuid, text, text, text, text, text, text, integer)', 'execute'),
+  not has_function_privilege('echo_auth', 'public.queue_add(uuid, text, text, text, text, text, text, text, integer)', 'execute'),
   'the auth role cannot run the queue operations'
 );
 

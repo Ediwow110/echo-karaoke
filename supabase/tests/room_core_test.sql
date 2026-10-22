@@ -27,12 +27,37 @@ select ok((select relrowsecurity from pg_class where oid = 'private.room_host_se
 select ok(not has_schema_privilege('anon', 'private', 'USAGE'), 'anon cannot use the private schema');
 select ok(not has_schema_privilege('authenticated', 'private', 'USAGE'), 'authenticated cannot use the private schema');
 
-select function_privs_are('public', 'create_room', array['text', 'uuid', 'text', 'text', 'text', 'text', 'boolean', 'boolean'], 'anon', array[]::text[], 'anon cannot execute create_room');
-select function_privs_are('public', 'join_room', array['text', 'uuid', 'text', 'text'], 'anon', array[]::text[], 'anon cannot execute join_room');
-select function_privs_are('public', 'read_room_guest', array['uuid', 'uuid', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute read_room_guest');
-select function_privs_are('public', 'read_room_host', array['uuid', 'uuid', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute read_room_host');
-select function_privs_are('public', 'host_command', array['uuid', 'uuid', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute host_command');
-select function_privs_are('private', 'require_guest', array['uuid', 'uuid', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute require_guest');
+select function_privs_are('public', 'create_room', array['text', 'text', 'text', 'text', 'text', 'text', 'boolean', 'boolean'], 'anon', array[]::text[], 'anon cannot execute create_room');
+select function_privs_are('public', 'join_room', array['text', 'text', 'text', 'text'], 'anon', array[]::text[], 'anon cannot execute join_room');
+select function_privs_are('public', 'read_room_guest', array['uuid', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute read_room_guest');
+select function_privs_are('public', 'read_room_host', array['uuid', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute read_room_host');
+select function_privs_are('public', 'host_command', array['uuid', 'text', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute host_command');
+select function_privs_are('private', 'require_guest', array['uuid', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute require_guest');
+
+-- The identity provider issues a string user id, not a uuid.
+select has_column('public', 'members', 'user_id', 'the member user id column exists');
+select is(
+  (select format_type(a.atttypid, a.atttypmod)
+   from pg_attribute a
+   join pg_class c on c.oid = a.attrelid
+   join pg_namespace n on n.oid = c.relnamespace
+   where n.nspname = 'public' and c.relname = 'members' and a.attname = 'user_id'),
+  'text',
+  'the member user id is text');
+select is(
+  (select pg_get_function_identity_arguments(p.oid) like '%p_user_id text%'
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'public' and p.proname = 'create_room'),
+  true,
+  'create_room accepts a text user id');
+select is(
+  (select pg_get_function_identity_arguments(p.oid) like '%p_user_id text%'
+   from pg_proc p
+   join pg_namespace n on n.oid = p.pronamespace
+   where n.nspname = 'private' and p.proname = 'require_guest'),
+  true,
+  'require_guest accepts a text user id');
 
 -- Room constraints keep codes and ended state honest.
 select throws_ok(
@@ -56,7 +81,7 @@ select
 from (
   select public.create_room(
     'ABCDEFGHJKMNPQRS',
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     'Host One',
     repeat('g', 40),
     repeat('h', 40)
@@ -81,7 +106,7 @@ select ok(
 
 -- Opening the invite on the host browser must not turn the host into a guest.
 select throws_ok(
-  format('select public.join_room(%L, %L::uuid, %L, %L)', 'ABCDEFGHJKMNPQRS', '11111111-1111-1111-1111-111111111111', 'Renamed Host', repeat('q', 40)),
+  format('select public.join_room(%L, %L::text, %L, %L)', 'ABCDEFGHJKMNPQRS', '11111111-1111-1111-1111-111111111111', 'Renamed Host', repeat('q', 40)),
   '22023', 'HOST_ALREADY_IN_ROOM',
   'the host cannot join their own room as a guest');
 
@@ -91,13 +116,13 @@ select is(
   'a rejected host join leaves the host name unchanged');
 
 select lives_ok(
-  format('select public.read_room_host(%L::uuid, %L::uuid, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40)),
+  format('select public.read_room_host(%L::uuid, %L::text, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40)),
   'a rejected host join leaves the host pass valid');
 
 select is(
   public.read_room_guest(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select guest_token from ctx)
   ) ->> 'status',
   'live',
@@ -106,7 +131,7 @@ select is(
 select ok(
   public.read_room_guest(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select guest_token from ctx)
   ) ? 'roster',
   'guest read includes the roster projection');
@@ -114,7 +139,7 @@ select ok(
 select is(
   public.read_room_guest(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select guest_token from ctx)
   ) -> 'room' ->> 'guestPlaybackLocked',
   'true',
@@ -123,7 +148,7 @@ select is(
 select is(
   public.read_room_guest(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select guest_token from ctx)
   ) -> 'room' ->> 'guestControlLocked',
   'false',
@@ -132,34 +157,34 @@ select is(
 select is(
   public.read_room_host(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select host_token from ctx)
   ) ->> 'status',
   'live',
   'a valid host token reads host room state');
 
 select throws_ok(
-  format('select public.read_room_guest(%L::uuid, %L::uuid, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
+  format('select public.read_room_guest(%L::uuid, %L::text, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
   '28000', 'UNAUTHORIZED',
   'a wrong guest token is rejected');
 
 select throws_ok(
-  format('select public.read_room_guest(%L::uuid, %L::uuid, %L)', (select room_id from ctx), '22222222-2222-2222-2222-222222222222', repeat('g', 40)),
+  format('select public.read_room_guest(%L::uuid, %L::text, %L)', (select room_id from ctx), '22222222-2222-2222-2222-222222222222', repeat('g', 40)),
   '28000', 'UNAUTHORIZED',
   'a guest token from another Auth user is rejected');
 
 select throws_ok(
-  format('select public.read_room_host(%L::uuid, %L::uuid, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
+  format('select public.read_room_host(%L::uuid, %L::text, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
   '28000', 'UNAUTHORIZED',
   'a wrong host token is rejected');
 
 select throws_ok(
-  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40), 'lock'),
+  format('select public.host_command(%L::uuid, %L::text, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40), 'lock'),
   '28000', 'UNAUTHORIZED',
   'host commands reject a wrong host token');
 
 select throws_ok(
-  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40), 'nonsense'),
+  format('select public.host_command(%L::uuid, %L::text, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40), 'nonsense'),
   '22023', 'VALIDATION_ERROR',
   'an unknown host action is rejected');
 
@@ -172,7 +197,7 @@ select
 from (
   select public.create_room(
     'ZYXWVTSRQPNMKJHG',
-    '33333333-3333-3333-3333-333333333333'::uuid,
+    '33333333-3333-3333-3333-333333333333'::text,
     'Host Two',
     repeat('p', 40),
     repeat('q', 40),
@@ -183,39 +208,39 @@ from (
 ) s;
 
 select throws_ok(
-  format('select public.read_room_guest(%L::uuid, %L::uuid, %L)', (select room_id from ctx2), '11111111-1111-1111-1111-111111111111', repeat('g', 40)),
+  format('select public.read_room_guest(%L::uuid, %L::text, %L)', (select room_id from ctx2), '11111111-1111-1111-1111-111111111111', repeat('g', 40)),
   '28000', 'UNAUTHORIZED',
   'a guest token cannot read a different room');
 
 select throws_ok(
-  format('select public.read_room_host(%L::uuid, %L::uuid, %L)', (select room_id from ctx), '33333333-3333-3333-3333-333333333333', repeat('q', 40)),
+  format('select public.read_room_host(%L::uuid, %L::text, %L)', (select room_id from ctx), '33333333-3333-3333-3333-333333333333', repeat('q', 40)),
   '28000', 'UNAUTHORIZED',
   'a host token cannot read a different room');
 
 select throws_ok(
-  format('select public.join_room(%L, %L::uuid, %L, %L)', 'AAAAAAAABBBBBBBB', '44444444-4444-4444-4444-444444444444', 'Guest', repeat('m', 40)),
+  format('select public.join_room(%L, %L::text, %L, %L)', 'AAAAAAAABBBBBBBB', '44444444-4444-4444-4444-444444444444', 'Guest', repeat('m', 40)),
   '22023', 'ROOM_NOT_FOUND',
   'joining an unknown code reports ROOM_NOT_FOUND');
 
 select is(
-  public.join_room('ZYXWVTSRQPNMKJHG', '44444444-4444-4444-4444-444444444444'::uuid, 'Guest Two', repeat('m', 40)) ->> 'role',
+  public.join_room('ZYXWVTSRQPNMKJHG', '44444444-4444-4444-4444-444444444444'::text, 'Guest Two', repeat('m', 40)) ->> 'role',
   'guest',
   'joining a live room creates a guest member');
 
 select throws_ok(
-  format('select public.touch_member(%L::uuid, %L::uuid, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
+  format('select public.touch_member(%L::uuid, %L::text, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
   '28000', 'UNAUTHORIZED',
   'heartbeat requires the correct guest token');
 
 -- Guest lock blocks guests but not the host.
 select lives_ok(
-  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40), 'lock'),
+  format('select public.host_command(%L::uuid, %L::text, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40), 'lock'),
   'host can lock guest requests');
 
 select is(
   public.host_command(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select host_token from ctx),
     'unlock'
   ) ->> 'guestControlLocked',
@@ -225,7 +250,7 @@ select is(
 select is(
   public.host_command(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select host_token from ctx),
     'unlock_playback'
   ) ->> 'guestPlaybackLocked',
@@ -235,7 +260,7 @@ select is(
 select is(
   public.host_command(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select host_token from ctx),
     'lock_playback'
   ) ->> 'guestPlaybackLocked',
@@ -245,7 +270,7 @@ select is(
 select is(
   public.read_room_host(
     (select room_id from ctx2),
-    '33333333-3333-3333-3333-333333333333'::uuid,
+    '33333333-3333-3333-3333-333333333333'::text,
     (select host_token from ctx2)
   ) -> 'room' ->> 'name',
   'Second Stage',
@@ -254,7 +279,7 @@ select is(
 select is(
   public.host_access_check(
     (select room_id from ctx2),
-    '33333333-3333-3333-3333-333333333333'::uuid,
+    '33333333-3333-3333-3333-333333333333'::text,
     (select host_token from ctx2)
   ) ->> 'status',
   'live',
@@ -264,7 +289,7 @@ select is(
 select is(
   public.host_command(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select host_token from ctx),
     'end'
   ) ->> 'status',
@@ -274,7 +299,7 @@ select is(
 select is(
   public.read_room_guest(
     (select room_id from ctx),
-    '11111111-1111-1111-1111-111111111111'::uuid,
+    '11111111-1111-1111-1111-111111111111'::text,
     (select guest_token from ctx)
   ) ->> 'status',
   'ended',
@@ -284,19 +309,19 @@ select ok(
   not (
     public.read_room_guest(
       (select room_id from ctx),
-      '11111111-1111-1111-1111-111111111111'::uuid,
+      '11111111-1111-1111-1111-111111111111'::text,
       (select guest_token from ctx)
     ) ? 'queue'
   ),
   'an ended room withholds queue data');
 
 select throws_ok(
-  format('select public.join_room(%L, %L::uuid, %L, %L)', 'ABCDEFGHJKMNPQRS', '55555555-5555-5555-5555-555555555555', 'Late Guest', repeat('n', 40)),
+  format('select public.join_room(%L, %L::text, %L, %L)', 'ABCDEFGHJKMNPQRS', '55555555-5555-5555-5555-555555555555', 'Late Guest', repeat('n', 40)),
   '22023', 'ROOM_ENDED',
   'joining an ended room reports ROOM_ENDED');
 
 select throws_ok(
-  format('select public.host_command(%L::uuid, %L::uuid, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40), 'lock'),
+  format('select public.host_command(%L::uuid, %L::text, %L, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('h', 40), 'lock'),
   '22023', 'ROOM_ENDED',
   'host commands other than end are rejected after the room ends');
 
