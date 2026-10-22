@@ -5,7 +5,7 @@
   "outputDirectory": "dist",
   "rewrites": [
     {
-      "source": "/((?!assets/|fonts/|images/|favicon\\.svg|robots\\.txt|llms\\.txt).*)",
+      "source": "/((?!api/|assets/|fonts/|images/|favicon\\.svg|robots\\.txt|llms\\.txt).*)",
       "destination": "/index.html"
     }
   ],
@@ -15,7 +15,7 @@
       "headers": [
         {
           "key": "Content-Security-Policy",
-          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com https://*.ytimg.com; font-src 'self'; connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.youtube.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://vercel.live; media-src 'self' blob: https://www.youtube.com; upgrade-insecure-requests"
+          "value": "default-src 'self'; base-uri 'self'; object-src 'none'; frame-ancestors 'none'; form-action 'self'; script-src 'self' https://www.youtube.com https://s.ytimg.com https://vercel.live; style-src 'self' 'unsafe-inline'; img-src 'self' data: blob: https://i.ytimg.com https://img.youtube.com https://*.ytimg.com; font-src 'self'; connect-src 'self' https://www.youtube.com; frame-src https://www.youtube.com https://www.youtube-nocookie.com https://vercel.live; media-src 'self' blob: https://www.youtube.com; upgrade-insecure-requests"
         },
         {
           "key": "X-Content-Type-Options",

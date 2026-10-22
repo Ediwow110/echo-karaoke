@@ -31,7 +31,15 @@ describe('Vercel deployment configuration', () => {
     expect(route.test('/favicon.svg')).toBe(false);
   });
 
-  it('sets a restrictive CSP for the app, Supabase and YouTube', () => {
+  it('sends the API routes to the function and the rest to the app', () => {
+    const source = config.rewrites?.[0]?.source ?? '';
+    const route = new RegExp('^' + source + '$');
+    expect(route.test('/api/create-room')).toBe(false);
+    expect(route.test('/api/auth/token')).toBe(false);
+    expect(route.test('/room/abc/host')).toBe(true);
+  });
+
+  it('sets a restrictive CSP for the same-origin API and YouTube', () => {
     const csp = header('Content-Security-Policy');
     expect(csp).toContain("default-src 'self'");
     expect(csp).toContain("frame-ancestors 'none'");
@@ -39,8 +47,8 @@ describe('Vercel deployment configuration', () => {
     expect(csp).toContain('script-src');
     expect(csp).toContain('frame-src');
     expect(csp).toContain('https://www.youtube.com');
-    expect(csp).toContain('connect-src');
-    expect(csp).toContain('https://*.supabase.co');
+    expect(csp).toContain("connect-src 'self' https://www.youtube.com");
+    expect(csp).not.toContain('supabase');
     expect(csp).not.toContain('default-src *');
   });
 
