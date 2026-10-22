@@ -283,11 +283,13 @@ integration job removes the inherited encrypted keys first. Branch names include
 run id and attempt, so two runs never collide.
 
 The workflow ran green on `master` on 2026-10-23, including the heartbeat fix
-([run 39870306564](https://github.com/Ediwow110/echo-karaoke/actions/runs/39870306564)):
+([run 39871229479](https://github.com/Ediwow110/echo-karaoke/actions/runs/39871229479)):
 `verify`, `database`, and `integration` all passed. The first CI attempt failed at
 `db push` because Neon's branch URI carries `channel_binding`, which the Supabase CLI
 connector sends as a server parameter. `scripts/neon-branch.mjs` now removes that
-parameter from the branch URIs.
+parameter from the branch URIs. A later run hit a one-second bucket boundary in
+`ratelimit_test.sql`; the test now expires the stored window deterministically instead
+of sleeping across the boundary.
 
 ## Step 7: The room sweep
 

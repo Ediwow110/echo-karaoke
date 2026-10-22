@@ -24,7 +24,7 @@ fix.
 | Production browser flow | Playwright, desktop host plus 390px guest | room created, guest joined, queue visible, guest in the host roster |
 | Heartbeat after session swap | integration test plus `heartbeat_test.sql` | 401 before; 200 after; host member refreshed without an auth user id |
 | Production heartbeat | new anonymous session plus the original host pass | touch 200, host read 200, end 200 |
-| CI | GitHub Actions runs 39868480083, 39868803159, and 39870306564 | verify, database, integration passed |
+| CI | GitHub Actions runs 39868480083, 39868803159, 39870306564, and 39871229479 | verify, database, integration passed |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
 exercises create, join, reads, touch, lock, queue add/vote/remove, playback

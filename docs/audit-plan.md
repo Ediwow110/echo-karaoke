@@ -609,6 +609,7 @@ and `echo_auth`. The current report is
 | N-12 | Medium | The production alias was assumed rather than read from the project | Fixed |
 | N-13 | Low | CI branch URLs carried `channel_binding`, which the Supabase CLI sent to the server | Fixed |
 | N-14 | High | The host heartbeat used the guest pass, so a session replacement stopped refreshing the host member | Fixed |
+| N-15 | Low | `ratelimit_test.sql` used a one-second bucket, so CI could flap across a wall-clock boundary | Fixed |
 
 Gates on 2026-10-23: 229 unit tests, 234 database assertions on Neon, 4 operation
 integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
@@ -616,8 +617,9 @@ integration tests, `npm run build`, `vercel build`, and a local hosted-style flo
 `https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production
 sign-in, token, and create-room flow returned 200, 200, and 201. A Playwright flow
 created a room on desktop, joined from a 390px guest viewport, saw the queue, and
-appeared in the host roster. CI run 39870306564 passed `verify`, `database`, and
+appeared in the host roster. CI run 39871229479 passed `verify`, `database`, and
 `integration` with the heartbeat fix on `master`; production was redeployed, and a
 second anonymous session used the original host pass to touch (200), read (200), and
-end (200) the room. The remaining work is the physical-phone camera run and the open
-items in the report.
+end (200) the room. A one-second bucket boundary made `ratelimit_test.sql` flaky once;
+the test now expires the stored window deterministically. The remaining work is the
+physical-phone camera run and the open items in the report.
