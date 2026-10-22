@@ -52,7 +52,9 @@ Neon Postgres, with the schema proven on it
 
 The application and the API share an origin, so the browser makes same-origin requests.
 There is no cross-origin request anywhere in the product, so there is no origin
-allowlist for the API, and the content security policy does not change.
+allowlist for the API. The content security policy is tightened rather than left alone:
+the browser no longer calls Supabase for anything, so the Supabase origins leave
+`connect-src`, which leaves the app talking to its own origin and to YouTube.
 
 The two database roles are separate credentials with separate grants. The room
 operations use the service role, which can run the authorized operations and nothing
@@ -200,7 +202,8 @@ Three server secrets are added:
 - the Neon auth role connection string,
 - the Better Auth secret.
 
-The content security policy does not change, because the API is same origin.
+The content security policy is tightened, because the browser no longer calls Supabase.
+The API is same origin, so `connect-src` becomes `'self' https://www.youtube.com`.
 
 The SPA rewrite has to stop swallowing the API routes. The current rule sends everything
 that is not a static file to the app, so `/api/create-room` would be answered with the
