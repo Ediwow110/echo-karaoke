@@ -5,6 +5,7 @@ type Header = { key: string; value: string };
 type VercelConfig = {
   buildCommand?: string;
   outputDirectory?: string;
+  regions?: string[];
   rewrites?: { source: string; destination: string }[];
   headers?: { source: string; headers: Header[] }[];
 };
@@ -19,6 +20,17 @@ describe('Vercel deployment configuration', () => {
     expect(config.buildCommand).toContain('npm run verify:deploy');
     expect(config.buildCommand).toContain('npm run build');
     expect(config.outputDirectory).toBe('dist');
+  });
+
+  it('uses the default Node runtime and pins Node 24 through package metadata', () => {
+    const handler = readFileSync('api/[...path].ts', 'utf8');
+    const packageJson = JSON.parse(readFileSync('package.json', 'utf8')) as { engines?: { node?: string } };
+    expect(handler).not.toContain('config = { runtime:');
+    expect(packageJson.engines?.node).toBe('24.x');
+  });
+
+  it('runs the function beside the Neon database', () => {
+    expect(config.regions).toEqual(['sin1']);
   });
 
   it('rewrites SPA routes but leaves static files alone', () => {
