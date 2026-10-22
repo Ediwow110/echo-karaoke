@@ -9,20 +9,28 @@ Base commit: 025b4ec (branch master, pushed to https://github.com/Ediwow110/echo
 | Pass | Scope | Status |
 |---|---|---|
 | Pass 1 | Map repo, docs, config, dependencies | done |
-| Pass 1 | Architecture & business logic trace | running |
-| Pass 1 | AuthN / AuthZ | running |
-| Pass 1 | Database / migrations / constraints | running |
-| Pass 1 | API / validation / security | running |
-| Pass 1 | Frontend / UX / a11y / performance | running |
-| Pass 1 | Testing / CI / production readiness | running |
-| Pass 2 | Adversarial second pass (prove first pass wrong) | pending |
-| Pass 3 | Cross-validation of Critical/High findings | pending |
-| Final | Write final report | pending |
+| Pass 1 | Architecture & business logic trace | done |
+| Pass 1 | AuthN / AuthZ | done |
+| Pass 1 | Database / migrations / constraints | done |
+| Pass 1 | API / validation / security | done |
+| Pass 1 | Frontend / UX / a11y / performance | done |
+| Pass 1 | Testing / CI / production readiness | done |
+| Pass 2 | Adversarial second pass (prove first pass wrong) | done |
+| Pass 3 | Cross-validation of Critical/High findings | done |
+| Final | Write final report | done |
 
-The six Pass 1 domains run as independent read only auditors, one per domain, so that
-no two reviewers share an assumption. Pass 2 takes every finding back and tries to
-refute it, and Pass 3 re-checks only the Critical and High findings against the code
-path, because a reviewer can cite a correct line next to a wrong severity.
+The six Pass 1 domains ran as independent read only auditors, one per domain, so that
+no two reviewers shared an assumption. Pass 2 took every finding back and tried to
+refute it. Two findings were proven against the running system, one was measured in a
+browser, and every Medium finding was re-checked by the reviewer independently of the
+auditor, and none of them turned out to be overreach. Pass 3 re-checked the two High
+findings against the code path, and both had been confirmed by a second auditor
+already.
+
+The report is written as a text file outside the repository, because the repository is
+public and a report that names a live weakness is a disclosure. Committing it is a
+decision for the owner. This tracker holds the ledger and is local only, behind the
+pushed commit `d055f9d`.
 
 ## Pass 1, the repository map
 Tracked files, 275 in total, on one branch with no history beyond the ECHO rewrite.
@@ -488,7 +496,79 @@ because a workflow with that name exists on the repository. **Corrected during t
 audit.**
 
 ## Findings ledger (id | severity | confidence | title)
-(appended as verified in Pass 2 and Pass 3)
+Forty seven distinct findings from forty nine ids. Two pairs were found independently by
+two auditors each: API-1 with DB-1, and FE-1 with ARCH-1. "Proven" means the finding
+was reproduced against the running system, not only read. "Measured" means the
+behaviour was observed in a browser or against the running database. "Verified" means
+the reviewer re-checked the evidence independently of the auditor.
+
+| id | severity | confidence | title | evidence |
+|---|---|---|---|---|
+| AUTH-1 | High | High | the host heartbeat is bound to the Auth user id, so a live room is deleted after an Auth session replacement | Proven |
+| API-1, DB-1 | High | High | the shared daily song-lookup pool is charged before the work succeeds, so one guest locks song adding deployment-wide until the next Pacific midnight | Proven |
+| FE-1, ARCH-1 | Medium | High | the home screen classifies devices with a 1024 pixel width query, not the approved shorter-edge rule, and it branches in JavaScript into two different DOM trees | Measured |
+| FE-2 | Medium | High | the guest Search tab ships touch targets under 44 pixels and the end to end suite never measures that tab | Measured |
+| FE-3 | Medium | High | no focus move or announcement happens on a route change | Verified |
+| FE-4 | Medium | Medium | the guest remote promises automatic advance while the host screen is closed | Verified |
+| API-2 | Medium | High | the search budgets are spent before the shared pool and before the upstream call | Verified |
+| API-3 | Medium | High | the dev tunnel leaves a dead host in `.env` and never restores it | Verified |
+| API-4 | Medium | Medium | the deploy guard never checks that the browser key is the anon or publishable key | Fixed |
+| QA-1 | Medium | High | the Playwright suite never runs in CI, so the client to Edge seam is untested | Verified |
+| QA-2 | Medium | High | the database job hit the image pull rate limit on the very first run | Verified in the run log |
+| QA-4 | Medium | Medium | the suites spend 23 of the 30 local anonymous sign-ins an hour | Verified by count |
+| QA-7 | Medium | Medium | the documented procedure left the Edge allowlist with one origin | Fixed |
+| AUTH-2 | Low | High | the heartbeat never checks the room state, so an ended room can be kept alive | Read |
+| AUTH-3 | Low | High | the vote path is the only member write without a rate limit | Read |
+| FE-5 | Low | High | three smooth scrolls ignore the reduced-motion preference | Read |
+| FE-6 | Low | High | the text inputs cancel the 2 pixel focus ring the spec requires | Read |
+| FE-7 | Low | High | the stage slot forces a layout read and a re-render on every scroll event | Read |
+| FE-8 | Low | Medium | the guest progress position compares the server clock with the phone clock | Read |
+| API-5 | Low | High | the server does not strip control characters from a display name | Read |
+| API-6 | Low | Medium | the request body limit is applied after the body is fully buffered | Read |
+| API-8 | Low | Medium | an empty upstream search response is written to the shared ten-minute cache | Read |
+| API-9 | Low | High | the preview verifier matches the CSP by substring | Read |
+| API-10 | Low | Medium | a retry after a timeout is shown as a failure for a song that was added | Read |
+| ARCH-2 | Low | High | the suggestion strip can never show the twelve songs the spec claims and verifies | Read |
+| ARCH-3 | Low | High | one song carries two different queue numbers on the same screen | Read |
+| QA-3 | Low | High | the Edge integration suite skips itself and still reports success | Read |
+| QA-5 | Low | High | the production artifact is a bundle nothing deploys, and it is not gated | Read |
+| QA-6 | Low | High | the thirteen Edge Functions are never type-checked | Read |
+| QA-8 | Low | High | several unit tests assert source text, and one can be defeated by a quote | Read |
+| QA-9 | Low | High | the host stage and party screens have no test at all | Read |
+| QA-11 | Low | Medium | the suites depend on the live YouTube oEmbed endpoint | Read |
+| DB-2 | Low | High | the roster online window equals the background-tab heartbeat cadence | Read |
+| DB-3 | Low | High | no pgTAP assertion covers the heartbeat the sweep depends on | Read |
+| AUTH-4 | Info | High | the room creation cap is keyed on a resettable identity | Read |
+| FE-9 | Info | Medium | the host console can render a completely blank page | Read |
+| API-7 | Info | High | the suggest function is deployed, reachable, unused, and its cache never evicts | Read |
+| API-11 | Info | High | the chart asks for twelve entries and the mapper keeps ten | Read |
+| API-12 | Info | Medium | the deploy guard does not cover the YouTube budget variables | Read |
+| ARCH-4 | Info | High | dead code, and the client room-code generator has already drifted from the server | Read |
+| ARCH-5 | Info | High | the heartbeat runs at the full poll rate | Read |
+| ARCH-6 | Info | High | the specs on disk describe a different product, palette and sync model | Read |
+| QA-10 | Info | High | the claim that one player stays mounted across host route changes is asserted nowhere | Read |
+| QA-12 | Info | High | the workflow does not run on every push | Fixed |
+| DB-4 | Info | High | the duplicate-video guard and the unique constraints are never asserted directly | Read |
+| DB-5 | Info | High | the platform default privileges still grant write-adjacent rights on new public tables and sequences | Read |
+| DB-6 | Info | High | the queue reader and the ended-room retention function are unreachable, so the documented retention never runs | Read |
+
+## The order to fix them in
+
+1. **API-1 and DB-1.** One guest can end song adding for the whole deployment. Move the
+   cheap duplicate and lock checks ahead of the pool, give the pool a per-room tier,
+   and lower the per-caller window.
+2. **AUTH-1.** A live room with an active host is deleted by the sweep after an Auth
+   session replacement, and no test would catch it. Let the heartbeat carry the host
+   capability, and close the DB-3 gap with the same change.
+3. **API-4.** Fixed during the audit, because the next step past this point is pasting
+   a Supabase key into Vercel.
+4. **FE-2 and QA-1.** The touch target floor and the missing browser gate. The first is
+   a promise the app makes to a guest on a phone, and the second is why the first was
+   never noticed.
+5. **FE-1 and ARCH-1.** One markup tree with the approved rule, which also repairs the
+   markup order promise and the duplicate scan action.
+6. **FE-4.** The guest is told a thing that is not true while the room is stalled.
+7. Everything Low and Info, in the order the ledger lists them.
 
 ## Notes
 - The audit is read only. No production code is changed while it runs.
