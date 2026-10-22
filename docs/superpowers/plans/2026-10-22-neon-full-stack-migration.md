@@ -134,9 +134,13 @@ grant select, insert, update, delete on public.user, public.session, public.acco
 revoke all on public.user, public.session, public.account, public.verification, public.jwks from anon, authenticated;
 ```
 
-- [ ] **Step 6: Fix the default privileges so a new table is never writable by a browser role**
+- [ ] **Step 6: Put the default privilege fix first, so a new table is never writable by a browser role**
 
-Add to `supabase/migrations/0000_platform_compatibility.sql`, after the schema creation:
+This goes at the top of `supabase/migrations/0020_auth_schema.sql`, before the
+generated table statements, because a default privilege only affects the objects
+created after it is set. It must live in this migration and not in
+`0000_platform_compatibility.sql`, because `0000` is already applied on Neon and
+editing an applied migration would not take effect there.
 
 ```sql
 -- A new table in this schema must not be readable or writable by a browser
@@ -169,7 +173,6 @@ Expected: PASS on both.
 git add supabase/migrations/0000_platform_compatibility.sql supabase/migrations/0020_auth_schema.sql supabase/tests/auth_role_test.sql server/auth/auth.ts package.json package-lock.json
 git commit -m "feat: add the auth schema, the auth role and the default privilege fix"
 ```
-
 ---
 
 ### Task 2: The server identity module
