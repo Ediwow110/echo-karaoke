@@ -6,7 +6,10 @@ let pending: Promise<string> | null = null;
 
 async function fetchToken(): Promise<string | null> {
   try {
-    const response = await fetch('/api/auth/token', { credentials: 'include' });
+    const response = await fetch('/api/auth/token', {
+      credentials: 'include',
+      signal: AbortSignal.timeout(10_000),
+    });
     if (!response.ok) return null;
     const body = (await response.json()) as { token?: unknown };
     return typeof body.token === 'string' && body.token.length > 0 ? body.token : null;
@@ -22,6 +25,7 @@ async function signIn(): Promise<void> {
       headers: { 'Content-Type': 'application/json' },
       body: '{}',
       credentials: 'include',
+      signal: AbortSignal.timeout(10_000),
     });
   } catch {
     // The second token request reports whether a usable session exists.
@@ -53,9 +57,4 @@ export function ensureAnonymousSession(): Promise<string> {
     pending = null;
   });
   return pending;
-}
-
-export function clearAnonymousSession(): void {
-  bearerToken = null;
-  tokenFetchedAt = 0;
 }
