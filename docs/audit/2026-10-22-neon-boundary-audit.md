@@ -21,6 +21,7 @@ Verdict: **deployed, verified, and CI green** at
 | Production verifier | `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` | passed |
 | Production auth and room | curl against the alias | sign-in 200, token 200, create-room 201 |
 | Production browser flow | Playwright, desktop host plus 390px guest | room created, guest joined, queue visible, guest in the host roster |
+| Heartbeat after session swap | integration test plus `heartbeat_test.sql` | 401 before; 200 after; host member refreshed without an auth user id |
 | CI | GitHub Actions runs 39868480083 and 39868803159 | verify, database, integration passed |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
@@ -125,6 +126,22 @@ sends that URL parameter to the server. The branch helper now removes
 `channel_binding` while keeping `sslmode`. The rerun passed `verify`, `database`, and
 `integration`.
 
+### 14. High, fixed: the host heartbeat stopped after an auth session replacement
+
+The client ignored the `role` argument in `touchRoomMember` and always sent the guest
+pass. `public.touch_member` resolves the guest member by room, auth user id, and
+token digest, so a new anonymous session made the heartbeat return 401. The host pass
+is not user-bound, so the host stayed in control while its member row stopped
+refreshing, and the sweep could delete the live room after thirty minutes.
+
+The client now sends the host pass for a host heartbeat; the router calls a new
+`public.touch_host` that validates the room host secret through `private.require_host`
+and refreshes the host member without reading the auth user id. Both heartbeat paths
+now reject ended rooms (`0023_host_heartbeat.sql`). The regression is covered by an
+integration test that swaps the auth session (401 before the fix, 200 after), a client
+unit test that checks the selected pass, and the `heartbeat_test.sql` suite. Database
+assertions are now 234.
+
 ## The boundary that did not move
 
 - The authorized SQL is unchanged. The 225 database assertions cover grants, RLS,
@@ -145,16 +162,12 @@ sends that URL parameter to the server. The branch helper now removes
 - The YouTube Data API key path. The no-key path is tested; the live quota path is not.
 - Neon connection limits and function concurrency under a full room.
 - Per-IP throttling in front of Better Auth.
-- The host heartbeat after an auth session replacement, which remains open from the
-  2026-10-22 audit.
 - The user-owned `scripts/dev-tunnel.ps1`, which still describes the Supabase tunnel
   and was intentionally not modified.
 
 ## Order to finish
 
 1. Run a physical phone camera QR flow against the production alias.
-2. Fix the host heartbeat across auth session replacement, with a test that would fail
-   without it.
-3. Add a per-IP sign-in throttle and an explicit room-size limit before a public party.
-4. Decide whether the dev tunnel is updated for `/api` or retired.
-5. Decide whether the YouTube key is configured or left as the paste-link fallback.
+2. Add a per-IP sign-in throttle and an explicit room-size limit before a public party.
+3. Decide whether the dev tunnel is updated for `/api` or retired.
+4. Decide whether the YouTube key is configured or left as the paste-link fallback.

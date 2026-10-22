@@ -95,12 +95,22 @@ Proposed fix: accept the host pass in `touch-member` and resolve the host member
 through `private.require_host`, which is not bound to a user id, so the heartbeat
 survives an Auth session replacement.
 
+**Fixed 2026-10-23.** The client sends the host pass for a host heartbeat. The router
+calls `public.touch_host`, which validates the room host secret and refreshes the host
+member without a user id. An integration test swaps the auth session (401 before the
+fix, 200 after), a client unit test checks the selected pass, and
+`supabase/tests/heartbeat_test.sql` covers the SQL path.
+
 ### AUTH-2: the heartbeat never checks the room state
 Pass 1 severity: Low. Auditor confidence: High.
 `public.touch_member` (`0001_room_core.sql:540-562`) has no `private.require_live`,
 unlike every other mutation, so a deliberate heartbeat loop keeps an ended room alive
 past the retention window. The honest client stops polling an ended room
 (`src/features/rooms/useRoomData.ts:85-87`), so only a deliberate loop triggers it.
+
+**Fixed 2026-10-23** in `0023_host_heartbeat.sql`: both `touch_member` and
+`touch_host` call `private.require_live`, and `heartbeat_test.sql` asserts the ended
+room rejection.
 
 ### AUTH-3: the vote path is the only member write without a rate limit
 Pass 1 severity: Low. Auditor confidence: High.
@@ -504,7 +514,7 @@ the reviewer re-checked the evidence independently of the auditor.
 
 | id | severity | confidence | title | evidence |
 |---|---|---|---|---|
-| AUTH-1 | High | High | the host heartbeat is bound to the Auth user id, so a live room is deleted after an Auth session replacement | Proven |
+| AUTH-1 | High | High | the host heartbeat is bound to the Auth user id, so a live room is deleted after an Auth session replacement | Fixed |
 | API-1, DB-1 | High | High | the shared daily song-lookup pool is charged before the work succeeds, so one guest locks song adding deployment-wide until the next Pacific midnight | Proven |
 | FE-1, ARCH-1 | Medium | High | the home screen classifies devices with a 1024 pixel width query, not the approved shorter-edge rule, and it branches in JavaScript into two different DOM trees | Measured |
 | FE-2 | Medium | High | the guest Search tab ships touch targets under 44 pixels and the end to end suite never measures that tab | Measured |
@@ -517,7 +527,7 @@ the reviewer re-checked the evidence independently of the auditor.
 | QA-2 | Medium | High | the database job hit the image pull rate limit on the very first run | Verified in the run log |
 | QA-4 | Medium | Medium | the suites spend 23 of the 30 local anonymous sign-ins an hour | Verified by count |
 | QA-7 | Medium | Medium | the documented procedure left the Edge allowlist with one origin | Fixed |
-| AUTH-2 | Low | High | the heartbeat never checks the room state, so an ended room can be kept alive | Read |
+| AUTH-2 | Low | High | the heartbeat never checks the room state, so an ended room can be kept alive | Fixed |
 | AUTH-3 | Low | High | the vote path is the only member write without a rate limit | Read |
 | FE-5 | Low | High | three smooth scrolls ignore the reduced-motion preference | Read |
 | FE-6 | Low | High | the text inputs cancel the 2 pixel focus ring the spec requires | Read |
@@ -537,7 +547,7 @@ the reviewer re-checked the evidence independently of the auditor.
 | QA-9 | Low | High | the host stage and party screens have no test at all | Read |
 | QA-11 | Low | Medium | the suites depend on the live YouTube oEmbed endpoint | Read |
 | DB-2 | Low | High | the roster online window equals the background-tab heartbeat cadence | Read |
-| DB-3 | Low | High | no pgTAP assertion covers the heartbeat the sweep depends on | Read |
+| DB-3 | Low | High | no pgTAP assertion covers the heartbeat the sweep depends on | Fixed |
 | AUTH-4 | Info | High | the room creation cap is keyed on a resettable identity | Read |
 | FE-9 | Info | Medium | the host console can render a completely blank page | Read |
 | API-7 | Info | High | the suggest function is deployed, reachable, unused, and its cache never evicts | Read |
@@ -557,9 +567,8 @@ the reviewer re-checked the evidence independently of the auditor.
 1. **API-1 and DB-1.** One guest can end song adding for the whole deployment. Move the
    cheap duplicate and lock checks ahead of the pool, give the pool a per-room tier,
    and lower the per-caller window.
-2. **AUTH-1.** A live room with an active host is deleted by the sweep after an Auth
-   session replacement, and no test would catch it. Let the heartbeat carry the host
-   capability, and close the DB-3 gap with the same change.
+2. **AUTH-1.** Fixed 2026-10-23: the heartbeat carries the host capability, a session
+   swap returns 200, and `heartbeat_test.sql` closes the DB-3 gap.
 3. **API-4.** Fixed during the audit, because the next step past this point is pasting
    a Supabase key into Vercel.
 4. **FE-2 and QA-1.** The touch target floor and the missing browser gate. The first is
@@ -598,13 +607,16 @@ and `echo_auth`. The current report is
 | N-10 | Info | `clearAnonymousSession` was dead API | Removed |
 | N-11 | High | The production function imports had no ESM extensions, so every API request returned 500 | Fixed |
 | N-12 | Medium | The production alias was assumed rather than read from the project | Fixed |
+| N-13 | Low | CI branch URLs carried `channel_binding`, which the Supabase CLI sent to the server | Fixed |
+| N-14 | High | The host heartbeat used the guest pass, so a session replacement stopped refreshing the host member | Fixed |
 
-Gates on 2026-10-23: 226 unit tests, 225 database assertions on Neon, 3 operation
+Gates on 2026-10-23: 229 unit tests, 234 database assertions on Neon, 4 operation
 integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
 (sign-in 200, token 200, create-room 201). Production is deployed at
 `https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production
 sign-in, token, and create-room flow returned 200, 200, and 201. A Playwright flow
 created a room on desktop, joined from a 390px guest viewport, saw the queue, and
 appeared in the host roster. CI runs 39868480083 and 39868803159 passed `verify`,
-`database`, and `integration` on `master`. The remaining work is the physical-phone
-camera run and the open items in the report.
+`database`, and `integration` on `master` before the heartbeat fix; the fix is
+committed locally and awaits its own deployment and CI run. The remaining work is the
+physical-phone camera run and the open items in the report.

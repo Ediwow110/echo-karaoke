@@ -6,7 +6,7 @@ Status: Deployed and verified at `https://echo-karaoke-mocha.vercel.app` on
 all passed. Every hosted value below is named, never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The local
-gates are already green: 226 unit tests, 225 database assertions against Neon, 3
+gates are already green: 229 unit tests, 234 database assertions against Neon, 4
 operation integration tests, and a production build. This document covers only what a
 hosted account makes possible.
 
@@ -270,7 +270,7 @@ The jobs:
 
 1. `verify` runs typecheck, the unit suite, the build, and `npm audit`.
 2. `database` creates a Neon branch through the API, applies the migration chain,
-   runs the 225 pgTAP assertions, and deletes the branch even on failure.
+   runs the 234 pgTAP assertions, and deletes the branch even on failure.
 3. `integration` creates a second branch, applies the chain, deletes the inherited
    `public.jwks` rows so Better Auth generates keys for this run's secret, runs the
    operation suite, and deletes the branch.
@@ -300,9 +300,9 @@ five-minute guarantee; the interval is opportunistic.
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 225/225.
-- [x] `npm run test:integration` reports 3/3 against Neon.
-- [x] `npm test` reports 226 unit tests passing.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 234/234.
+- [x] `npm run test:integration` reports 4/4 against Neon.
+- [x] `npm test` reports 229 unit tests passing.
 - [x] `npm run build` passes.
 - [x] `vercel deploy --prod` builds with the guard enabled.
 - [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
@@ -314,6 +314,6 @@ five-minute guarantee; the interval is opportunistic.
 
 - The YouTube Data API key. Without it, search reports that it is not configured and
   the paste-a-link path keeps working.
-- The host heartbeat after an auth session replacement, which remains an open finding
-  from the 2026-10-22 audit.
+- A heartbeat is now bound to the room capability: a host whose auth session is
+  replaced still refreshes the host member. Both heartbeat paths reject ended rooms.
 - Per-IP sign-in throttling in front of Better Auth.
