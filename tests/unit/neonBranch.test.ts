@@ -27,16 +27,18 @@ describe('Neon CI branch', () => {
         return jsonResponse(201, { branch: { id: 'br-ci' } });
       }
       const role = new URL(url).searchParams.get('role_name');
-      return jsonResponse(200, { uri: 'postgresql://' + role + ':fresh@br-ci.example/neondb' });
+      return jsonResponse(200, {
+        uri: 'postgresql://' + role + ':fresh@br-ci.example/neondb?sslmode=require&channel_binding=require',
+      });
     }) as unknown as typeof fetch;
 
     const branch = await createBranch({ ...base, fetchImpl });
 
     expect(branch).toEqual({
       branchId: 'br-ci',
-      neonDatabaseUrl: 'postgresql://owner:fresh@br-ci.example/neondb',
-      serviceDatabaseUrl: 'postgresql://service_role:fresh@br-ci.example/neondb',
-      authDatabaseUrl: 'postgresql://echo_auth:fresh@br-ci.example/neondb',
+      neonDatabaseUrl: 'postgresql://owner:fresh@br-ci.example/neondb?sslmode=require',
+      serviceDatabaseUrl: 'postgresql://service_role:fresh@br-ci.example/neondb?sslmode=require',
+      authDatabaseUrl: 'postgresql://echo_auth:fresh@br-ci.example/neondb?sslmode=require',
     });
     const create = calls[0];
     expect(create.url).toBe('https://console.neon.tech/api/v2/projects/project-1/branches');

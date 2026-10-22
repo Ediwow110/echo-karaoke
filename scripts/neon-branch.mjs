@@ -59,7 +59,16 @@ async function connectionUri(options, branchId, target) {
   if (typeof body?.uri !== 'string' || body.uri.length === 0) {
     throw new Error('Neon returned no connection URI for the branch.');
   }
-  return body.uri;
+  // The Supabase CLI's connector treats channel_binding as a server startup
+  // parameter and Neon rejects it. Keep sslmode and drop the client hint.
+  let uri;
+  try {
+    uri = new URL(body.uri);
+  } catch {
+    throw new Error('Neon returned an invalid connection URI.');
+  }
+  uri.searchParams.delete('channel_binding');
+  return uri.toString();
 }
 
 export async function createBranch(options) {
