@@ -5,7 +5,7 @@ Scope: the identity path, the two Neon credentials, the Vercel Function boundary
 and the parts of the room authorization SQL that did not move.
 Verdict: **deployed, verified, and CI green** at
 `https://echo-karaoke-mocha.vercel.app` on 2026-10-23, including the host-heartbeat
-fix.
+fix and the abuse controls.
 
 ## Evidence
 
@@ -24,8 +24,9 @@ fix.
 | Production browser flow | Playwright, desktop host plus 390px guest | room created, guest joined, queue visible, guest in the host roster |
 | Heartbeat after session swap | integration test plus `heartbeat_test.sql` | 401 before; 200 after; host member refreshed without an auth user id |
 | Production heartbeat | new anonymous session plus the original host pass | touch 200, host read 200, end 200 |
-| Abuse controls | unit, pgTAP, and integration | sign-in 429 at the cap; room join 409 `ROOM_FULL`; existing guest rejoins |
-| CI | GitHub Actions runs 39868480083, 39868803159, 39870306564, and 39871229479 | verify, database, integration passed |
+| Abuse controls | unit, pgTAP, integration, and live probe | sign-in 429 at the cap; room join 409 `ROOM_FULL`; existing guest rejoins |
+| Production limits | temporary 6/hour and 2 members, then restored | six 200s, seventh 429 with `Retry-After`; guest 409; rejoin 200 |
+| CI | GitHub Actions runs 39868480083, 39868803159, 39870306564, 39871229479, and 39873145755 | verify, database, integration passed |
 
 The integration suite signs in through Better Auth, fetches the JWT, verifies it, and
 exercises create, join, reads, touch, lock, queue add/vote/remove, playback
@@ -165,7 +166,10 @@ the server's rate-limit message instead of the generic session error.
 
 Evidence: a fresh guest is rejected at the cap, an existing guest still joins, the
 third sign-in from one network returns 429, and the suites are 235 unit, 243 database,
-and 6 integration tests.
+and 6 integration tests. Live, with temporary limits of 6 and 2, six sign-ins returned
+200, the seventh returned 429 with `Retry-After`, the second guest returned 409
+`ROOM_FULL`, and the existing guest rejoined with 200. The limits were restored to 120
+and 50 and the deployment repeated.
 
 ## The boundary that did not move
 
