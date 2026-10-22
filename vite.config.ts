@@ -12,25 +12,9 @@ const allowedHosts = (process.env.VITE_DEV_ALLOWED_HOSTS ?? '')
   .map((host) => host.trim())
   .filter((host) => host.length > 0);
 
-// A tunnel serves the app over https, and a browser refuses an http request
-// from an https page. The proxy answers the room service on the same origin
-// as the app, so a tunnel carries the app and the service together:
-//   VITE_DEV_SUPABASE_URL=http://127.0.0.1:55421
-const supabaseTarget = process.env.VITE_DEV_SUPABASE_URL ?? '';
-
-const proxy = supabaseTarget.length > 0
-  ? {
-      '/auth/v1': { target: supabaseTarget, changeOrigin: true },
-      '/rest/v1': { target: supabaseTarget, changeOrigin: true },
-      '/functions/v1': { target: supabaseTarget, changeOrigin: true },
-      '/realtime/v1': { target: supabaseTarget, changeOrigin: true, ws: true },
-    }
-  : undefined;
-
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     allowedHosts: allowedHosts.length > 0 ? allowedHosts : undefined,
-    proxy,
   },
 });

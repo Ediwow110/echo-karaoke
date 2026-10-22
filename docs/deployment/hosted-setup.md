@@ -1,409 +1,283 @@
 # Hosted Setup Runbook
 
-Date: 2026-10-22
-Status: Procedure only. No hosted project, no deployment, and no push were performed.
+Date: 2026-10-23
+Status: Procedure only. Nothing has been pushed or deployed from this document. Every
+hosted value below is named, never printed.
 
-This runbook takes ECHO from a clean machine to a deployed, verified preview. Every
-command is run from the repository root. Every value comes from a hosted account, so
-each step names the value it needs and where to read it.
-
-The local audit is already closed. Build passes, unit 180/180, database 210/210, Edge
-17/17, and Playwright 9/9. This document does not repeat that work. It covers only the
-steps that a hosted account makes possible.
+This runbook takes ECHO from the repository to a deployed, verified site. The local
+gates are already green: 216 unit tests, 221 database assertions against Neon, 2
+operation integration tests, and a production build. This document covers only what a
+hosted account makes possible.
 
 ## What this procedure produces
 
-- A hosted Supabase project with the schema, the Edge Functions, and their secrets.
-- A Vercel project that serves the built app with the CSP and the security headers.
-- A git remote, so the CI workflow runs on every push.
-- A verified preview, checked with `npm run verify:preview` and by hand.
+- A Neon Postgres database with the full migration chain and the two login roles.
+- A Better Auth service inside the same Vercel Function, with anonymous sessions and
+  Ed25519 JWTs.
+- One Vercel Function at `/api/*` that serves auth and the thirteen room operations.
+- A production deployment whose browser bundle holds no database credential.
+- A CI workflow that runs the database and operation suites on throwaway Neon branches.
 
-## Values to collect first
+## Architecture
 
-| Value | Where it comes from | Used by |
-|---|---|---|
-| Project ref | Supabase dashboard, project settings, API | Every `supabase` command |
-| Project URL | Supabase dashboard, project settings, API | `VITE_SUPABASE_URL` |
-| Publishable anon key | Supabase dashboard, project settings, API | `VITE_SUPABASE_ANON_KEY` |
-| App origin | The Vercel production domain | `ALLOWED_ORIGINS` |
-| YouTube Data API key | Google Cloud console, YouTube Data API v3 | Edge secret `YOUTUBE_API_KEY` |
-
-The YouTube key is optional. Without it the search box and the suggestion strip report
-that search is not configured, and the paste a link path keeps working. The app never
-sends the key to the browser.
-
-## Step 1: Create the hosted Supabase project
-
-A free plan allows two active free projects per organization member. A paused project
-does not count, and a second free organization carries its own quota of two, so a
-product with its own database belongs in its own organization rather than sharing one
-with another product. The ECHO project goes in a second free organization.
-
-Create the organization with the CLI, once the access token is in place:
-
-```bash
-npx supabase orgs create ECHO
-npx supabase projects create echo-karaoke --org-id <new-org-id> --region ap-northeast-1 --db-password <password>
+```
+browser (Vite app)
+  |  same-origin fetch, Bearer JWT, room token headers
+  v
+Vercel Function  /api/auth/*     -> Better Auth (AUTH_DATABASE_URL)
+                 /api/<operation> -> room operations (DATABASE_URL)
+  |                                   |
+  v                                   v
+Neon Postgres                    Neon Postgres
+auth tables only                 room schema only
+echo_auth role                   service_role role
 ```
 
-The project creation also works through the Supabase platform API, which takes the
-organization id, the region, and no password. The CLI needs the password only so that
-later `db push` runs can connect directly.
+The browser never receives a database URL. The deploy guard refuses a build when any
+`VITE_` variable holds a PostgreSQL connection string, and the preview verifier scans
+the served HTML and main asset for one.
 
-The local stack and the hosted project must agree on the Postgres major version. The
-local `supabase/config.toml` pins `major_version = 17`, so read the hosted project's
-major version in the dashboard before applying migrations.
+## Project references
 
-Then turn on the two Auth settings the app needs.
+| Resource | Value |
+|---|---|
+| Neon project | `echo-karaoke` (`plain-queen-50704361`) |
+| Neon region | `aws-ap-southeast-1` |
+| Neon default branch | `main` (`br-curly-pine-b3bzrw7u`) |
+| Vercel project | `echo-karaoke` on `ediwow110s-projects` |
+| Expected production origin | `https://echo-karaoke.vercel.app` |
 
-1. **Anonymous sign-ins must be on.** Dashboard, Authentication, Providers, Email. The
-   app signs in without an account, so this switch is the product, not an option.
-2. **Raise the anonymous sign-in rate limit.** Dashboard, Authentication, Rate Limits.
-   The hosted default is 30 anonymous sign-ins per hour per IP address. A karaoke party
-   puts every guest phone on one venue network, and a venue network is often a single
-   public address, so all of those guests spend the same budget. With the default, the
-   thirty first guest of the hour cannot join. Set it to the size of the largest room
-   you expect, and read the value back before the party.
+The Vercel production domain is the project's default domain. Confirm it after the
+first deployment and use the confirmed value everywhere this document writes
+`https://echo-karaoke.vercel.app`.
 
-The local stack does not enforce this limit, so the Playwright suite passes without the
-change. The limit only appears on the hosted project, and only in the real scenario.
+## Credentials
 
-## Step 2: Link the project and apply the migrations
+Four connection strings exist, and they are not interchangeable.
 
-```bash
-npx supabase login
-npx supabase link --project-ref <project-ref>
-npx supabase db push --dry-run
-npx supabase db push
-```
+| Name | Role | Path | Used by |
+|---|---|---|---|
+| `DATABASE_URL` | `service_role` | pooled | The Vercel Function for room operations |
+| `AUTH_DATABASE_URL` | `echo_auth` | direct | Better Auth for identity tables |
+| `NEON_DATABASE_URL` | `neondb_owner` | direct | Migrations, pgTAP, branch cleanup |
+| `BETTER_AUTH_SECRET` | secret | n/a | Better Auth cookie and JWKS encryption |
 
-The CLI cannot run the browser login in a non-interactive shell, and the link step
-asks for the database password. Run those two in a terminal of your own. Every later
-step reads the stored link and needs no secret.
+`service_role` bypasses row level security and may execute the room operations. It has
+no grant on the auth tables. `echo_auth` may read and write `user`, `session`,
+`account`, `verification`, and `jwks`; it has no grant on the room schema and cannot
+execute a room operation. The owner URL is never set on Vercel.
 
-`--dry-run` prints the migrations before they run. Read that list. It must contain
-every file in `supabase/migrations`, from `0001_room_core.sql` through
-`0019_abandoned_room_cleanup.sql`, and nothing else.
+`server/.env.neon` holds the four local values and is ignored by git. Never copy it
+into a build environment, a chat message, or a command whose output is logged.
 
-Two migrations need attention on a hosted project:
+## Step 1: Apply the database chain
 
-- `0018_retention_and_creation_limits.sql` adds `public.cleanup_ended_rooms(cutoff)`,
-  which refuses a cutoff less than one day old.
-- `0019_abandoned_room_cleanup.sql` installs `pg_cron` and schedules
-  `cleanup_abandoned_rooms(now() - interval '30 minutes')` every five minutes. It also
-  creates the `members_room_id_last_seen_at_idx` and `rooms_created_at_abandoned_idx`
-  indexes. Supabase enables `pg_cron` on hosted projects, so the schedule takes effect
-  without a dashboard switch.
-
-`supabase/seed.sql` holds local test data. `db push` does not run it unless
-`--include-seed` is passed, and the production database does not need it.
-
-Verify the schema landed:
+The chain runs from `0000_platform_compatibility.sql` through
+`0021_user_id_text.sql`. On Neon it has already been applied to `main`. To apply it to
+another database:
 
 ```bash
-npx supabase db dump --linked --schema public --file /tmp/echo-schema-check.sql
+npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
 ```
 
-Then check the sweep on the hosted database, after a room has existed for more than 30
-minutes with no heartbeat:
+The migrations create `anon`, `authenticated`, `service_role`, and `echo_auth` when a
+plain Postgres lacks them, install `pgcrypto` and the pgTAP extension used by the test
+files, and grant the authorized operations only to `service_role`.
+
+Run the database suite against the same URL:
+
+```bash
+npx supabase test db --db-url "$NEON_DATABASE_URL"
+```
+
+Expected: `Result: PASS`, 8 files and 221 assertions. Docker must be running because
+the Supabase CLI runs `pg_prove` in a container.
+
+### Rotating `BETTER_AUTH_SECRET`
+
+Better Auth encrypts the private JWKS key with this secret. Changing the secret while
+the old encrypted rows remain makes every auth request fail with a decryption error.
+Rotate in this order:
 
 ```sql
-select jobname, schedule, active from cron.job where jobname = 'cleanup-abandoned-rooms';
+delete from public.jwks;
 ```
 
-## Step 3: Deploy the Edge Functions
+Then change the secret in Vercel and redeploy. Better Auth generates a new key pair on
+the next auth request. Existing clients receive a fresh token from `/api/auth/token`;
+the old public key is gone, so a token minted before the rotation stops verifying.
+That is expected and is limited to the rotation window.
 
-```bash
-npx supabase functions deploy
-```
+## Step 2: Understand the auth routes
 
-The deploy covers all thirteen functions. Do not pass `--no-verify-jwt`. Every function
-verifies the anonymous Auth token, and the browser sends it.
+Better Auth is mounted at `/api/auth/*` in the same function as the operations.
 
-The service role key is read from the function environment, so it must be present in the
-hosted project. The runtime injects `SUPABASE_URL`, `SUPABASE_ANON_KEY` and
-`SUPABASE_SERVICE_ROLE_KEY` by default, and the shared room module reads exactly
-those names. A project that shows only the new publishable and secret keys still
-carries the legacy `anon` and `service_role` keys under API Keys, Legacy API Keys.
-Check that both legacy keys exist before deploying.
-
-Confirm that the functions answer before continuing:
-
-```bash
-curl -i -X POST "https://<project-ref>.supabase.co/functions/v1/create-room" \
-  -H "apikey: <publishable-anon-key>" \
-  -H "authorization: Bearer <publishable-anon-key>" \
-  -H "content-type: application/json" \
-  -d '{"displayName":"Deploy Check"}'
-```
-
-A `401` with a JSON body means the function is deployed and the token check is on. The
-gateway can answer the `401` before the function runs, and the function can answer it
-on its own, so either way the deploy worked. A network error means the function is not
-deployed.
-
-## Step 4: Set the Edge secrets
-
-```bash
-npx supabase secrets set ALLOWED_ORIGINS=https://<app-origin>,https://<preview-origin>
-npx supabase secrets set YOUTUBE_API_KEY=<youtube-data-api-key>
-```
-
-`ALLOWED_ORIGINS` is the CORS allowlist for the functions. An empty value reflects any
-origin, which is convenient locally and too permissive in public. The list holds bare
-origins, comma separated, with no path and no trailing slash. A request from an origin
-that is not on the list is answered with the first allowed origin, so the browser
-blocks it.
-
-The list needs **both** the production origin and the preview origin, and the preview
-needs a stable name because the generated deployment host changes on every deploy. Set
-the alias once, before the first preview:
-
-```bash
-vercel alias set <deployment-url> echo-karaoke-preview
-```
-
-That gives the preview the fixed origin `https://echo-karaoke-preview.vercel.app`,
-which is the one to put in the list. A preview on a generated host is a different
-origin, so the browser blocks every function call from it and the room service appears
-to be broken even though the static app loads.
-
-The Edge secret and the Vercel build variable are two different things and they are
-read in two different places. The Edge secret is what the functions enforce, and the
-Vercel build variable is what the deploy guard checks. Setting one does not set the
-other, and a preview whose origin is missing from the Edge secret passes
-`npm run verify:preview` and still cannot create a room.
-
-The two YouTube budget variables have safe defaults and only need a value if the
-defaults are wrong for the account:
-
-```bash
-npx supabase secrets set YOUTUBE_DAILY_SEARCH_BUDGET=90 YOUTUBE_DAILY_POPULAR_BUDGET=200
-```
-
-The search budget must stay at or below 90. YouTube gives `search.list` its own bucket
-of 100 calls per day, and 90 leaves headroom. The chart budget draws from the shared
-pool of 10,000 units per day.
-
-After a secret change, redeploy is not needed. The runtime reads the secret on the next
-cold start. Confirm the list without printing the values:
-
-```bash
-npx supabase secrets list
-```
-
-## Step 5: Create the Vercel project and set its environment
-
-The Vercel CLI 65.1.0 is installed globally, and the account is signed in. The project
-`echo-karaoke` already exists on the team `ediwow110s-projects`, and this directory is
-linked to it through `.vercel/project.json`. The link directory is git-ignored.
-
-Two settings on the project need attention before the first public deployment.
-
-**Vercel Authentication must be off.** A new project on a team starts with
-`ssoProtection` set to `all_except_custom_domains`, which answers every request on the
-`vercel.app` domain with a redirect to the sign-in page. Guests cannot join a room
-through that, so the setting has to be cleared:
-
-```bash
-curl -X PATCH https://api.vercel.com/v9/projects/<project-id> \
-  -H "Authorization: Bearer $VERCEL_TOKEN" \
-  -H "Content-Type: application/json" \
-  -d '{"ssoProtection": null}'
-```
-
-**The three environment variables must exist for both environments.** The project
-needs them in the build environment, because `vercel.json` runs `npm run verify:deploy`
-before the build and the guard refuses to build without them. The build stops there on
-purpose. A build that skips the guard can carry the tunnel URL.
-
-| Variable | Scope | Value |
+| Route | Method | Purpose |
 |---|---|---|
-| `VITE_SUPABASE_URL` | Build and runtime | The project URL from Step 1 |
-| `VITE_SUPABASE_ANON_KEY` | Build and runtime | The publishable anon key from Step 1 |
-| `ALLOWED_ORIGINS` | Build | The app origin, the same value as the Edge secret |
+| `/api/auth/sign-in/anonymous` | POST | Create the anonymous identity and session cookie |
+| `/api/auth/token` | GET | Return the Ed25519 JWT for the current session |
+| `/api/auth/jwks` | GET | Publish the public key set used by the verifier |
+
+The browser client tries `/api/auth/token` first, signs in anonymously only when no
+session exists, retries the token, and refreshes it after ten minutes. The room
+operations verify the JWT signature against the JWKS and require the anonymous claim.
+
+`resolveBaseUrl` uses `BETTER_AUTH_URL` when set, otherwise the current Vercel
+deployment host, otherwise the project production domain, otherwise
+`http://127.0.0.1:3000`. `resolveTrustedOrigins` trusts that base URL, both Vercel
+hosts, and every origin in `ALLOWED_ORIGINS`.
+
+## Step 3: Run the full stack locally
+
+The app needs the function, not just Vite. `vercel dev` serves both.
 
 ```bash
-vercel env add VITE_SUPABASE_URL production
-vercel env add VITE_SUPABASE_ANON_KEY production
+cp server/.env.neon .env.local
+npx vercel dev
+```
+
+`.env.local` is ignored by git. Open `http://127.0.0.1:3000`, create a room, open the
+guest link in a second browser, and add a song. The function and the database are both
+local processes; only the database is hosted.
+
+For the operation integration suite, no dev server is needed; the test starts an HTTP
+server around the function handler itself:
+
+```bash
+set -a; . server/.env.neon; set +a
+npm run test:integration
+```
+
+Expected: 2 tests pass, including the abandoned-room sweep.
+
+## Step 4: Set the Vercel environment
+
+Add these to the Production environment:
+
+```bash
+vercel env add DATABASE_URL production
+vercel env add AUTH_DATABASE_URL production
+vercel env add BETTER_AUTH_SECRET production
+vercel env add BETTER_AUTH_URL production
 vercel env add ALLOWED_ORIGINS production
 ```
 
-The same three belong to the preview environment, with the preview origin in
-`ALLOWED_ORIGINS`. A preview build without them fails the guard exactly as a
-production build would.
+| Variable | Value |
+|---|---|
+| `DATABASE_URL` | The pooled `service_role` connection string |
+| `AUTH_DATABASE_URL` | The direct `echo_auth` connection string |
+| `BETTER_AUTH_SECRET` | A random secret of at least 32 characters |
+| `BETTER_AUTH_URL` | `https://echo-karaoke.vercel.app` |
+| `ALLOWED_ORIGINS` | `https://echo-karaoke.vercel.app` |
 
-`ALLOWED_ORIGINS` must exist in the build environment, because `vercel.json` runs
-`npm run verify:deploy` before the build and the guard refuses to build without it. The
-build stops there on purpose. A build that skips the guard can carry the tunnel URL.
+`ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. It is
+not a CORS allowlist any more: the function is same-origin, so no CORS headers are
+needed.
 
-`vercel.json` also applies the CSP and the security headers. The CSP allows
-`*.supabase.co` in `connect-src`. A project on a custom Supabase domain needs that host
-added. `npm run verify:preview` reads `VITE_SUPABASE_URL` and checks that the CSP
-allows the origin the app actually calls, so run it with that variable set.
+Repeat the database, auth secret, and origin variables for the Preview environment.
+Do **not** set `BETTER_AUTH_URL` for Preview; the current deployment host is derived
+from `VERCEL_URL` and trusted automatically. Preview deployments still need the two
+database URLs and the secret, or the function cannot start.
 
-## Step 6: Add the git remote
+The guard runs before every build. A missing `ALLOWED_ORIGINS`, a wildcard origin, an
+origin with a path or trailing slash, and any `VITE_*` PostgreSQL URL all stop the
+build.
 
-The repository has no remote, so the CI workflow has never run. The user approves each
-push, so this step waits for that approval.
+### Region
 
-The remote already points at `https://github.com/Ediwow110/echo-karaoke.git`, and the
-repository is created and public. Nothing has been pushed. The push is held until the
-Vercel preview is verified.
+`vercel.json` pins the function to `sin1`, the region of the Neon project. Keep the
+two together; a function in another region adds a cross-region round trip to every
+database call.
 
-```bash
-git push -u origin master
-```
+### Vercel Authentication
 
-The workflow runs on every pull request, and on every push to `master` or to a branch
-named `feature/…`. A push to any other branch name starts no workflow, so a branch
-such as `fix/guest-cors` is not verified until it is opened as a pull request.
+Turn Vercel Authentication off for the project, or guests will be redirected to a
+Vercel sign-in page before they can join a room. An SSO-protected deployment also
+fails `npm run verify:preview` with a message naming that cause.
 
-The CI workflow needs two repository variables and one secret:
+## Step 5: Deploy and verify
 
-| Name | Kind | Value |
-|---|---|---|
-| `VITE_SUPABASE_URL` | Variable | The project URL |
-| `ALLOWED_ORIGINS` | Variable | The app origin |
-| `VITE_SUPABASE_ANON_KEY` | Secret | The publishable anon key |
-
-```bash
-gh variable set VITE_SUPABASE_URL --body "<project-url>"
-gh variable set ALLOWED_ORIGINS --body "<app-origin>"
-gh secret set VITE_SUPABASE_ANON_KEY --body "<publishable-anon-key>"
-```
-
-The `production-artifact` job runs only when both variables are set. It runs the deploy
-guard, builds the bundle with the production values, and uploads `dist` as an artifact.
-The `verify` and `database` jobs always run, and the database job also runs the Edge
-integration suite against a local stack.
-
-The anon key is a publishable key, so it is not a secret in the usual sense, but the
-workflow reads it from the secret store, so keep it there.
-
-## Step 7: Build and check the bundle locally first
-
-Run the guard with the production values before the first hosted build:
+Deployment is a separate approval gate. Once approved:
 
 ```bash
-$env:VITE_SUPABASE_URL='https://<project-ref>.supabase.co'
-$env:VITE_SUPABASE_ANON_KEY='<publishable-anon-key>'
-$env:ALLOWED_ORIGINS='https://<app-origin>'
-npm run verify:deploy
-npm run build
+vercel deploy --prod
+npm run verify:preview -- https://echo-karaoke.vercel.app
 ```
 
-The guard rejects a missing value, a non-HTTPS URL, the trycloudflare tunnel, a
-wildcard origin, and an origin with a path or a trailing slash. The build output must
-not contain the tunnel host. Check it:
+The verifier checks:
+
+- the security headers and the CSP, including `connect-src 'self'`;
+- that the HTML and the main asset contain no `postgresql://` string;
+- the SPA fallback for a deep room route;
+- immutable caching on the hashed asset;
+- `/api/auth/jwks` returns a non-empty key set;
+- a POST to an unknown `/api/*` route returns JSON `404`, not the app shell.
+
+Then verify one real flow by hand: create a room, open the guest link on a phone, add a
+song, and press play. The integration suite proves the same path against Neon, but it
+does not prove the deployed cookies or the phone camera.
+
+## Step 6: CI
+
+The workflow is `.github/workflows/ci.yml`. It needs one repository variable and five
+repository secrets:
 
 ```bash
-Select-String -Path dist/assets/*.js -Pattern 'trycloudflare'
+gh variable set NEON_PROJECT_ID --body "plain-queen-50704361"
+gh secret set NEON_API_KEY --body "<neon api key>"
+gh secret set NEON_DATABASE_URL --body "<owner direct url>"
+gh secret set NEON_SERVICE_DATABASE_URL --body "<service_role direct url>"
+gh secret set NEON_AUTH_DATABASE_URL --body "<echo_auth direct url>"
+gh secret set BETTER_AUTH_SECRET --body "<ci-only secret>"
 ```
 
-No match means the bundle is clean. A match means the environment leaked the tunnel
-URL, and the build must be redone.
+The Neon API key is created in the Neon console under account settings. It is only
+allowed to create and delete branches in this project; do not reuse an organization
+key.
 
-The current `.env` holds a tunnel URL because the phone tunnel rewrites it on every
-run. That file is for the tunnel, not for production. The production build takes its
-values from the environment, so the tunnel file can stay as it is.
+The jobs:
 
-## Step 8: Deploy and verify the preview
+1. `verify` runs typecheck, the unit suite, the build, and `npm audit`.
+2. `database` creates a Neon branch through the API, applies the migration chain,
+   runs the 221 pgTAP assertions, and deletes the branch even on failure.
+3. `integration` creates a second branch, applies the chain, deletes the inherited
+   `public.jwks` rows so Better Auth generates keys for this run's secret, runs the
+   operation suite, and deletes the branch.
 
-Deploy from the CLI. The preview environment and the production environment hold
-different values, so the target has to be named:
+Branches copy the parent's data. The CI secret can differ from production because the
+integration job removes the inherited encrypted keys first. Branch names include the
+run id and attempt, so two runs never collide.
 
-```bash
-vercel deploy --environment preview
-```
+The workflow has not run yet: nothing has been pushed. A push is a separate approval
+gate.
 
-The preview needs the stable name from Step 4, so move the alias onto the new
-deployment after each one:
+## Step 7: The room sweep
 
-```bash
-vercel alias set <new-deployment-url> echo-karaoke-preview
-```
+When a room is created, the same request first calls
+`cleanup_abandoned_rooms(now() - interval '30 minutes')` and
+`cleanup_ended_rooms(now() - interval '2 days')`. A room whose members have not sent a
+heartbeat for thirty minutes is deleted the next time somebody creates a room. Ended
+rooms older than two days are deleted at the same time.
 
-Then run the preview verifier against the deployment URL. Keep the production values in
-the environment, because the verifier reads `VITE_SUPABASE_URL` to confirm that the CSP
-allows the Supabase origin the app calls:
+Both sweeps are best effort. A sweep failure is ignored so that a room can still be
+created when the cleanup call fails. There is no required pg_cron job and no
+five-minute guarantee; the interval is opportunistic.
 
-```bash
-$env:VITE_SUPABASE_URL='https://<project-ref>.supabase.co'
-npm run verify:preview -- https://<deployment-url>
-```
+## Verification checklist
 
-The verifier checks the home page, the security headers, the CSP directives, the
-Supabase origin, the SPA fallback on a deep route, the immutable caching on the hashed
-assets, and the ECHO title. It fails when the deployment is missing any of them.
+- [ ] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 221/221.
+- [ ] `npm run test:integration` reports 2/2 against Neon.
+- [ ] `npm test` reports the unit suite green.
+- [ ] `npm run build` passes.
+- [ ] `vercel deploy --prod` builds with the guard enabled.
+- [ ] `npm run verify:preview -- https://echo-karaoke.vercel.app` passes.
+- [ ] A real host/guest flow works on a phone.
+- [ ] The CI workflow runs green on `master` after a push.
 
-Two cases the verifier handles on its own. A deployment behind Vercel Authentication
-answers with a redirect to the sign-in page, and the verifier names that once instead of
-reporting every header as missing. A deployment behind Vercel Deployment Protection
-answers the same way unless the request carries a bypass token, which the verifier
-reads from `PREVIEW_BYPASS_TOKEN` and sends as the `x-vercel-protection-bypass` header.
-The token is on the project under the `protectionBypass` field.
+## Not covered here
 
-Vercel appends a feedback script to the HTML it serves, and that script opens a frame
-from `vercel.live`. The CSP in `vercel.json` allows both, because a blocked script
-reports a policy violation in the console on every page load. Vercel can already change
-the script it serves, so the allowance adds no new trust.
-
-The browser is the last judge. Open the deployment URL by hand and read the console.
-It must have no errors and no policy violations. A preview that was built with
-placeholder Supabase values renders the shell and reports a failure from the room
-service, which is the expected state until Step 3 lands.
-
-## Step 9: The preview checks that need a human
-
-The verifier cannot judge these. Each one needs a phone, a real network, and a real
-video.
-
-1. **The camera and the QR.** Open the deployment on a phone over HTTPS, allow the
-   camera, and scan the QR on the host screen. The camera needs a secure origin, so
-   this is the check that a plain HTTP preview cannot pass.
-2. **Playback.** Create a room, add a known embeddable video, and hear the music on
-   the host screen. The player loads a frame from `www.youtube.com`, and the CSP
-   allows that host. A video that YouTube refuses to embed is not a player fault: the
-   app reports the failure and skips the song.
-3. **The guest sync.** Join from the phone, add a song, and watch it appear on the
-   host queue. The guest pause control reaches the host on the next poll, which is at
-   most four seconds.
-4. **The origin allowlist.** Open the deployment from a different origin and confirm
-   the function answers with the allowlist origin instead of the request origin. The
-   browser console must show no CORS error on the allowed origin.
-5. **The venue network.** With the raised rate limit from Step 1, join from several
-   phones on one network. A failure with "Could not start a guest session" means the
-   anonymous sign-in budget is still too small.
-
-## What not to ship
-
-- A build made with the tunnel URL in `.env`. The tunnel host changes on every run and
-  the bundle would call a host that no longer exists.
-- A build made without `ALLOWED_ORIGINS`. The functions would reflect any origin.
-- A bundle that contains the service role key or the YouTube key. Only the publishable
-  anon key belongs in the browser.
-
-## Rollback
-
-The application is a static bundle, so a rollback is a redeployment of the previous
-build. The database is not rolled back by a redeployment. A migration that must be
-reversed needs a new forward migration, because the schema history is applied in order
-and the hosted project keeps that history.
-
-The cleanup sweep is the one scheduled job. Disable it without dropping the data:
-
-```sql
-select cron.unschedule('cleanup-abandoned-rooms');
-```
-
-## Open items that this procedure does not close
-
-- The hosted cloud security scan was canceled and the rescan was declined. The external
-  security input stays unverified. A green local suite is not scan coverage.
-- CodeRabbit is not installed and no remote exists, so it cannot review a pull request
-  until Step 6 is done.
-- The live YouTube search path has never run against a real key. Step 4 adds the key,
-  and the first search in a keyed environment is the proof.
-- The anonymous Auth users are kept on purpose. A sweep job for them is not part of
-  this procedure.
+- The YouTube Data API key. Without it, search reports that it is not configured and
+  the paste-a-link path keeps working.
+- The host heartbeat after an auth session replacement, which remains an open finding
+  from the 2026-10-22 audit.
+- Per-IP sign-in throttling in front of Better Auth.

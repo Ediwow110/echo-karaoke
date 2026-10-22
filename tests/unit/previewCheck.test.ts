@@ -19,7 +19,7 @@ const DEFAULT_CSP = [
   "style-src 'self' 'unsafe-inline'",
   "img-src 'self' data: blob: https://i.ytimg.com",
   "font-src 'self'",
-  "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://www.youtube.com",
+  "connect-src 'self' https://www.youtube.com",
   'frame-src https://www.youtube.com',
   "media-src 'self' blob: https://www.youtube.com",
 ].join('; ');
@@ -35,6 +35,8 @@ const HOME_HEADERS = {
 
 const SPA_ROUTE = 'https://app.example/room/00000000-0000-0000-0000-000000000000/host';
 const ASSET = 'https://app.example/assets/index-abc123.js';
+const JWKS = 'https://app.example/api/auth/jwks';
+const API_PROBE = 'https://app.example/api/__preview_check__';
 
 function fakeFetch(routes: Record<string, Route>) {
   return async (
@@ -66,11 +68,21 @@ function goodRoutes(csp = DEFAULT_CSP): Record<string, Route> {
       body: 'export const nothing = true;',
     },
     [SPA_ROUTE]: { status: 200, headers: { 'content-type': 'text/html; charset=utf-8' }, body: HOME_HTML },
+    [JWKS]: {
+      status: 200,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ keys: [{ kid: 'key-1', kty: 'OKP' }] }),
+    },
+    [API_PROBE]: {
+      status: 404,
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ error: { code: 'NOT_FOUND', message: 'That operation is not available' } }),
+    },
   };
 }
 
 describe('preview verification', () => {
-  it('passes a deployment that carries the headers, the CSP, the SPA fallback, and cached assets', async () => {
+  it('passes a deployment with headers, CSP, SPA fallback, cached assets, and a working API', async () => {
     const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(goodRoutes()) });
 
     expect(result.errors).toEqual([]);
@@ -87,43 +99,61 @@ describe('preview verification', () => {
 
   it('reports a CSP that drops a required directive', async () => {
     const result = await checkPreview('https://app.example', {
-      fetchImpl: fakeFetch(goodRoutes("default-src 'self'; connect-src 'self' https://*.supabase.co")),
+      fetchImpl: fakeFetch(goodRoutes("default-src 'self'; connect-src 'self'")),
     });
 
     expect(result.errors).toContain('The CSP is missing frame-ancestors \'none\'.');
   });
 
-  it('accepts a custom Supabase domain in connect-src when the deployment names it', async () => {
-    const csp = "default-src 'self'; frame-ancestors 'none'; connect-src 'self' https://api.echo.example";
-    const result = await checkPreview('https://app.example', {
-      fetchImpl: fakeFetch(goodRoutes(csp)),
-      supabaseUrl: 'https://api.echo.example',
-    });
-
-    expect(result.errors).toEqual([]);
-  });
-
-  it('reports a CSP that does not allow the Supabase origin the app uses', async () => {
-    const csp = "default-src 'self'; frame-ancestors 'none'; connect-src 'self' https://*.supabase.co";
-
-    const result = await checkPreview('https://app.example', {
-      fetchImpl: fakeFetch(goodRoutes(csp)),
-      supabaseUrl: 'https://api.echo.example',
-    });
-
-    expect(result.errors).toContain(
-      'The CSP does not allow the Supabase origin https://api.echo.example in connect-src.',
-    );
-  });
-
-  it('reports a CSP that allows neither the shared Supabase wildcard nor the named origin', async () => {
-    const csp = "default-src 'self'; frame-ancestors 'none'; connect-src 'self'";
-
+  it('reports a CSP that does not confine the API to the same origin', async () => {
+    const csp = "default-src 'self'; frame-ancestors 'none'; connect-src *";
     const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(goodRoutes(csp)) });
 
-    expect(result.errors).toContain(
-      'The CSP does not allow a Supabase origin in connect-src.',
+    expect(result.errors).toContain('The CSP is missing connect-src \'self\'.');
+  });
+
+  it('reports a database connection string in the HTML', async () => {
+    const routes = goodRoutes();
+    routes['https://app.example/'].body = HOME_HTML.replace(
+      '<div id="root"></div>',
+      '<div id="root" data-db="postgresql://user:pass@host/db"></div>',
     );
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain('A database connection string is present in the served HTML.');
+  });
+
+  it('reports a database connection string in the main asset', async () => {
+    const routes = goodRoutes();
+    routes[ASSET].body = 'const url = "postgresql://user:pass@host/db";';
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain('A database connection string is present in the served main asset.');
+  });
+
+  it('reports a JWKS endpoint that returns no keys', async () => {
+    const routes = goodRoutes();
+    routes[JWKS].body = JSON.stringify({ keys: [] });
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain('The JWKS endpoint returned no keys.');
+  });
+
+  it('reports an API route that the rewrite sends to the app shell', async () => {
+    const routes = goodRoutes();
+    routes[API_PROBE] = {
+      status: 200,
+      headers: { 'content-type': 'text/html; charset=utf-8' },
+      body: HOME_HTML,
+    };
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain('The API probe returned 200 instead of 404.');
+    expect(result.errors).toContain('The API probe did not answer as JSON.');
   });
 
   it('reports a deep route that does not fall back to the app HTML', async () => {

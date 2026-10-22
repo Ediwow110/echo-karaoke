@@ -1,19 +1,12 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
 
-const REQUIRED_CSP_DIRECTIVES = ["default-src 'self'", "frame-ancestors 'none'", 'connect-src'];
-const SHARED_SUPABASE_WILDCARD = 'https://*.supabase.co';
+const REQUIRED_CSP_DIRECTIVES = ["default-src 'self'", "frame-ancestors 'none'", "connect-src 'self'"];
+const CONNECTION_STRING = /postgres(ql)?:\/\//i;
+const CREDENTIAL_ERROR = 'A database connection string is present in the served';
 
-export function expectedSupabaseOrigin(env = process.env) {
-  const raw = (env.VITE_SUPABASE_URL ?? env.SUPABASE_URL ?? '').trim();
-  if (raw.length === 0) {
-    return null;
-  }
-  try {
-    return new URL(raw).origin;
-  } catch {
-    return null;
-  }
+function credentialError(where) {
+  return CREDENTIAL_ERROR + ' ' + where + '.';
 }
 
 function isLoopback(hostname) {
@@ -35,17 +28,16 @@ export async function checkPreview(input, options = {}) {
     errors.push('Use HTTPS for a deployed preview.');
   }
 
-  const supabaseOrigin = options.supabaseUrl ?? null;
   const bypassToken = options.bypassToken ?? null;
-  // A protected deployment answers with a redirect to the sign-in page, so the
-  // bypass token has to travel with every request.
-  const requestInit = bypassToken === null
-    ? { redirect: 'manual' }
-    : { redirect: 'manual', headers: { 'x-vercel-protection-bypass': bypassToken } };
+  const baseHeaders = bypassToken === null ? {} : { 'x-vercel-protection-bypass': bypassToken };
 
-  async function fetchOrReport(url) {
+  async function fetchOrReport(url, init = {}) {
     try {
-      return await fetchImpl(url, requestInit);
+      return await fetchImpl(url, {
+        redirect: 'manual',
+        ...init,
+        headers: { ...baseHeaders, ...(init.headers ?? {}) },
+      });
     } catch {
       errors.push('Could not reach ' + url + '.');
       return null;
@@ -89,30 +81,19 @@ export async function checkPreview(input, options = {}) {
     for (const directive of REQUIRED_CSP_DIRECTIVES) {
       if (!csp.includes(directive)) errors.push('The CSP is missing ' + directive + '.');
     }
-    // A project on a custom Supabase domain cannot use the shared wildcard, so
-    // the origin the app actually calls is the one that has to be allowed. The
-    // wildcard only covers the projects that live under supabase.co.
-    const coversOrigin = supabaseOrigin !== null
-      && (csp.includes(supabaseOrigin)
-        || (supabaseOrigin.endsWith('.supabase.co') && csp.includes(SHARED_SUPABASE_WILDCARD)));
-    if (supabaseOrigin === null) {
-      if (!csp.includes(SHARED_SUPABASE_WILDCARD)) {
-        errors.push('The CSP does not allow a Supabase origin in connect-src.');
-      }
-    } else if (!coversOrigin) {
-      errors.push(
-        'The CSP does not allow the Supabase origin ' + supabaseOrigin + ' in connect-src.',
-      );
-    }
 
     const html = await home.text();
     if (!html.includes('<title>ECHO')) errors.push('The ECHO title is missing from the HTML.');
+    if (CONNECTION_STRING.test(html)) errors.push(credentialError('HTML'));
+
     const script = html.match(/<script[^>]+src="([^"]+)"/i)?.[1];
     if (script !== undefined) {
       const asset = await fetchOrReport(new URL(script, target.origin).href);
       if (asset !== null) {
         if (asset.status !== 200) errors.push('The main asset returned ' + asset.status + '.');
         requireHeader(asset.headers, 'cache-control', 'immutable');
+        const source = await asset.text();
+        if (CONNECTION_STRING.test(source)) errors.push(credentialError('main asset'));
       }
     } else {
       errors.push('Could not find the main script asset in the HTML.');
@@ -124,6 +105,33 @@ export async function checkPreview(input, options = {}) {
     if (route.status !== 200) errors.push('The SPA route returned ' + route.status + '.');
     if (!(route.headers.get('content-type') ?? '').includes('text/html')) {
       errors.push('The SPA route did not return the app HTML.');
+    }
+  }
+
+  const jwks = await fetchOrReport(target.origin + '/api/auth/jwks');
+  if (jwks !== null) {
+    if (jwks.status !== 200) {
+      errors.push('The JWKS endpoint returned ' + jwks.status + '.');
+    }
+    if (!(jwks.headers.get('content-type') ?? '').includes('application/json')) {
+      errors.push('The JWKS endpoint did not answer as JSON.');
+    } else {
+      const body = await jwks.json().catch(() => null);
+      if (body === null || !Array.isArray(body.keys) || body.keys.length === 0) {
+        errors.push('The JWKS endpoint returned no keys.');
+      }
+    }
+  }
+
+  const probe = await fetchOrReport(target.origin + '/api/__preview_check__', {
+    method: 'POST',
+    headers: { 'content-type': 'application/json' },
+    body: '{}',
+  });
+  if (probe !== null) {
+    if (probe.status !== 404) errors.push('The API probe returned ' + probe.status + ' instead of 404.');
+    if (!(probe.headers.get('content-type') ?? '').includes('application/json')) {
+      errors.push('The API probe did not answer as JSON.');
     }
   }
 
@@ -140,7 +148,6 @@ export async function main(env = process.env) {
 
   const bypassToken = (env.PREVIEW_BYPASS_TOKEN ?? env.VERCEL_PROTECTION_BYPASS ?? '').trim();
   const { errors } = await checkPreview(input, {
-    supabaseUrl: expectedSupabaseOrigin(env),
     bypassToken: bypassToken.length === 0 ? null : bypassToken,
   });
 
