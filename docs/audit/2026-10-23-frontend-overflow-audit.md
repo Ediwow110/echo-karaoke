@@ -25,7 +25,8 @@ containment.
   settings at 1440, 1024, 768, 390, and 320px before and after the fix; local Vite
   build for the fixed source.
 - Automation: `tests/e2e/switch.spec.ts` checks containment, the 44px target, and a
-  minimum 3:1 thumb/track contrast in both states; it passed against the local build.
+  minimum 3:1 thumb/track contrast in both states; it passed against the local build
+  and the measurements were repeated on the live host settings screen.
 - Screenshots: `docs/audit/assets/switch-before.png`, `switch-after.png`,
   `switch-mid.png`, `switch-target-focus.png`, and `switch-off-contrast.png`.
 
@@ -88,9 +89,11 @@ unit, database, and the operation integration suite only.
 
 ## Deployment
 
-The fix is deployed at `https://echo-karaoke-mocha.vercel.app` (CI run 39875426170
-passed verify, database, and integration). The live host-settings switch was measured
-at five widths after the deployment; all thumb insets are positive.
+The overflow fix is deployed at `https://echo-karaoke-mocha.vercel.app` (CI run
+39875426170). The accessibility follow-up is also deployed (CI run 39877317874 passed
+verify, database, and integration). Live host-settings checks at 1440 and 390px
+measure a 44x44 target, a 44x24 track, 4px thumb insets in both states, contrast
+8.66:1 ON and 3.89:1 OFF, and both switches toggled successfully.
 
 ## Recommended Next Steps
 
