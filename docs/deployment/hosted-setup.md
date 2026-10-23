@@ -162,6 +162,14 @@ npx vercel dev
 guest link in a second browser, and add a song. The function and the database are both
 local processes; only the database is hosted.
 
+Search and the chart need a YouTube Data API key in the same file. Without one they
+answer "not configured" and paste-a-link still works, so add it only when you want to
+exercise the keyed paths:
+
+```
+YOUTUBE_API_KEY=your_key_here
+```
+
 For the operation integration suite, no dev server is needed; the test starts an HTTP
 server around the function handler itself:
 
@@ -184,6 +192,7 @@ vercel env add BETTER_AUTH_URL production
 vercel env add ALLOWED_ORIGINS production
 vercel env add ROOM_MEMBER_LIMIT production
 vercel env add ANON_SIGNIN_LIMIT_PER_HOUR production
+vercel env add YOUTUBE_API_KEY production
 ```
 
 | Variable | Value |
@@ -195,6 +204,9 @@ vercel env add ANON_SIGNIN_LIMIT_PER_HOUR production
 | `ALLOWED_ORIGINS` | `https://echo-karaoke-mocha.vercel.app` |
 | `ROOM_MEMBER_LIMIT` | `50` (allowed 2–500); host plus guests |
 | `ANON_SIGNIN_LIMIT_PER_HOUR` | `120` (allowed 1–1000); per hashed network address |
+| `YOUTUBE_API_KEY` | Optional YouTube Data API v3 key. Without it search and the chart report "not configured" and guests paste links |
+| `YOUTUBE_DAILY_SEARCH_BUDGET` | `90` upstream search calls per day across all rooms |
+| `YOUTUBE_DAILY_POPULAR_BUDGET` | `200` upstream chart calls per day |
 
 `ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. It is
 not a CORS allowlist any more: the function is same-origin, so no CORS headers are
@@ -207,10 +219,21 @@ HMAC-SHA-256 of it. If the limiter store is unavailable, sign-in fails closed wi
 503. Raise `ANON_SIGNIN_LIMIT_PER_HOUR` for a venue network that expects more than 120
 new guests in an hour.
 
+The YouTube budgets are the only defence against a quota blowout, because a single
+`search.list` call costs 100 of the 10,000 units a key gets per day while the chart
+call costs 1. The defaults therefore spend about 9,200 units at full load, and results
+are cached for ten minutes so a popular term bills once. Per-user and per-room limits
+sit in front of them, and the suggest endpoint uses the key-free autocomplete upstream,
+so it never touches the quota. A key with a different daily allowance should change
+`YOUTUBE_DAILY_SEARCH_BUDGET`, not the per-member limits.
+
 Repeat the database, auth secret, and origin variables for the Preview environment.
 Do **not** set `BETTER_AUTH_URL` for Preview; the current deployment host is derived
 from `VERCEL_URL` and trusted automatically. Preview deployments still need the two
-database URLs and the secret, or the function cannot start.
+database URLs and the secret, or the function cannot start. `YOUTUBE_API_KEY` is
+optional in both environments: a Preview without it just reports search as not
+configured, which is also how the integration suite keeps its YouTube calls off the
+real quota.
 
 The guard runs before every build. A missing `ALLOWED_ORIGINS`, a wildcard origin, an
 origin with a path or trailing slash, and any `VITE_*` PostgreSQL URL all stop the
