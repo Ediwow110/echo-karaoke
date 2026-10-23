@@ -17,3 +17,6 @@ blob-report/
 # The design spec that the console redesign replaced
 ENCORE_DESIGN_SPEC.md
 .neon
+
+# The /understand knowledge graph and its analysis artifacts
+.ua/
