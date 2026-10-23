@@ -2,10 +2,10 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 type Call = { url: string; init: RequestInit };
 
-function jsonResponse(body: unknown, status = 200): Response {
+function jsonResponse(body: unknown, status = 200, headers: Record<string, string> = {}): Response {
   return new Response(JSON.stringify(body), {
     status,
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', ...headers },
   });
 }
 
@@ -138,6 +138,44 @@ describe('the anonymous session', () => {
     await expect(ensureAnonymousSession()).rejects.toThrow(
       'Too many guest sessions from this network. Try again later.',
     );
+  });
+
+  it('backs off after a rate-limit response instead of retrying on every poll', async () => {
+    let now = 1_000_000;
+    vi.spyOn(Date, 'now').mockImplementation(() => now);
+    let limited = true;
+    let tokenCalls = 0;
+    let signInCalls = 0;
+    stubFetch((url) => {
+      if (url.endsWith('/api/auth/token')) {
+        tokenCalls += 1;
+        return limited ? jsonResponse({}, 401) : jsonResponse({ token: 'fresh-token' });
+      }
+      if (url.endsWith('/api/auth/sign-in/anonymous')) {
+        signInCalls += 1;
+        return limited
+          ? jsonResponse({
+            error: {
+              code: 'RATE_LIMITED',
+              message: 'Too many guest sessions from this network. Try again later.',
+            },
+          }, 429, { 'Retry-After': '60' })
+          : jsonResponse({});
+      }
+      return jsonResponse({}, 404);
+    });
+    const { ensureAnonymousSession } = await loadAuth();
+
+    await expect(ensureAnonymousSession()).rejects.toThrow('Too many guest sessions');
+    await expect(ensureAnonymousSession()).rejects.toThrow('Too many guest sessions');
+    expect(tokenCalls).toBe(2);
+    expect(signInCalls).toBe(1);
+
+    limited = false;
+    now += 61_000;
+    expect(await ensureAnonymousSession()).toBe('fresh-token');
+    expect(tokenCalls).toBe(3);
+    expect(signInCalls).toBe(1);
   });
 
   it('reports a failed sign-in and token exchange', async () => {

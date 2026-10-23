@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { resolveRoomMemberLimit, resolveSignInLimit } from '../../server/operations/limits';
-import { clientIp, signInSubject } from '../../server/auth/signinLimit';
+import { clientIp, isTrustedSignInOrigin, signInSubject } from '../../server/auth/signinLimit';
 
 describe('abuse limits', () => {
   it('uses safe defaults', () => {
@@ -34,6 +34,22 @@ describe('abuse limits', () => {
     expect(clientIp(forwarded)).toBe('203.0.113.5');
     expect(clientIp(real)).toBe('198.51.100.7');
     expect(clientIp(missing)).toBe('unknown');
+  });
+
+  it('accepts the app origins and refuses a cross-site sign-in', () => {
+    const env = {
+      BETTER_AUTH_URL: 'https://echo.example',
+      ALLOWED_ORIGINS: 'https://preview.example',
+    };
+    const request = (origin?: string): Request => new Request('https://echo.example/api/auth/sign-in/anonymous', {
+      method: 'POST',
+      headers: origin === undefined ? {} : { origin },
+    });
+
+    expect(isTrustedSignInOrigin(request('https://echo.example'), env)).toBe(true);
+    expect(isTrustedSignInOrigin(request('https://preview.example'), env)).toBe(true);
+    expect(isTrustedSignInOrigin(request('https://evil.example'), env)).toBe(false);
+    expect(isTrustedSignInOrigin(request(), env)).toBe(true);
   });
 
   it('hashes the address without storing it in the subject', () => {

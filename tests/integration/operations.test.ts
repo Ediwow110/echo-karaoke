@@ -309,6 +309,33 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
     }
   });
 
+  it('does not spend the sign-in quota on a cross-site request', async () => {
+    const previous = process.env.ANON_SIGNIN_LIMIT_PER_HOUR;
+    process.env.ANON_SIGNIN_LIMIT_PER_HOUR = '1';
+    try {
+      const network = 'test-origin-' + Date.now();
+      const crossSite = await fetch(BASE + '/api/auth/sign-in/anonymous', {
+        method: 'POST',
+        headers: {
+          'content-type': 'application/json',
+          origin: 'https://evil.example',
+          'x-forwarded-for': network,
+        },
+        body: '{}',
+      });
+      expect(crossSite.status).toBe(403);
+
+      const sameSite = await signInResponse(network);
+      expect(sameSite.status).toBe(200);
+    } finally {
+      if (previous === undefined) {
+        delete process.env.ANON_SIGNIN_LIMIT_PER_HOUR;
+      } else {
+        process.env.ANON_SIGNIN_LIMIT_PER_HOUR = previous;
+      }
+    }
+  });
+
   it('rejects a new guest when the room is full', async () => {
     const previous = process.env.ROOM_MEMBER_LIMIT;
     process.env.ROOM_MEMBER_LIMIT = '2';

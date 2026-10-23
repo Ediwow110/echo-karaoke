@@ -2,6 +2,7 @@ import { createHmac } from 'node:crypto';
 import { operationCall, serviceDatabase } from '../db/client.js';
 import { resolveSignInLimit } from '../operations/limits.js';
 import { jsonResponse } from '../operations/errors.js';
+import { resolveTrustedOrigins } from './origins.js';
 
 const BUCKET = 'anon-sign-in';
 const WINDOW_SECONDS = 3600;
@@ -27,10 +28,27 @@ export function signInSubject(ip: string, secret: string): string {
   return 'signin:' + createHmac('sha256', secret).update(ip).digest('hex');
 }
 
+export function isTrustedSignInOrigin(
+  request: Request,
+  env: Record<string, string | undefined> = process.env,
+): boolean {
+  const origin = request.headers.get('origin');
+  if (origin === null) {
+    return true;
+  }
+  return resolveTrustedOrigins(env).includes(origin);
+}
+
 export async function enforceSignInLimit(
   request: Request,
   env: Record<string, string | undefined> = process.env,
 ): Promise<Response | null> {
+  if (!isTrustedSignInOrigin(request, env)) {
+    return jsonResponse({
+      error: { code: 'FORBIDDEN', message: 'That origin is not allowed' },
+    }, 403);
+  }
+
   const subject = signInSubject(clientIp(request), env.BETTER_AUTH_SECRET ?? '');
   let result: LimitResult | null = null;
   try {
