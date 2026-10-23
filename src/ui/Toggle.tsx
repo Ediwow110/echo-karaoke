@@ -16,8 +16,8 @@ export default function Toggle({ checked, onChange, label, description, disabled
           <p className="mt-1 text-[0.75rem] leading-[1.55] text-ink-2">{description}</p>
         )}
       </div>
-      <div className="flex shrink-0 items-center gap-2 pt-0.5">
-        <span aria-hidden="true" className={['w-6 shrink-0 text-right text-[0.625rem] font-medium', checked ? 'text-signal' : 'text-ink-2'].join(' ')}>
+      <div className="flex shrink-0 items-start gap-2 pt-0.5">
+        <span aria-hidden="true" className={['w-6 shrink-0 text-right text-[0.625rem] font-medium leading-6', checked ? 'text-signal' : 'text-ink-2'].join(' ')}>
           {checked ? 'ON' : 'OFF'}
         </span>
         <button
@@ -28,19 +28,26 @@ export default function Toggle({ checked, onChange, label, description, disabled
           disabled={disabled || busy}
           onClick={() => onChange(!checked)}
           className={[
-            'relative h-6 w-11 shrink-0 rounded-full transition-colors duration-(--duration-fast)',
+            'group relative flex h-11 w-11 shrink-0 items-start justify-center rounded-lg transition-colors',
             'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
             'disabled:pointer-events-none disabled:opacity-40',
-            checked ? 'bg-signal-fill' : 'bg-line-strong',
           ].join(' ')}
         >
           <span
-            aria-hidden="true"
+            data-switch-track
             className={[
-              'absolute left-0 top-1 size-4 rounded-full bg-graphite-deep transition-transform duration-(--duration-fast)',
-              checked ? 'translate-x-6 bg-signal-ink' : 'translate-x-1',
+              'relative block h-6 w-11 rounded-full transition-colors duration-(--duration-fast)',
+              checked ? 'bg-signal-fill' : 'bg-line-strong',
             ].join(' ')}
-          />
+          >
+            <span
+              aria-hidden="true"
+              className={[
+                'absolute left-0 top-1 size-4 rounded-full transition-transform duration-(--duration-fast)',
+                checked ? 'translate-x-6 bg-signal-ink' : 'translate-x-1 bg-ink-2',
+              ].join(' ')}
+            />
+          </span>
         </button>
       </div>
     </div>

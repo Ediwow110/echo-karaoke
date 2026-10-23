@@ -24,9 +24,10 @@ containment.
 - Rendered implementation: production `https://echo-karaoke-mocha.vercel.app`, host
   settings at 1440, 1024, 768, 390, and 320px before and after the fix; local Vite
   build for the fixed source.
-- Automation: `tests/e2e/switch.spec.ts` passed against the local build.
-- Screenshots: `docs/audit/assets/switch-before.png`, `switch-after.png`, and
-  `switch-mid.png`.
+- Automation: `tests/e2e/switch.spec.ts` checks containment, the 44px target, and a
+  minimum 3:1 thumb/track contrast in both states; it passed against the local build.
+- Screenshots: `docs/audit/assets/switch-before.png`, `switch-after.png`,
+  `switch-mid.png`, `switch-target-focus.png`, and `switch-off-contrast.png`.
 
 ## Findings
 
@@ -53,21 +54,21 @@ containment.
   states and at 200% text size.
 - Impact: small horizontal jitter next to the switch during the state change.
 
-### Minor, open: the switch hit area is 44x24px
+### Minor, fixed: the switch hit area is now 44x44px
 
-- The track is 44x24 and the button shares that box. It meets the WCAG 2.5.8 minimum
-  of 24x24, but not the 44px touch-target floor used by the app's mobile tests.
-- Recommendation: wrap the 24px track in a 44px-high transparent button, or add a
-  vertical hit area, without changing the visual track.
-- Owner: design decision; the visual size is unchanged in this fix.
+- The visual track remains 44x24, but the focusable button is 44x44 with the track at
+  the top. The target meets the app's 44px mobile floor and WCAG 2.5.8.
+- The focus ring surrounds the 44px target; the visual track is unchanged.
+- The state label uses a 24px line box so ON/OFF stays aligned with the track.
 
-### Needs design decision: OFF-state thumb contrast
+### Minor, fixed: OFF-state thumb contrast
 
-- OFF thumb `#0a0a0d` against track `#3b3846` is **1.73:1**; ON is **8.66:1**;
-  track against surface is 1.56:1.
-- The adjacent ON/OFF text provides a state label, but the knob itself is low-contrast.
-  Changing the token would alter the approved palette, so this was not changed without
-  the Figma source.
+- OFF thumb is now `ink-2` (`#99959f`) against the `line-strong` track (`#3b3846`):
+  **3.89:1**. ON remains **8.66:1** (dark thumb on the lavender fill).
+- The token comes from the existing palette; no new color was introduced.
+- The track against the card surface is 1.56:1, but the adjacent ON/OFF label
+  provides a non-color state indicator. A stricter track boundary would require a
+  design-system decision on `line-strong`.
 
 ## Page-Level Checks
 
@@ -93,5 +94,6 @@ at five widths after the deployment; all thumb insets are positive.
 
 ## Recommended Next Steps
 
-1. Decide the 44px hit-area and OFF-contrast changes with the design source.
-2. Add the browser suite to CI once a reliable preview server is chosen.
+1. Add the browser suite to CI once a reliable preview server is chosen.
+2. If a stricter track-boundary contrast is required, change `line-strong` at the
+   token level rather than overriding it in the component.
