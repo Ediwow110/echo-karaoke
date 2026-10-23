@@ -7,7 +7,7 @@ is green on `master`: verify, database, and integration all passed. Every hosted
 below is named, never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The local
-gates are already green: 235 unit tests, 243 database assertions against Neon, 6
+gates are already green: 237 unit tests, 243 database assertions against Neon, 7
 operation integration tests, and a production build. This document covers only what a
 hosted account makes possible.
 
@@ -323,8 +323,8 @@ five-minute guarantee; the interval is opportunistic.
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 243/243.
-- [x] `npm run test:integration` reports 6/6 against Neon.
-- [x] `npm test` reports 235 unit tests passing.
+- [x] `npm run test:integration` reports 7/7 against Neon.
+- [x] `npm test` reports 237 unit tests passing.
 - [x] `npm run build` passes.
 - [x] `vercel deploy --prod` builds with the guard enabled.
 - [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.

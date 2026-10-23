@@ -612,7 +612,7 @@ and `echo_auth`. The current report is
 | N-15 | Low | `ratelimit_test.sql` used a one-second bucket, so CI could flap across a wall-clock boundary | Fixed |
 | N-16 | Medium | No room-size cap and no per-network sign-in throttle | Fixed |
 
-Gates on 2026-10-23: 235 unit tests, 243 database assertions on Neon, 6 operation
+Gates on 2026-10-23: 237 unit tests, 243 database assertions on Neon, 7 operation
 integration tests, `npm run build`, `vercel build`, and a local hosted-style flow
 (sign-in 200, token 200, create-room 201). Production is deployed at
 `https://echo-karaoke-mocha.vercel.app`; the verifier passed, and a production

@@ -77,7 +77,7 @@ Rooms are cleaned up when a room is created. That request first deletes every ro
 
 ## Tests
 
-    npm test                 # 235 unit and component tests (jsdom)
+    npm test                 # 237 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # 243 pgTAP assertions
     npm run test:integration # the function's auth and operation path against Neon

@@ -165,8 +165,8 @@ the default is 120 per hour (`ANON_SIGNIN_LIMIT_PER_HOUR`), the response is 429 
 the server's rate-limit message instead of the generic session error.
 
 Evidence: a fresh guest is rejected at the cap, an existing guest still joins, the
-third sign-in from one network returns 429, and the suites are 235 unit, 243 database,
-and 6 integration tests. Live, with temporary limits of 6 and 2, six sign-ins returned
+third sign-in from one network returns 429, and the suites are 237 unit, 243 database,
+and 7 integration tests. Live, with temporary limits of 6 and 2, six sign-ins returned
 200, the seventh returned 429 with `Retry-After`, the second guest returned 409
 `ROOM_FULL`, and the existing guest rejoined with 200. The limits were restored to 120
 and 50 and the deployment repeated.
