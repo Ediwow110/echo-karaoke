@@ -13,7 +13,7 @@ export type SearchResult = {
 
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const MAX_RESULTS = 10;
-const MAX_SUGGESTIONS = 10;
+export const MAX_SUGGESTIONS = 10;
 const MEMBER_SEARCH_LIMIT = 20;
 const USER_DAILY_SEARCH_LIMIT = 30;
 const ROOM_DAILY_SEARCH_LIMIT = 60;

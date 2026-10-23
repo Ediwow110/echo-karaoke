@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 // The mapper is plain TypeScript, so the unit suite can exercise it directly.
-import { mapSearchResponse } from '../../supabase/functions/_shared/youtube';
+import { mapSearchResponse } from '../../server/operations/youtube';
 
 function payload(items: unknown[]): unknown {
   return { items };

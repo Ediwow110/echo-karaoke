@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { MAX_SUGGESTIONS, parseSuggestions } from '../../supabase/functions/_shared/youtube';
+import { MAX_SUGGESTIONS, parseSuggestions } from '../../server/operations/youtube';
 
 describe('youtube suggestions', () => {
   it('reads the suggestion list from the autocomplete payload', () => {

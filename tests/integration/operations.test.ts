@@ -215,6 +215,10 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
     });
     expect(removed.status).toBe(200);
 
+    // A configured key would bill real YouTube quota on this call; the unit
+    // suites cover the keyed path against a mocked upstream.
+    delete process.env.YOUTUBE_API_KEY;
+
     const search = await call('youtube-search', guestAuth, {
       roomId,
       query: 'abba',
