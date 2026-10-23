@@ -22,7 +22,8 @@ containment.
 - Source visual truth: unavailable; the verdict is an implementation-quality verdict,
   not a Figma fidelity approval.
 - Rendered implementation: production `https://echo-karaoke-mocha.vercel.app`, host
-  settings at 1440, 1024, 768, 390, and 320px; local Vite build for the fixed source.
+  settings at 1440, 1024, 768, 390, and 320px before and after the fix; local Vite
+  build for the fixed source.
 - Automation: `tests/e2e/switch.spec.ts` passed against the local build.
 - Screenshots: `docs/audit/assets/switch-before.png`, `switch-after.png`, and
   `switch-mid.png`.
@@ -40,7 +41,9 @@ containment.
   unchecked; every sampled mid-transition frame stays inside the track.
 - Impact: the control looked broken and the thumb could overlap neighboring content.
 - Verification: browser test at both states plus a mid-transition sample; local
-  screenshots; 200% root text size keeps the thumb contained.
+  screenshots; 200% root text size keeps the thumb contained. After deployment on
+  2026-10-23, production host settings measured checked `24/4` and unchecked `4/24`
+  at 1440, 1024, 768, 390, and 320 with every frame contained.
 
 ### Minor, fixed: the ON/OFF label shifts the group
 
@@ -82,8 +85,13 @@ containment.
 run Playwright. The browser suite needs `vercel dev`; the current CI jobs cover type,
 unit, database, and the operation integration suite only.
 
+## Deployment
+
+The fix is deployed at `https://echo-karaoke-mocha.vercel.app` (CI run 39875426170
+passed verify, database, and integration). The live host-settings switch was measured
+at five widths after the deployment; all thumb insets are positive.
+
 ## Recommended Next Steps
 
-1. Deploy the switch fix.
-2. Decide the 44px hit-area and OFF-contrast changes with the design source.
-3. Add the browser suite to CI once a reliable preview server is chosen.
+1. Decide the 44px hit-area and OFF-contrast changes with the design source.
+2. Add the browser suite to CI once a reliable preview server is chosen.
