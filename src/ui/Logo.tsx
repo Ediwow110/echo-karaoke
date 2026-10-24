@@ -5,9 +5,9 @@ export type LogoProps = {
 };
 
 const sizes = {
-  sm: { wordmark: 'text-[1.05rem]', bars: 'h-4 gap-[2px]', bar: 'w-[2px]' },
-  md: { wordmark: 'text-[1.35rem]', bars: 'h-5 gap-[3px]', bar: 'w-[2.5px]' },
-  lg: { wordmark: 'text-[1.6rem]', bars: 'h-6 gap-[3px]', bar: 'w-[3px]' },
+  sm: { wordmark: 'text-[1.7rem]', bars: 'h-6 gap-[3px]', bar: 'w-[3px]' },
+  md: { wordmark: 'text-[2.05rem]', bars: 'h-8 gap-[4px]', bar: 'w-[3.5px]' },
+  lg: { wordmark: 'text-[2.4rem]', bars: 'h-10 gap-[4px]', bar: 'w-[4px]' },
 };
 
 const barHeights = ['50%', '100%', '72%', '38%'];
@@ -20,8 +20,8 @@ export default function Logo({ size = 'md', withWordmark = true, className = '' 
         {barHeights.map((height, index) => (
           <span
             key={index}
-            className={['rounded-full bg-signal', scale.bar].join(' ')}
-            style={{ height }}
+            className={['logo-bar rounded-full bg-signal', scale.bar].join(' ')}
+            style={{ height, animationDelay: index * -0.22 + 's' }}
           />
         ))}
       </span>

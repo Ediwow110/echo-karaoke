@@ -167,6 +167,33 @@
   to { transform: scale(1.065) translate3d(0.6%, 0.35%, 0); }
 }
 
+/* The logo bars answer like a quiet room mic rather than a loading spinner. */
+@keyframes logo-wave {
+  0%, 100% { transform: scaleY(0.55); opacity: 0.75; }
+  38% { transform: scaleY(1); opacity: 1; }
+  68% { transform: scaleY(0.78); opacity: 0.86; }
+}
+
+/* A second, slower light layer so the smoke in the stage stills breathes. */
+@keyframes smoke-drift {
+  from { transform: translate3d(-10%, 3%, 0) scale(1.04); opacity: 0.25; }
+  to { transform: translate3d(10%, -4%, 0) scale(1.18); opacity: 0.62; }
+}
+
+/* The home stage still gets a slightly larger camera move than the stage
+   fallbacks, so its smoke reads as alive at card size. */
+@keyframes stage-pan {
+  from { transform: scale(1.06) translate3d(-2.2%, -1.2%, 0); }
+  to { transform: scale(1.13) translate3d(2.2%, 1.2%, 0); }
+}
+
+@keyframes smoke-beam {
+  0% { transform: translate3d(-35%, 0, 0) rotate(10deg); opacity: 0; }
+  25% { opacity: 0.5; }
+  60% { opacity: 0.35; }
+  100% { transform: translate3d(35%, 0, 0) rotate(10deg); opacity: 0; }
+}
+
 /* ---------------------------------------------------------------------------
    Base
    --------------------------------------------------------------------------- */
@@ -338,6 +365,44 @@
   .stage-drift {
     animation: var(--animate-stage-drift);
     transform-origin: 50% 50%;
+  }
+
+  .stage-smoke {
+    background:
+      radial-gradient(55% 50% at 72% 12%, rgba(230, 183, 136, 0.38), transparent 68%),
+      radial-gradient(50% 55% at 28% 82%, rgba(182, 160, 255, 0.24), transparent 72%);
+    mix-blend-mode: screen;
+    opacity: 0.9;
+    pointer-events: none;
+    animation: smoke-drift 12s var(--ease-console) infinite alternate;
+  }
+
+  .stage-smoke::after {
+    content: '';
+    position: absolute;
+    inset: -35% -10%;
+    background: linear-gradient(
+      112deg,
+      transparent 32%,
+      rgba(230, 183, 136, 0.38) 45%,
+      rgba(182, 160, 255, 0.22) 56%,
+      transparent 72%
+    );
+    filter: blur(12px);
+    mix-blend-mode: screen;
+    opacity: 0;
+    pointer-events: none;
+    animation: smoke-beam 10s var(--ease-console) infinite;
+  }
+
+  .stage-pan {
+    animation: stage-pan 16s var(--ease-console) infinite alternate;
+    transform-origin: 50% 50%;
+  }
+
+  .logo-bar {
+    transform-origin: center;
+    animation: logo-wave 1.8s var(--ease-console) infinite;
   }
 }
 

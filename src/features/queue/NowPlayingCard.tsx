@@ -44,11 +44,12 @@ export default function NowPlayingCard({
         <img
           src="/images/stage-spotlight.jpg"
           alt=""
-          className="stage-drift absolute inset-0 h-full w-full object-cover opacity-45"
+          className="stage-pan absolute inset-0 h-full w-full object-cover opacity-45"
           loading="lazy"
           decoding="async"
         />
         <div className="absolute inset-0 stage-sheen" aria-hidden="true" />
+        <div className="stage-smoke absolute inset-0" aria-hidden="true" />
         <div className="relative px-5 py-7">
           <p className="eyebrow text-gold">Now playing</p>
           <h3 className="mt-2 font-display text-[1.4rem] font-bold tracking-[-0.02em] text-ink">{emptyTitle}</h3>

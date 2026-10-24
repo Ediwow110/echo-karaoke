@@ -114,7 +114,7 @@ export default function HostPartyPage() {
   return (
     <div className="flex min-h-dvh flex-col bg-graphite-deep text-ink">
       <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 sm:px-6">
-        <Logo size="sm" />
+        <Logo size="md" />
         <p className="hidden text-[0.625rem] font-medium uppercase tracking-[0.12em] text-ink-2 sm:block">
           {roomName} · Party view
         </p>
@@ -131,8 +131,9 @@ export default function HostPartyPage() {
           <div ref={attachSlot} className="absolute inset-0" data-party-slot />
         ) : (
           <div className="absolute inset-0 overflow-hidden">
-            <img src="/images/stage-spotlight.jpg" alt="" className="stage-drift h-full w-full object-cover opacity-70" />
+            <img src="/images/stage-spotlight.jpg" alt="" className="stage-pan h-full w-full object-cover opacity-70" />
             <div className="absolute inset-0 stage-sheen" aria-hidden="true" />
+            <div className="stage-smoke absolute inset-0" aria-hidden="true" />
             <div className="relative grid h-full place-items-center px-6 text-center">
               <div className="max-w-[32rem]">
                 <p className="eyebrow text-gold">{roomName}</p>

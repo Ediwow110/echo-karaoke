@@ -76,6 +76,7 @@ export default function HostDiscoverPage() {
           fetchPriority="high"
           className="stage-drift absolute inset-0 h-full w-full object-cover object-[62%_35%]"
         />
+        <div className="stage-smoke absolute inset-0" aria-hidden="true" />
         <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,13,24,0.96)_0%,rgba(16,13,24,0.82)_42%,rgba(16,13,24,0.18)_100%)]" aria-hidden="true" />
         <div className="relative flex min-h-[19rem] flex-col justify-between gap-8 p-6 sm:min-h-[21rem] sm:p-8">
           <div className="flex flex-wrap items-center justify-between gap-3">

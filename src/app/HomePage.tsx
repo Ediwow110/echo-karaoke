@@ -365,8 +365,9 @@ export default function HomePage() {
                 width={1600}
                 height={534}
                 fetchPriority="high"
-                className="stage-drift absolute inset-0 h-full w-full object-cover"
+                className="stage-pan absolute inset-0 h-full w-full object-cover"
               />
+              <div className="stage-smoke absolute inset-0" aria-hidden="true" />
               <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,13,24,0.15),rgba(16,13,24,0.9))]" aria-hidden="true" />
               <div className="absolute inset-x-0 bottom-0 p-5">
                 <p className="eyebrow text-gold">One host screen. Everyone in.</p>

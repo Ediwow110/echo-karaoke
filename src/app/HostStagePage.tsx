@@ -121,7 +121,7 @@ export default function HostStagePage() {
       <header className="sticky top-0 z-30 border-b border-line bg-graphite/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Logo size="sm" />
+            <Logo size="md" />
             <span className="hidden h-5 w-px bg-line sm:block" aria-hidden="true" />
             <Link
               to={'/room/' + roomId + '/host'}
@@ -186,8 +186,9 @@ export default function HostStagePage() {
               <div ref={attachSlot} className="absolute inset-0" data-stage-slot />
             ) : (
               <>
-                <img src="/images/stage-spotlight.jpg" alt="" className="stage-drift absolute inset-0 h-full w-full object-cover opacity-70" loading="lazy" />
+                <img src="/images/stage-spotlight.jpg" alt="" className="stage-pan absolute inset-0 h-full w-full object-cover opacity-70" loading="lazy" />
                 <div className="absolute inset-0 stage-sheen" aria-hidden="true" />
+                <div className="stage-smoke absolute inset-0" aria-hidden="true" />
                 <div className="relative grid h-full place-items-center px-6 text-center">
                   <div className="max-w-[30rem]">
                     <p className="eyebrow text-gold">Your private stage</p>
