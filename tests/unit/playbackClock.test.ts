@@ -24,4 +24,12 @@ describe('the guest playback clock', () => {
     expect(estimatePosition({ positionSeconds: 9, isPlaying: true, updatedAt: null })).toBe(9);
     expect(estimatePosition({ positionSeconds: 9, isPlaying: true, updatedAt: 'not a date' })).toBe(9);
   });
+
+  it('does not turn a skewed phone clock into minutes of progress', () => {
+    expect(estimatePosition({
+      positionSeconds: 30,
+      isPlaying: true,
+      updatedAt: '2026-10-22T10:00:00.000Z',
+    }, Date.parse('2026-10-22T11:00:00.000Z'))).toBe(30);
+  });
 });

@@ -12,10 +12,15 @@ export function operationCall(name: string, params: unknown[]): { text: string; 
   };
 }
 
-export function serviceDatabase() {
-  return neon(process.env.DATABASE_URL ?? '');
+export function databaseUrlFor(
+  env: Record<string, string | undefined> = process.env,
+): string {
+  if (env.VERCEL_ENV === 'preview') {
+    return env.PREVIEW_DATABASE_URL ?? '';
+  }
+  return env.DATABASE_URL ?? '';
 }
 
-export function authDatabase() {
-  return neon(process.env.AUTH_DATABASE_URL ?? '');
+export function serviceDatabase() {
+  return neon(databaseUrlFor());
 }

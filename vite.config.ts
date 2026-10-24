@@ -16,5 +16,8 @@ export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     allowedHosts: allowedHosts.length > 0 ? allowedHosts : undefined,
+    proxy: {
+      '/api': 'http://127.0.0.1:3001',
+    },
   },
 });

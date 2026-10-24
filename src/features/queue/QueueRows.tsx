@@ -1,10 +1,8 @@
 import type { ReactNode } from 'react';
-import {
-  ArrowDownIcon,
-  ArrowUpIcon,
-  MusicNotesIcon,
-  XIcon,
-} from '@phosphor-icons/react';
+import { ArrowDownIcon } from '@phosphor-icons/react/dist/csr/ArrowDown';
+import { ArrowUpIcon } from '@phosphor-icons/react/dist/csr/ArrowUp';
+import { MusicNotesIcon } from '@phosphor-icons/react/dist/csr/MusicNotes';
+import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import type { QueueEntry } from '../rooms/useRoomData';
 import { formatTime } from '../../lib/format';
 import { SongArtwork } from '../../ui';

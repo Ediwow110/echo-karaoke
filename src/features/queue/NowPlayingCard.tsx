@@ -1,5 +1,5 @@
 import type { ReactNode } from 'react';
-import { MonitorPlayIcon } from '@phosphor-icons/react';
+import { MonitorPlayIcon } from '@phosphor-icons/react/dist/csr/MonitorPlay';
 import type { QueueEntry } from '../rooms/useRoomData';
 import type { PlaybackState } from '../playback/playbackApi';
 import { usePlaybackProgress } from '../playback/usePlaybackProgress';

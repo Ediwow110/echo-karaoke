@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { operationCall } from '../../server/db/client';
+import { databaseUrlFor, operationCall } from '../../server/db/client';
 
 describe('the operation call builder', () => {
   it('builds a parameterised call to the named operation', () => {
@@ -10,5 +10,18 @@ describe('the operation call builder', () => {
 
   it('refuses an operation name that is not a plain identifier', () => {
     expect(() => operationCall('queue_add; drop table rooms', [])).toThrow(/operation/i);
+  });
+
+  it('selects a separate preview database branch', () => {
+    expect(databaseUrlFor({
+      VERCEL_ENV: 'preview',
+      DATABASE_URL: 'postgresql://production/db',
+      PREVIEW_DATABASE_URL: 'postgresql://preview/db',
+    })).toBe('postgresql://preview/db');
+    expect(databaseUrlFor({
+      VERCEL_ENV: 'production',
+      DATABASE_URL: 'postgresql://production/db',
+      PREVIEW_DATABASE_URL: 'postgresql://preview/db',
+    })).toBe('postgresql://production/db');
   });
 });

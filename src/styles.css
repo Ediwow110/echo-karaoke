@@ -200,6 +200,10 @@
     outline-offset: 2px;
   }
 
+  [data-route-focus]:focus {
+    outline: none;
+  }
+
   ::selection {
     background: var(--color-signal);
     color: var(--color-signal-ink);

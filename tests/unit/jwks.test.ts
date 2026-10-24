@@ -29,6 +29,37 @@ async function serve(payload: () => unknown, status = 200): Promise<string> {
 }
 
 describe('JWKS cache', () => {
+  it('caches an in-process key loader and still supports forced rotation refresh', async () => {
+    let reads = 0;
+    let kid = 'local-k1';
+    const source = async () => {
+      reads += 1;
+      return { keys: [{ kid }] };
+    };
+
+    expect((await fetchJwks(source))[0]?.kid).toBe('local-k1');
+    kid = 'local-k2';
+    expect((await fetchJwks(source))[0]?.kid).toBe('local-k1');
+    expect(reads).toBe(1);
+    expect((await fetchJwks(source, { force: true }))[0]?.kid).toBe('local-k2');
+    expect(reads).toBe(2);
+  });
+
+  it('does not reuse keys from a different in-process source', async () => {
+    const first = async () => ({ keys: [{ kid: 'first' }] });
+    const second = async () => ({ keys: [{ kid: 'second' }] });
+
+    expect((await fetchJwks(first))[0]?.kid).toBe('first');
+    expect((await fetchJwks(second))[0]?.kid).toBe('second');
+  });
+
+  it('propagates loader failures and rejects a loader without a key array', async () => {
+    const failing = async () => { throw new Error('key database unavailable'); };
+    await expect(fetchJwks(failing)).rejects.toThrow('key database unavailable');
+    await expect(fetchJwks(async () => ({ keys: 'nope' })))
+      .rejects.toThrow('the key set could not be read');
+  });
+
   it('reuses a fresh key set for the same URL', async () => {
     const url = await serve(() => ({ keys: [{ kid: 'k1' }] }));
 

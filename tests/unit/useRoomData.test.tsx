@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, renderHook, waitFor } from '@testing-library/react';
-import { createElement, type ReactNode } from 'react';
+import { createElement, StrictMode, type ReactNode } from 'react';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import { useRoomData } from '../../src/features/rooms/useRoomData';
 import { saveGuestToken } from '../../src/features/rooms/tokenStore';
@@ -33,6 +33,7 @@ beforeEach(() => {
 
 afterEach(() => {
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 describe('room data isolation', () => {
@@ -110,15 +111,24 @@ describe('room data isolation', () => {
     unmount();
   });
 
-  it('does not clear loading when a superseded read settles', async () => {
+  it('serializes refreshes instead of overlapping reads', async () => {
     const pending: Array<(value: unknown) => void> = [];
+    let inFlightReads = 0;
+    let maxConcurrentReads = 0;
     const api: EdgeApi = {
       invoke: (async (name: string) => {
         if (name === 'touch-member') {
           return {};
         }
         if (name === 'guest-room-read') {
-          return new Promise((resolve) => pending.push(resolve));
+          inFlightReads += 1;
+          maxConcurrentReads = Math.max(maxConcurrentReads, inFlightReads);
+          return new Promise((resolve) => {
+            pending.push((value) => {
+              inFlightReads -= 1;
+              resolve(value);
+            });
+          });
         }
         throw new RoomApiError('NETWORK_ERROR', 0, 'The room service could not be reached');
       }) as unknown as EdgeApi['invoke'],
@@ -140,15 +150,20 @@ describe('room data isolation', () => {
     act(() => {
       void result.current.refresh();
     });
-    await waitFor(() => {
-      expect(pending.length).toBe(2);
-    });
+    // The extra refresh is queued, not sent while a read is already pending.
+    await Promise.resolve();
+    expect(pending.length).toBe(1);
+    expect(maxConcurrentReads).toBe(1);
 
     await act(async () => {
       pending[0](roomA);
       await Promise.resolve();
     });
-    expect(result.current.loading).toBe(true);
+    await waitFor(() => {
+      expect(pending.length).toBe(2);
+    });
+    expect(result.current.loading).toBe(false);
+    expect(result.current.data?.roomId).toBe('room-a');
 
     await act(async () => {
       pending[1](roomA);
@@ -158,8 +173,108 @@ describe('room data isolation', () => {
       expect(result.current.loading).toBe(false);
       expect(result.current.data?.roomId).toBe('room-a');
     });
+    expect(maxConcurrentReads).toBe(1);
 
     unmount();
+  });
+
+  it('finishes a slow initial read despite StrictMode and multiple polling ticks', async () => {
+    vi.useFakeTimers();
+    const pending: Array<(value: unknown) => void> = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'touch-member') return {};
+        return new Promise((resolve) => pending.push(resolve));
+      }) as unknown as EdgeApi['invoke'],
+    };
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(
+      StrictMode,
+      null,
+      createElement(RoomApiProvider, { api, children }),
+    );
+    const { result, unmount } = renderHook(() => useRoomData('room-a', 'guest'), { wrapper });
+
+    try {
+      expect(pending).toHaveLength(1);
+      await act(async () => { await vi.advanceTimersByTimeAsync(12_000); });
+      expect(pending).toHaveLength(1);
+      expect(result.current.loading).toBe(true);
+
+      await act(async () => { pending[0](roomA); });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.data?.roomId).toBe('room-a');
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+      expect(pending).toHaveLength(2);
+      await act(async () => { pending[1](roomA); });
+    } finally {
+      unmount();
+    }
+  });
+
+  it('does not let an old room read consume the new room refresh queue', async () => {
+    const pending: Array<{ roomId: string; resolve: (value: unknown) => void }> = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        if (name === 'touch-member') return {};
+        const { roomId } = body as { roomId: string };
+        return new Promise((resolve) => pending.push({ roomId, resolve }));
+      }) as unknown as EdgeApi['invoke'],
+    };
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(
+      RoomApiProvider,
+      { api, children },
+    );
+    const { result, rerender, unmount } = renderHook(
+      (props: { roomId: string }) => useRoomData(props.roomId, 'guest'),
+      { initialProps: { roomId: 'room-a' }, wrapper },
+    );
+
+    try {
+      expect(pending.map((read) => read.roomId)).toEqual(['room-a']);
+      rerender({ roomId: 'room-b' });
+      expect(pending.map((read) => read.roomId)).toEqual(['room-a', 'room-b']);
+      act(() => { void result.current.refresh(); });
+
+      await act(async () => { pending[0].resolve(roomA); });
+      expect(result.current.loading).toBe(true);
+      expect(result.current.data).toBeNull();
+      expect(pending.map((read) => read.roomId)).toEqual(['room-a', 'room-b']);
+
+      const roomB = { ...roomA, roomId: 'room-b', room: { ...roomA.room, id: 'room-b' } };
+      await act(async () => { pending[1].resolve(roomB); });
+      expect(result.current.loading).toBe(false);
+      expect(result.current.data?.roomId).toBe('room-b');
+      expect(pending.map((read) => read.roomId)).toEqual(['room-a', 'room-b', 'room-b']);
+      await act(async () => { pending[2].resolve(roomB); });
+    } finally {
+      unmount();
+    }
+  });
+
+  it('does not wait for a slow heartbeat before displaying the room', async () => {
+    let resolveTouch: (value: unknown) => void = () => undefined;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'touch-member') {
+          return new Promise((resolve) => { resolveTouch = resolve; });
+        }
+        return roomA;
+      }) as unknown as EdgeApi['invoke'],
+    };
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(
+      RoomApiProvider,
+      { api, children },
+    );
+    const { result, unmount } = renderHook(() => useRoomData('room-a', 'guest'), { wrapper });
+
+    try {
+      await waitFor(() => { expect(result.current.loading).toBe(false); });
+      expect(result.current.data?.roomId).toBe('room-a');
+    } finally {
+      await act(async () => { resolveTouch({}); });
+      unmount();
+    }
   });
 
   it('sends a throttled heartbeat while hidden without reading the room', async () => {

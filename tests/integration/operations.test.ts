@@ -8,6 +8,13 @@ const runsHere = Boolean(
   && process.env.BETTER_AUTH_SECRET,
 );
 
+if (process.env.CI === 'true' && !runsHere) {
+  throw new Error('CI must provide DATABASE_URL, AUTH_DATABASE_URL, and BETTER_AUTH_SECRET for the integration suite.');
+}
+if (!runsHere) {
+  console.warn('Integration suite skipped: set DATABASE_URL, AUTH_DATABASE_URL, and BETTER_AUTH_SECRET.');
+}
+
 type Handler = (request: Request) => Promise<Response>;
 
 let handler: Handler | undefined;

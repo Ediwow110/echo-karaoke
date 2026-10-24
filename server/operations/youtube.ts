@@ -1,7 +1,7 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
-import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
+import { HttpError, jsonResponse, logFailure, mapDatabaseError } from './errors.js';
 import { readJsonObject } from './tokens.js';
-import { requireRoomId, requireTokenHeader, type Caller } from './room.js';
+import { requireRoomId, optionalTokenHeader, type Caller } from './room.js';
 
 export type SearchResult = {
   videoId: string;
@@ -23,6 +23,7 @@ const DEFAULT_DAILY_SEARCH_BUDGET = 90;
 const DEFAULT_DAILY_POPULAR_BUDGET = 200;
 const SEARCH_CACHE_TTL_MS = 5 * 60_000;
 const SUGGEST_CACHE_TTL_MS = 60_000;
+const SUGGEST_CACHE_MAX = 500;
 
 let popularCached: { at: number; results: SearchResult[] } | null = null;
 const suggestCache = new Map<string, { at: number; suggestions: string[] }>();
@@ -40,6 +41,29 @@ function decodeEntities(value: string): string {
     .replace(/&gt;/g, '>');
 }
 
+type Snippet = {
+  title?: unknown;
+  channelTitle?: unknown;
+  thumbnails?: { medium?: { url?: unknown }; high?: { url?: unknown }; default?: { url?: unknown } };
+};
+
+function mapItem(videoId: unknown, snippet: Snippet | undefined): SearchResult | null {
+  if (typeof videoId !== 'string' || !VIDEO_ID_PATTERN.test(videoId)) return null;
+  const title = text(snippet?.title, 500);
+  if (title === null) return null;
+  const thumbnails = snippet?.thumbnails;
+  const thumbnail = text(thumbnails?.medium?.url, 500)
+    ?? text(thumbnails?.high?.url, 500)
+    ?? text(thumbnails?.default?.url, 500);
+  return {
+    videoId,
+    title: decodeEntities(title),
+    channelTitle: text(snippet?.channelTitle, 200),
+    thumbnailUrl: thumbnail,
+    durationSeconds: null,
+  };
+}
+
 export function mapSearchResponse(payload: unknown): SearchResult[] {
   if (payload === null || typeof payload !== 'object') return [];
   const items = (payload as { items?: unknown }).items;
@@ -47,29 +71,26 @@ export function mapSearchResponse(payload: unknown): SearchResult[] {
 
   const mapped: SearchResult[] = [];
   for (const raw of items) {
-    const item = raw as {
-      id?: { videoId?: unknown };
-      snippet?: {
-        title?: unknown;
-        channelTitle?: unknown;
-        thumbnails?: { medium?: { url?: unknown }; high?: { url?: unknown }; default?: { url?: unknown } };
-      };
-    } | null;
-    const videoId = item?.id?.videoId;
-    if (typeof videoId !== 'string' || !VIDEO_ID_PATTERN.test(videoId)) continue;
-    const title = text(item?.snippet?.title, 500);
-    if (title === null) continue;
-    const thumbnails = item?.snippet?.thumbnails;
-    const thumbnail = text(thumbnails?.medium?.url, 500)
-      ?? text(thumbnails?.high?.url, 500)
-      ?? text(thumbnails?.default?.url, 500);
-    mapped.push({
-      videoId,
-      title: decodeEntities(title),
-      channelTitle: text(item?.snippet?.channelTitle, 200),
-      thumbnailUrl: thumbnail,
-      durationSeconds: null,
-    });
+    const item = raw as { id?: { videoId?: unknown }; snippet?: Snippet } | null;
+    const result = mapItem(item?.id?.videoId, item?.snippet);
+    if (result !== null) mapped.push(result);
+    if (mapped.length === MAX_RESULTS) break;
+  }
+  return mapped;
+}
+
+// videos.list, including chart=mostPopular, returns id as a string. search.list
+// returns id.videoId. The two shapes must not share an id reader.
+export function mapVideoListResponse(payload: unknown): SearchResult[] {
+  if (payload === null || typeof payload !== 'object') return [];
+  const items = (payload as { items?: unknown }).items;
+  if (!Array.isArray(items)) return [];
+
+  const mapped: SearchResult[] = [];
+  for (const raw of items) {
+    const item = raw as { id?: unknown; snippet?: Snippet } | null;
+    const result = mapItem(item?.id, item?.snippet);
+    if (result !== null) mapped.push(result);
     if (mapped.length === MAX_RESULTS) break;
   }
   return mapped;
@@ -120,18 +141,34 @@ async function queryAllowNull(name: string, params: unknown[]): Promise<unknown>
   }
 }
 
-async function requireGuestAccess(request: Request, caller: Caller, roomId: string): Promise<string> {
-  const guestToken = requireTokenHeader(request, 'x-room-guest-token');
-  const access = (await queryAllowNull('room_access_check', [roomId, caller.userId, guestToken])) as {
-    status?: string;
-  } | null;
-  if (access === null) {
-    throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+async function requireRoomAccess(request: Request, caller: Caller, roomId: string): Promise<string> {
+  const guestToken = optionalTokenHeader(request, 'x-room-guest-token');
+  const hostToken = optionalTokenHeader(request, 'x-room-host-token');
+  if (guestToken !== null) {
+    const access = (await queryAllowNull('room_access_check', [roomId, caller.userId, guestToken])) as {
+      status?: string;
+    } | null;
+    if (access === null) {
+      throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+    }
+    if (access.status === 'ended') {
+      throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
+    }
+    return guestToken;
   }
-  if (access.status === 'ended') {
-    throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
+  if (hostToken !== null) {
+    const access = (await queryAllowNull('host_access_check', [roomId, caller.userId, hostToken])) as {
+      status?: string;
+    } | null;
+    if (access === null) {
+      throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+    }
+    if (access.status === 'ended') {
+      throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
+    }
+    return hostToken;
   }
-  return guestToken;
+  throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
 }
 
 async function enforceLimit(name: string, params: unknown[], message: string): Promise<void> {
@@ -157,14 +194,14 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
   const body = await readJsonObject(request);
   const roomId = requireRoomId(body.roomId);
   const query = requireQuery(body.query);
-  await requireGuestAccess(request, caller, roomId);
+  await requireRoomAccess(request, caller, roomId);
 
   const apiKey = process.env.YOUTUBE_API_KEY ?? '';
   if (apiKey.length === 0) {
     return jsonResponse({
       available: false,
       results: [],
-      message: 'Search is not configured. Paste a YouTube link instead.',
+      message: 'Search is not configured. Ask the host to enable YouTube search.',
     });
   }
 
@@ -181,22 +218,80 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     return jsonResponse({ available: true, results: cached });
   }
 
-  await enforceLimit('consume_daily_rate_limit', [
+  // Peek at the shared limits before charging the caller's personal day. A
+  // room that is already out, or a depleted global pool, must not cost a user
+  // one of their thirty searches.
+  const roomPeek = await queryAllowNull('peek_daily_rate_limit', [
+    'room:' + roomId,
+    'youtube-search-day',
+    ROOM_DAILY_SEARCH_LIMIT,
+  ]) as { allowed?: boolean } | null;
+  if (roomPeek?.allowed !== true) {
+    return jsonResponse({
+      available: false,
+      results: [],
+      message: 'This room has reached its search limit for today. Try again tomorrow.',
+    });
+  }
+
+  const globalPeek = await queryAllowNull('peek_daily_rate_limit', [
+    'global',
+    'youtube-search-day',
+    dailyBudget('YOUTUBE_DAILY_SEARCH_BUDGET', DEFAULT_DAILY_SEARCH_BUDGET),
+  ]) as { allowed?: boolean } | null;
+  if (globalPeek?.allowed !== true) {
+    return jsonResponse({
+      available: false,
+      results: [],
+      message: 'Search is resting for today. Try again tomorrow.',
+    });
+  }
+
+  const userPeek = await queryAllowNull('peek_daily_rate_limit', [
     'user:' + caller.userId,
     'youtube-search-day',
     USER_DAILY_SEARCH_LIMIT,
-  ], "You have reached today's search limit. Paste a link or try tomorrow.");
+  ]) as { allowed?: boolean } | null;
+  if (userPeek?.allowed !== true) {
+    throw new HttpError('RATE_LIMITED', 429, "You have reached today's search limit. Try again tomorrow.");
+  }
+
+  const charged: string[] = [];
+  const refundCharged = async (): Promise<void> => {
+    if (charged.length === 0) return;
+    const results = await Promise.allSettled(charged.map((subject) => (
+      queryAllowNull('refund_daily_rate_limit', [subject, 'youtube-search-day'])
+    )));
+    for (const result of results) {
+      if (result.status === 'rejected') {
+        logFailure('youtube-search/refund', result.reason, 500, request);
+      }
+    }
+  };
+
+  const userDaily = await queryAllowNull('consume_daily_rate_limit', [
+    'user:' + caller.userId,
+    'youtube-search-day',
+    USER_DAILY_SEARCH_LIMIT,
+  ]) as { allowed?: boolean } | null;
+  charged.push('user:' + caller.userId);
+  if (userDaily?.allowed !== true) {
+    await refundCharged();
+    throw new HttpError('RATE_LIMITED', 429, "You have reached today's search limit. Try again tomorrow.");
+  }
 
   const roomDaily = await queryAllowNull('consume_daily_rate_limit', [
     'room:' + roomId,
     'youtube-search-day',
     ROOM_DAILY_SEARCH_LIMIT,
   ]) as { allowed?: boolean } | null;
+  charged.push('room:' + roomId);
   if (roomDaily?.allowed !== true) {
+    await refundCharged();
     return jsonResponse({
       available: false,
       results: [],
-      message: 'This room has reached its search limit for today. Paste a YouTube link instead.',
+      message: 'This room has reached its search limit for today. Try again tomorrow.',
     });
   }
 
@@ -205,11 +300,13 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     'youtube-search-day',
     dailyBudget('YOUTUBE_DAILY_SEARCH_BUDGET', DEFAULT_DAILY_SEARCH_BUDGET),
   ]) as { allowed?: boolean } | null;
+  charged.push('global');
   if (daily?.allowed !== true) {
+    await refundCharged();
     return jsonResponse({
       available: false,
       results: [],
-      message: 'Search is resting for today. Paste a YouTube link instead.',
+      message: 'Search is resting for today. Try again tomorrow.',
     });
   }
 
@@ -220,9 +317,11 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
   try {
     upstream = await fetch(target, { signal: AbortSignal.timeout(6000) });
   } catch {
+    await refundCharged();
     throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube search is unavailable right now');
   }
   if (!upstream.ok) {
+    await refundCharged();
     throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube search is unavailable right now');
   }
 
@@ -230,6 +329,7 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
   try {
     payload = await upstream.json();
   } catch {
+    await refundCharged();
     throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube search returned an unreadable response');
   }
 
@@ -241,14 +341,14 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
 export async function youtubePopular(request: Request, caller: Caller): Promise<Response> {
   const body = await readJsonObject(request);
   const roomId = requireRoomId(body.roomId);
-  await requireGuestAccess(request, caller, roomId);
+  await requireRoomAccess(request, caller, roomId);
 
   const apiKey = process.env.YOUTUBE_API_KEY ?? '';
   if (apiKey.length === 0) {
     return jsonResponse({
       available: false,
       results: [],
-      message: 'Suggestions are not configured. Paste a YouTube link instead.',
+      message: 'Suggestions are not configured. Ask the host to enable YouTube search.',
     });
   }
 
@@ -269,7 +369,7 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     dailyBudget('YOUTUBE_DAILY_POPULAR_BUDGET', DEFAULT_DAILY_POPULAR_BUDGET),
   ], 'The music chart is unavailable right now');
 
-  const target = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&videoCategoryId=10&maxResults=12&regionCode=US&key=' +
+  const target = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&videoCategoryId=10&maxResults=10&regionCode=US&key=' +
     encodeURIComponent(apiKey);
 
   let response: Response;
@@ -289,7 +389,7 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube suggestions returned an unreadable response');
   }
 
-  const results = mapSearchResponse(payload);
+  const results = mapVideoListResponse(payload);
   popularCached = { at: Date.now(), results };
   return jsonResponse({ available: true, results });
 }
@@ -322,6 +422,10 @@ async function fetchSuggestions(query: string): Promise<string[]> {
   }
 
   const suggestions = parseSuggestions(payload);
+  if (!suggestCache.has(query) && suggestCache.size >= SUGGEST_CACHE_MAX) {
+    const oldest = suggestCache.keys().next().value;
+    if (oldest !== undefined) suggestCache.delete(oldest);
+  }
   suggestCache.set(query, { at: Date.now(), suggestions });
   return suggestions;
 }
@@ -330,14 +434,14 @@ export async function youtubeSuggest(request: Request, caller: Caller): Promise<
   const body = await readJsonObject(request);
   const roomId = requireRoomId(body.roomId);
   const query = requireQuery(body.query, 2);
-  await requireGuestAccess(request, caller, roomId);
+  await requireRoomAccess(request, caller, roomId);
 
   await enforceLimit('consume_rate_limit', [
     caller.userId,
     'youtube-suggest-member',
     60,
     60,
-  ], 'Suggestions are busy. Keep typing or paste a link.');
+  ], 'Suggestions are busy. Try again in a moment.');
 
   const daily = await queryAllowNull('consume_daily_rate_limit', [
     'global',

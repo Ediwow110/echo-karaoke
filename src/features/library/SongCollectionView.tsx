@@ -1,14 +1,12 @@
 import { useMemo, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowRightIcon,
-  CheckIcon,
-  HeartIcon,
-  MagnifyingGlassIcon,
-  MusicNotesIcon,
-  PlusIcon,
-  SparkleIcon,
-} from '@phosphor-icons/react';
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
+import { HeartIcon } from '@phosphor-icons/react/dist/csr/Heart';
+import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { MusicNotesIcon } from '@phosphor-icons/react/dist/csr/MusicNotes';
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { SparkleIcon } from '@phosphor-icons/react/dist/csr/Sparkle';
 import { useRoomApi } from '../../app/RoomApiProvider';
 import { addSong } from '../queue/queueApi';
 import {
@@ -138,7 +136,7 @@ export default function SongCollectionView({ mode, roomId = null, queueHref = nu
             value={filter}
             onChange={(event) => setFilter(event.target.value)}
             placeholder="Search your collection…"
-            className="min-h-11 w-full rounded-media border border-line bg-surface pl-10 pr-3.5 text-[0.8125rem] text-ink placeholder:text-ink-3 focus:border-signal focus:outline-none"
+            className="min-h-11 w-full rounded-media border border-line bg-surface pl-10 pr-3.5 text-[0.8125rem] text-ink placeholder:text-ink-3 focus:border-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
           />
         </div>
       ) : null}

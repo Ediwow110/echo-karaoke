@@ -11,5 +11,5 @@ ECHO is a login-free YouTube karaoke room. One host screen plays the music while
 ## Notes
 
 - Room screens are not public directories and are excluded from crawling in robots.txt.
-- YouTube search requires a server-side API key. The app always explains this and offers the paste-link fallback.
+- YouTube search requires a server-side API key. Without it, or when the daily search budget is resting, the search panel offers a manual YouTube-link fallback.
 - Guest permissions for requests and playback are independent. Skipping, removing and reordering are host-only.

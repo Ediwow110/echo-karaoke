@@ -1,5 +1,7 @@
 import { useState } from 'react';
-import { CheckIcon, CopyIcon, UsersThreeIcon } from '@phosphor-icons/react';
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
+import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy';
+import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { Button, Chip, QrCode } from '../../ui';
 import { groupRoomCode } from '../../lib/format';
 

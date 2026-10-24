@@ -13,7 +13,18 @@ async function handleRequest(request: Request): Promise<Response> {
         return limited;
       }
     }
-    return auth.handler(restored);
+    const response = await auth.handler(restored);
+    if (url.pathname === '/api/auth/jwks' && response.ok) {
+      const headers = new Headers(response.headers);
+      headers.set('cache-control', 'public, max-age=0, s-maxage=300');
+      headers.set('vercel-cdn-cache-control', 'public, s-maxage=300, stale-while-revalidate=60');
+      return new Response(response.body, {
+        status: response.status,
+        statusText: response.statusText,
+        headers,
+      });
+    }
+    return response;
   }
   return handleOperation(restored);
 }

@@ -1,8 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoomApi } from '../../app/RoomApiProvider';
 import { RoomApiError } from '../../lib/edgeApi';
-import { loadGuestToken } from '../rooms/tokenStore';
+import type { RoomTokens } from '../../lib/edgeApi';
+import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
 import { addSong, type QueueSong } from './queueApi';
+import { parseYouTubeVideoId } from './youtubeVideo';
 import type { SearchResult } from '../../types/search';
 
 type SearchResponse = { available: boolean; results: SearchResult[]; message?: string };
@@ -42,6 +44,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [available, setAvailable] = useState(true);
+  const [searchBlocked, setSearchBlocked] = useState(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [addingId, setAddingId] = useState<string | null>(null);
@@ -51,6 +54,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
   const requestId = useRef(0);
   const mounted = useRef(true);
   const addedTimers = useRef(new Map<string, number>());
+  const debounceTimer = useRef<number | null>(null);
 
   useEffect(() => {
     mounted.current = true;
@@ -78,8 +82,14 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       return;
     }
 
+    let tokens: RoomTokens = {};
     const guestToken = loadGuestToken(roomId);
-    if (guestToken === null) {
+    const hostToken = loadHostToken(roomId);
+    if (guestToken !== null) {
+      tokens.guestToken = guestToken;
+    } else if (hostToken !== null) {
+      tokens.hostToken = hostToken;
+    } else {
       setError('This browser has no guest pass for the room.');
       setLoading(false);
       return;
@@ -91,23 +101,28 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       const response = await api.invoke<SearchResponse>(
         'youtube-search',
         { roomId, query: term },
-        { guestToken },
+        tokens,
       );
       if (!mounted.current || requestId.current !== current) {
         return;
       }
       const ready = response.available !== false;
       setAvailable(ready);
+      setSearchBlocked(!ready);
       setResults(ready ? (response.results ?? []) : []);
-      setMessage(ready ? null : (response.message ?? 'Search is not configured. Paste a YouTube link instead.'));
+      setMessage(ready ? null : (response.message ?? 'Search is not configured. Ask the host to enable YouTube search.'));
     } catch (caught) {
       if (!mounted.current || requestId.current !== current) {
         return;
       }
       const fallback = caught instanceof Error ? caught.message : 'The lookup failed.';
       setResults([]);
+      setSearchBlocked(caught instanceof RoomApiError
+        && (caught.code === 'RATE_LIMITED'
+          || caught.code === 'SEARCH_UNAVAILABLE'
+          || caught.code === 'LOOKUP_RATE_LIMITED'));
       setError(caught instanceof RoomApiError && caught.code === 'NETWORK_ERROR'
-        ? 'YouTube search is unreachable right now. Paste a link instead.'
+        ? 'YouTube search is unreachable right now. Try again.'
         : fallback);
     } finally {
       if (mounted.current && requestId.current === current) {
@@ -124,47 +139,64 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       setLoading(false);
       setSearched(false);
       setAvailable(true);
+      setSearchBlocked(false);
       setMessage(null);
       setError(null);
       return;
     }
     requestId.current += 1;
     setLoading(true);
-    const timer = window.setTimeout(() => {
+    if (debounceTimer.current !== null) {
+      window.clearTimeout(debounceTimer.current);
+    }
+    debounceTimer.current = window.setTimeout(() => {
+      debounceTimer.current = null;
       void search(query);
     }, DEBOUNCE_MS);
-    return () => window.clearTimeout(timer);
+    return () => {
+      if (debounceTimer.current !== null) {
+        window.clearTimeout(debounceTimer.current);
+        debounceTimer.current = null;
+      }
+    };
   }, [query, search]);
 
   const submit = useCallback(() => {
+    // Enter must not also fire the pending debounce timer.
+    if (debounceTimer.current !== null) {
+      window.clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
     void search(query);
   }, [query, search]);
 
-  const add = useCallback(async (result: SearchResult) => {
+  const addVideo = useCallback(async (videoId: string, fallbackTitle: string) => {
     if (disabled) {
       setAddError('The host turned off guest requests.');
-      return;
+      return false;
     }
-    setAddingId(result.videoId);
+    setAddingId(videoId);
     setAddError(null);
     setNotice(null);
     try {
-      const song = await addSong(api, roomId, result.videoId);
-      setAddedIds((current) => current.includes(result.videoId) ? current : [...current, result.videoId]);
-      setNotice({ title: song.title || result.title, position: song.position ?? null, videoId: result.videoId });
-      const previous = addedTimers.current.get(result.videoId);
+      const song = await addSong(api, roomId, videoId);
+      setAddedIds((current) => current.includes(videoId) ? current : [...current, videoId]);
+      setNotice({ title: song.title || fallbackTitle, position: song.position ?? null, videoId });
+      const previous = addedTimers.current.get(videoId);
       if (previous !== undefined) {
         window.clearTimeout(previous);
       }
-      addedTimers.current.set(result.videoId, window.setTimeout(() => {
-        addedTimers.current.delete(result.videoId);
+      addedTimers.current.set(videoId, window.setTimeout(() => {
+        addedTimers.current.delete(videoId);
         if (mounted.current) {
-          setAddedIds((current) => current.filter((videoId) => videoId !== result.videoId));
+          setAddedIds((current) => current.filter((addedId) => addedId !== videoId));
         }
       }, 12000));
       onAdded?.(song);
+      return true;
     } catch (caught) {
       setAddError(describeAddError(caught));
+      return false;
     } finally {
       if (mounted.current) {
         setAddingId(null);
@@ -172,11 +204,25 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     }
   }, [api, disabled, onAdded, roomId]);
 
+  const add = useCallback(async (result: SearchResult) => {
+    await addVideo(result.videoId, result.title);
+  }, [addVideo]);
+
+  const addByLink = useCallback(async (raw: string): Promise<boolean> => {
+    const videoId = parseYouTubeVideoId(raw);
+    if (videoId === null) {
+      setAddError('That is not a YouTube video link or an eleven-character video ID.');
+      return false;
+    }
+    return addVideo(videoId, 'YouTube video');
+  }, [addVideo]);
+
   const clear = useCallback(() => {
     setQuery('');
     setResults([]);
     setSearched(false);
     setError(null);
+    setSearchBlocked(false);
     setMessage(null);
     setAddError(null);
     setNotice(null);
@@ -192,6 +238,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     loading,
     searched,
     available,
+    searchBlocked,
     message,
     error,
     addingId,
@@ -200,6 +247,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     notice,
     submit,
     add,
+    addByLink,
     clear,
     resetNotice,
     clearAddError,

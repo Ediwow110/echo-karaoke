@@ -1,14 +1,12 @@
 import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
-import {
-  ClockCounterClockwiseIcon,
-  CompassIcon,
-  HeartIcon,
-  MusicNotesIcon,
-  PlusIcon,
-  QueueIcon,
-  SlidersHorizontalIcon,
-} from '@phosphor-icons/react';
+import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
+import { CompassIcon } from '@phosphor-icons/react/dist/csr/Compass';
+import { HeartIcon } from '@phosphor-icons/react/dist/csr/Heart';
+import { MusicNotesIcon } from '@phosphor-icons/react/dist/csr/MusicNotes';
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
+import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { Avatar, Logo } from '../../ui';
 import { loadGuestToken, loadHostToken } from './tokenStore';
 import {

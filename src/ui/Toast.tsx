@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
-import { CheckCircleIcon, InfoIcon, WarningCircleIcon, XIcon } from '@phosphor-icons/react';
+import { CheckCircleIcon } from '@phosphor-icons/react/dist/csr/CheckCircle';
+import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info';
+import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
+import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 
 export type ToastTone = 'success' | 'error' | 'info';
 
@@ -61,7 +64,7 @@ export default function Toast({
         type="button"
         onClick={onDismiss}
         aria-label="Dismiss message"
-        className="grid size-7 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+        className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
       >
         <XIcon size={14} weight="bold" aria-hidden="true" />
       </button>

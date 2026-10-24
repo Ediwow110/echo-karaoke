@@ -1,49 +1,59 @@
 # CLAUDE.md
 
-> Managed by Sauron v1.0.0. Persistent instruction manual for Claude Code.
+Persistent instructions for agents working in ECHO. See `README.md` for the product
+and deployment contract.
 
-## Common Commands
+## Commands
 
-- **Build Engine**: `npm run build`
-- **Run Test Suite**: `npm test`
-- **Typecheck**: `npx tsc --noEmit`
-- **Run Single Test**: `node --test tests/<filename>.test.mjs`
+- `npm run dev`: Vite only. `/api` is not served unless the optional local backend is
+  running.
+- `npx vercel dev`: the full app and the same-origin Function on port 3000.
+- `npm run build`: `tsc --noEmit` then the production Vite build.
+- `npm test`: unit and component tests in jsdom.
+- `npm run test:e2e:ui`: Playwright UI checks against Vite with mocked `/api` calls.
+  This suite must stay database-free and key-free.
+- `npm run test:e2e`: real host/guest flows against `vercel dev` or `E2E_BASE_URL`.
+- `npm run test:integration`: router/auth/operation path against a disposable Neon
+  branch. It skips without `DATABASE_URL`, `AUTH_DATABASE_URL`, and
+  `BETTER_AUTH_SECRET`.
+- `npx supabase test db --db-url "$NEON_DATABASE_URL"`: pgTAP suite.
+- `npm run verify:deploy`: the production environment guard used by Vercel.
+- `npm run verify:preview -- <url>`: deployment header, CSP, asset, and API checks.
 
-## Architecture & Code Organization
+## Architecture
 
-- Context: Production codebase governed by Sauron Universal Agent Harness.
-- `adapters/`: 17 runtime transpilation adapters, types, and safe conflict manager.
-- `bin/`: CLI orchestrator and runtime entry points.
-- `core/`: Fellowship sub-agent specifications and department skill metadata.
-- `skills/`: 44 ECC-standard modular skills across 7 functional departments.
-- `tests/`: Automated test suite executed with native Node.js test runner.
+- `src/`: React 19 and Vite SPA. The host screen owns one persistent YouTube player.
+  Guest phones are search and queue remotes.
+- `api/router.ts`: the only Vercel Function. It serves Better Auth under `/api/auth/*`
+  and the room operations under `/api/*`.
+- `server/auth`: Better Auth, JWT verification, JWKS, trusted origins, and the
+  DB-backed sign-in limiter.
+- `server/operations`: validation, quotas, the sweep, error mapping, and structured
+  failure logs.
+- `server/db`: Neon serverless operation calls and the auth connection.
+- `supabase/migrations`: plain Postgres schema and authorized SQL operations. The
+  Supabase CLI is only the migration and pgTAP runner; there are no Supabase Edge
+  Functions.
+- The browser never receives a database URL. It sends a Better Auth JWT plus a
+  room-scoped guest or host capability header.
 
-## Code Style & Conventions
+## Non-negotiables
 
-- Present tense, active voice, English language exclusively.
-- Zero emojis across all code files, comments, and commit messages.
-- Prohibit Latin abbreviations: use 'for example', 'that is', 'and so forth'.
-- Prohibit em dashes: use colons, parentheses, or separate sentences.
-- Strict Red-Green-Refactor TDD required before touching production code.
-- Zero untyped boundary parameters: enforce runtime validation (Zod, Pydantic).
-- Zero hardcoded secrets, connection strings, or unredacted logging output.
-- Token Conservation & Caveman Mode: When invoked with '/caveman' (or 'lite', 'ultra'), eliminate conversational filler and pleasantries while preserving all code, commands, paths, and technical precision verbatim. Restore standard conversational style when requested with '/caveman off'.
+- Keep authorization, duplicate checks, room limits, and quota checks in SQL or the
+  server. UI hiding is not authorization.
+- Keep queue and playback mutations under the room row lock. Revalidate after locking.
+- Never log tokens, passes, cookies, connection strings, or raw IP addresses.
+- Keep phone controls at least 44 by 44 pixels and reflow without horizontal scrolling
+  at 200 percent text.
+- Preserve the one persistent host player across host child-route changes.
+- Do not commit or deploy without the owner's explicit approval.
+- No secrets in source, tests, commands, or chat. Local values live in ignored files.
 
-## Fellowship Sub-Agents
+## Current risk areas
 
-- **Elessar** (`/aragorn`): Principal System Architect
-- **Shield of Gondor** (`/boromir`): Security Auditor and Shield
-- **Ringbearer** (`/frodo`): Core Task Executor
-- **Mithrandir** (`/gandalf`): Master Planner and Strategy Guide
-- **Lockbearer** (`/gimli`): Refactorer and AST Dead Code Slasher
-- **Greenleaf** (`/legolas`): Precision Linter and Syntax Bug Hunter
-- **Brandir** (`/merry`): QA and TDD Specialist
-- **Took** (`/pippin`): Edge Case and Chaos Prober
-- **The Brave** (`/samwise`): Git Commits and State Keeper
-
-## Token Optimization & Caveman Mode
-
-- When contributor triggers `/caveman` (or `lite`, `ultra`), enforce terse, spartan communication.
-- Drop conversational pleasantries, filler phrases, and tool narration overhead.
-- Never alter or compress code blocks, diffs, file paths, or commands.
-- Restore normal conversational style immediately when requested with `/caveman off`.
+- Quotas are shared. Preflight cheap checks before spending a daily budget.
+- Host presence matters: guests must not be told playback will advance when the host
+  screen is offline.
+- Preview deployments must use a Neon branch, not the production database.
+- `npm run verify:deploy` requires the auth secret, both database URLs, origins, and
+  bounded quota budgets.

@@ -1,8 +1,22 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
 
-const REQUIRED_CSP_DIRECTIVES = ["default-src 'self'", "frame-ancestors 'none'", "connect-src 'self'"];
+const REQUIRED_CSP_DIRECTIVES = ["default-src 'self'", "frame-ancestors 'none'", "object-src 'none'"];
 const CONNECTION_STRING = /postgres(ql)?:\/\//i;
+
+function cspDirectives(value) {
+  const directives = new Map();
+  for (const part of value.split(';')) {
+    const tokens = part.trim().split(/\s+/).filter((token) => token.length > 0);
+    if (tokens.length === 0) continue;
+    directives.set(tokens[0], tokens.slice(1));
+  }
+  return directives;
+}
+
+function hasToken(tokens, expected) {
+  return Array.isArray(tokens) && tokens.includes(expected);
+}
 const CREDENTIAL_ERROR = 'A database connection string is present in the served';
 
 function credentialError(where) {
@@ -75,11 +89,34 @@ export async function checkPreview(input, options = {}) {
     requireHeader(home.headers, 'referrer-policy', 'no-referrer');
     requireHeader(home.headers, 'x-frame-options', 'DENY');
     requireHeader(home.headers, 'permissions-policy', 'camera=(self)');
-    if (target.protocol === 'https:') requireHeader(home.headers, 'strict-transport-security', 'max-age=');
+    if (target.protocol === 'https:') {
+      const hsts = requireHeader(home.headers, 'strict-transport-security');
+      const maxAge = Number(/max-age=(\d+)/i.exec(hsts)?.[1] ?? 0);
+      if (!Number.isFinite(maxAge) || maxAge < 31_536_000) {
+        errors.push('Strict-Transport-Security max-age is too short.');
+      }
+    }
 
     const csp = requireHeader(home.headers, 'content-security-policy');
-    for (const directive of REQUIRED_CSP_DIRECTIVES) {
-      if (!csp.includes(directive)) errors.push('The CSP is missing ' + directive + '.');
+    const directives = cspDirectives(csp);
+    if (!hasToken(directives.get('default-src'), "'self'")) {
+      errors.push("The CSP is missing default-src 'self'.");
+    }
+    if (!hasToken(directives.get('frame-ancestors'), "'none'")) {
+      errors.push("The CSP is missing frame-ancestors 'none'.");
+    }
+    if (!hasToken(directives.get('object-src'), "'none'")) {
+      errors.push("The CSP is missing object-src 'none'.");
+    }
+    if (!hasToken(directives.get('connect-src'), "'self'")) {
+      errors.push("The CSP is missing connect-src 'self'.");
+    }
+    const scriptTokens = directives.get('script-src');
+    if (!Array.isArray(scriptTokens)
+      || scriptTokens.includes('*')
+      || scriptTokens.includes("'unsafe-eval'")
+      || scriptTokens.includes('data:')) {
+      errors.push('The CSP script-src is not restrictive.');
     }
 
     const html = await home.text();

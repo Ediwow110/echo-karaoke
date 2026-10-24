@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { cleanup, fireEvent, render, screen } from '@testing-library/react';
 import { createElement } from 'react';
 import { PlayIcon } from '@phosphor-icons/react';
-import { Button, Chip, Field, IconButton, Panel, Toggle, TransportButton } from '../../src/ui';
+import { Button, Chip, Field, IconButton, Toggle, TransportButton } from '../../src/ui';
 import '@testing-library/jest-dom/vitest';
 
 afterEach(() => {
@@ -33,11 +33,6 @@ describe('ui primitives', () => {
   it('marks an invalid field for assistive technology', () => {
     render(createElement(Field, { id: 'code', label: 'Room code', error: 'That code is wrong.' }));
     expect(screen.getByLabelText('Room code')).toHaveAttribute('aria-invalid', 'true');
-  });
-
-  it('renders a panel title with its icon', () => {
-    render(createElement(Panel, { title: 'Up next', icon: createElement(PlayIcon, { 'aria-hidden': true }), children: 'body' }));
-    expect(screen.getByRole('heading', { name: /up next/i })).toBeInTheDocument();
   });
 
   it('gives a transport button an accessible name', () => {

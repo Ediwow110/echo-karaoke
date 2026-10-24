@@ -2,6 +2,7 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
+  testIgnore: 'ui-mock.spec.ts',
   timeout: 60000,
   expect: { timeout: 15000 },
   fullyParallel: false,

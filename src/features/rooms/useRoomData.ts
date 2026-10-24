@@ -64,7 +64,8 @@ export type RoomState = {
 };
 
 const POLL_INTERVAL_MS = 4000;
-const HIDDEN_HEARTBEAT_MS = 30_000;
+const HIDDEN_HEARTBEAT_MS = 15_000;
+const VISIBLE_HEARTBEAT_MS = 10_000;
 
 export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
   const api = useRoomApi();
@@ -80,8 +81,13 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
   const consecutiveFailures = useRef(0);
   const dataRef = useRef<RoomView | null>(null);
   const lastHeartbeatAt = useRef(0);
+  const lastVisibleTouchAt = useRef(0);
+  const inFlight = useRef<Promise<void> | null>(null);
+  const queued = useRef(false);
+  const operationSeq = useRef(0);
+  const initializedFor = useRef<string | null>(null);
 
-  const refresh = useCallback(async () => {
+  const runRefresh = useCallback(async () => {
     if (dataRef.current?.status === 'ended') {
       return;
     }
@@ -92,11 +98,17 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
       }
       return;
     }
-    lastHeartbeatAt.current = Date.now();
+    const now = Date.now();
+    lastHeartbeatAt.current = now;
     const current = requestId.current + 1;
     requestId.current = current;
     try {
-      await touchRoomMember(api, roomId, role);
+      // The SQL touch is throttled to ten seconds. Do not spend a function
+      // invocation on every four-second read for a write that would be skipped.
+      if (now - lastVisibleTouchAt.current >= VISIBLE_HEARTBEAT_MS) {
+        lastVisibleTouchAt.current = now;
+        void touchRoomMember(api, roomId, role).catch(() => undefined);
+      }
       const view = role === 'host'
         ? await readRoomAsHost<RoomView>(api, roomId)
         : await readRoomAsGuest<RoomView>(api, roomId);
@@ -159,10 +171,57 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
     }
   }, [api, role, roomId]);
 
+  // Only one read may be in flight. Without this guard a slow response is
+  // replaced by the next four-second tick before it can clear `loading`, so a
+  // room can sit on its skeleton forever and every tick adds another request.
+  const startRefresh = useCallback((): Promise<void> => {
+    if (inFlight.current !== null) {
+      queued.current = true;
+      return inFlight.current;
+    }
+    const seq = operationSeq.current + 1;
+    operationSeq.current = seq;
+    const operation = (async () => {
+      try {
+        do {
+          queued.current = false;
+          await runRefresh();
+        } while (queued.current && active.current && operationSeq.current === seq);
+      } finally {
+        // A room switch replaces the guard with a new operation. Only the
+        // operation that owns the current sequence may clear it.
+        if (operationSeq.current === seq) {
+          inFlight.current = null;
+        }
+      }
+    })();
+    inFlight.current = operation;
+    return operation;
+  }, [runRefresh]);
+
+  const poll = useCallback((): void => {
+    if (inFlight.current !== null) {
+      return;
+    }
+    void startRefresh();
+  }, [startRefresh]);
+
+  const refresh = useCallback((): Promise<void> => startRefresh(), [startRefresh]);
+
   useEffect(() => {
     // Route parameters can change without remounting a page. Clear every
-    // room-scoped value before the first read for the new room.
+    // room-scoped value before the first read for the new room. StrictMode
+    // replays effects on mount, so ignore that second setup: resetting the
+    // in-flight guard here would let two initial reads run at once.
+    const key = `${role}:${roomId}`;
+    if (initializedFor.current === key) {
+      return;
+    }
+    initializedFor.current = key;
     requestId.current += 1;
+    operationSeq.current += 1;
+    inFlight.current = null;
+    queued.current = false;
     dataRef.current = null;
     consecutiveFailures.current = 0;
     wasOffline.current = false;
@@ -176,19 +235,17 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
 
   useEffect(() => {
     active.current = true;
-    void refresh();
-    const timer = window.setInterval(() => {
-      void refresh();
-    }, POLL_INTERVAL_MS);
+    poll();
+    const timer = window.setInterval(poll, POLL_INTERVAL_MS);
 
     const onVisibility = (): void => {
       if (document.hidden) {
         return;
       }
-      void refresh();
+      void startRefresh();
     };
     const onOnline = (): void => {
-      void refresh();
+      void startRefresh();
     };
     document.addEventListener('visibilitychange', onVisibility);
     window.addEventListener('online', onOnline);
@@ -199,7 +256,7 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
       document.removeEventListener('visibilitychange', onVisibility);
       window.removeEventListener('online', onOnline);
     };
-  }, [refresh]);
+  }, [poll, startRefresh]);
 
   return { data, error, loading, connection, restoredAt, lastLiveAt, refresh };
 }

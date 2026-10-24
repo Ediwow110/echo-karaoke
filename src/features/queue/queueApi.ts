@@ -71,8 +71,3 @@ export async function reorderSong(
 ): Promise<void> {
   await sendQueueCommand(api, roomId, { kind: 'reorder', songId, direction });
 }
-
-export async function readQueue(api: EdgeApi, roomId: string): Promise<QueueSong[]> {
-  const guestToken = requireGuestPass(roomId);
-  return api.invoke<QueueSong[]>('guest-room-read', { roomId }, { guestToken });
-}

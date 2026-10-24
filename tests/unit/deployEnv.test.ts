@@ -3,6 +3,9 @@ import { checkDeployEnv } from '../../scripts/check-deploy-env.mjs';
 
 const valid = {
   ALLOWED_ORIGINS: 'https://app.example',
+  BETTER_AUTH_SECRET: 'a'.repeat(40),
+  DATABASE_URL: 'postgresql://service@example/db',
+  AUTH_DATABASE_URL: 'postgresql://auth@example/db',
 };
 
 describe('deployment environment guard', () => {
@@ -44,6 +47,45 @@ describe('deployment environment guard', () => {
     expect(checkDeployEnv({ ALLOWED_ORIGINS: '' })).toContain(
       'ALLOWED_ORIGINS must list at least one deployed app origin.',
     );
+  });
+
+  it('rejects a missing auth secret or database credential', () => {
+    const errors = checkDeployEnv({ ALLOWED_ORIGINS: 'https://app.example' });
+    expect(errors).toContain('BETTER_AUTH_SECRET must contain at least 32 characters.');
+    expect(errors).toContain('DATABASE_URL must be a PostgreSQL connection string.');
+    expect(errors).toContain('AUTH_DATABASE_URL must be a PostgreSQL connection string.');
+  });
+
+  it('rejects a search budget above the separate 100-call bucket', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      YOUTUBE_DAILY_SEARCH_BUDGET: '101',
+    })).toContain('YOUTUBE_DAILY_SEARCH_BUDGET must be an integer between 1 and 100.');
+  });
+
+  it('requires separate preview database branches', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+    })).toEqual(expect.arrayContaining([
+      'PREVIEW_DATABASE_URL must be a PostgreSQL connection string in Preview.',
+      'PREVIEW_AUTH_DATABASE_URL must be a PostgreSQL connection string in Preview.',
+    ]));
+    expect(checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+      PREVIEW_DATABASE_URL: 'postgresql://service@preview/db',
+      PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@preview/db',
+    })).toEqual([]);
+  });
+
+  it('rejects Preview URLs that reuse the production database', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+      PREVIEW_DATABASE_URL: valid.DATABASE_URL,
+      PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@preview/db',
+    })).toContain('PREVIEW_DATABASE_URL must point at a different database than DATABASE_URL.');
   });
 
   it('rejects insecure, wildcard, and path-bearing origins', () => {

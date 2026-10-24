@@ -1,6 +1,8 @@
 import { useEffect, useState, type FormEvent } from 'react';
 import { Link, useNavigate, useParams } from 'react-router-dom';
-import { ArrowLeftIcon, KeyIcon, QrCodeIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
+import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
+import { QrCodeIcon } from '@phosphor-icons/react/dist/csr/QrCode';
 import { useRoomApi } from './RoomApiProvider';
 import { joinRoom } from '../features/rooms/roomApi';
 import { isValidRoomCode, normalizeRoomCode } from '../features/rooms/roomCode';

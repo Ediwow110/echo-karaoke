@@ -43,7 +43,7 @@ export default function Field({
             'min-h-11 w-full rounded-media border bg-surface px-3.5 text-[0.875rem] text-ink',
             'placeholder:text-ink-3',
             'transition-[border-color,background-color] duration-(--duration-fast) ease-(--ease-console)',
-            'focus:border-signal focus:outline-none focus-visible:outline-none',
+            'focus:border-signal focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
             invalid ? 'border-danger' : 'border-line hover:border-line-strong',
             icon === undefined ? '' : 'pl-10',
             className,

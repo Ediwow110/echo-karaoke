@@ -50,6 +50,8 @@ describe('Vercel deployment configuration', () => {
     expect(route.test('/assets/index.js')).toBe(false);
     expect(route.test('/fonts/inter-latin.woff2')).toBe(false);
     expect(route.test('/favicon.svg')).toBe(false);
+    expect(route.test('/src/main.tsx')).toBe(false);
+    expect(route.test('/@vite/client')).toBe(false);
   });
 
   it('sets a restrictive CSP for the same-origin API and YouTube', () => {

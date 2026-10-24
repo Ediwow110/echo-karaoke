@@ -1,5 +1,5 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
-import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
+import { HttpError, jsonResponse, logFailure, mapDatabaseError } from './errors.js';
 import { sweepAbandonedRooms, sweepEndedRooms } from './sweep.js';
 import {
   generateRoomCode,
@@ -18,7 +18,12 @@ export async function createRoom(request: Request, caller: Caller): Promise<Resp
   const roomName = normalizeRoomName(body.roomName);
   const guestsCanAdd = readOptionalBoolean(body.guestsCanAdd, true);
   const guestsCanControlPlayback = readOptionalBoolean(body.guestsCanControlPlayback, false);
-  await Promise.allSettled([sweepAbandonedRooms(), sweepEndedRooms()]);
+  const sweeps = await Promise.allSettled([sweepAbandonedRooms(), sweepEndedRooms()]);
+  for (const sweep of sweeps) {
+    if (sweep.status === 'rejected') {
+      logFailure('create-room/sweep', sweep.reason, 500, request);
+    }
+  }
   const database = serviceDatabase();
 
   for (let attempt = 0; attempt < 4; attempt += 1) {

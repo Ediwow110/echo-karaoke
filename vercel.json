@@ -10,7 +10,7 @@
       "destination": "/api/router?path=$1"
     },
     {
-      "source": "/((?!api/|assets/|fonts/|images/|favicon\\.svg|robots\\.txt|llms\\.txt).*)",
+      "source": "/((?!api/|assets/|fonts/|images/|favicon\\.svg|robots\\.txt|llms\\.txt|src/|@|node_modules/).*)",
       "destination": "/index.html"
     }
   ],

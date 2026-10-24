@@ -97,6 +97,13 @@ select lives_ok(
   format('select public.host_command(%L::uuid, %L::text, %L, %L)', (select room_id from vctx), '11111111-1111-1111-1111-111111111111', (select host_token from vctx), 'unlock'),
   'host unlocks guest controls');
 
+update public.queue_songs set status = 'played' where id = (select song_id from song);
+select throws_ok(
+  format('select public.vote_toggle(%L::uuid, %L::text, %L, %L::uuid)', (select room_id from vctx), '22222222-2222-2222-2222-222222222222', repeat('m', 40), (select song_id from song)),
+  '22023', 'VALIDATION_ERROR',
+  'a played song cannot collect new votes');
+update public.queue_songs set status = 'queued' where id = (select song_id from song);
+
 -- Votes disappear with the song.
 select lives_ok(
   format('select public.queue_remove(%L::uuid, %L::text, null, %L, %L::uuid)', (select room_id from vctx), '11111111-1111-1111-1111-111111111111', (select host_token from vctx), (select song_id from song)),

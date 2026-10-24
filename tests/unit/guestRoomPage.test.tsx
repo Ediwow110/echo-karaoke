@@ -46,7 +46,16 @@ function makeApi(locked = false): { api: EdgeApi; calls: string[] } {
       if (name === 'queue-command') {
         return { songId: 's1', videoId: 'dQw4w9WgXcQ', title: 'Never Gonna Give You Up', position: 1 };
       }
-      if (name === 'youtube-search' || name === 'youtube-popular') {
+      if (name === 'youtube-search') {
+        return { available: true, results: [{
+          videoId: 'dQw4w9WgXcQ',
+          title: 'Never Gonna Give You Up',
+          channelTitle: 'Rick Astley',
+          thumbnailUrl: null,
+          durationSeconds: null,
+        }] };
+      }
+      if (name === 'youtube-popular') {
         return { available: false, results: [], message: 'Search is not configured.' };
       }
       if (name === 'playback-command') {
@@ -113,40 +122,36 @@ describe('guest phone remote', () => {
     expect(calls).toContain('guest-room-read');
   });
 
-  it('offers live search and the paste fallback on the search tab', async () => {
+  it('offers only live search on the search tab', async () => {
     const { api } = makeApi();
     renderGuest(api, '/room/' + roomId + '/search');
 
     expect(await screen.findByLabelText(/find a song on youtube/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/paste a youtube link/i)).toBeInTheDocument();
+    expect(screen.queryByLabelText(/paste a youtube link/i)).not.toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: /add a song by youtube link/i })).not.toBeInTheDocument();
   });
 
   it('shows the lock notice and disables guest requests when the host locks them', async () => {
-    const { api } = makeApi(true);
+    const { api, calls } = makeApi(true);
     renderGuest(api, '/room/' + roomId + '/search');
 
     expect(await screen.findByText(/guest requests are off/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /add to queue/i })).toBeDisabled();
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'Rick Astley' } });
+    const add = await screen.findByRole('button', { name: /^add never gonna give you up$/i });
+    expect(add).toBeDisabled();
+    fireEvent.click(add);
+    expect(calls).not.toContain('queue-command');
   });
 
-  it('adds a song from a pasted link', async () => {
-    const { api } = makeApi();
+  it('adds a song from a YouTube search result', async () => {
+    const { api, calls } = makeApi();
     renderGuest(api, '/room/' + roomId + '/search');
 
-    fireEvent.change(await screen.findByLabelText(/paste a youtube link/i), { target: { value: 'https://youtu.be/dQw4w9WgXcQ' } });
-    fireEvent.click(screen.getByRole('button', { name: /add to queue/i }));
+    fireEvent.change(await screen.findByLabelText(/find a song on youtube/i), { target: { value: 'Rick Astley' } });
+    fireEvent.click(await screen.findByRole('button', { name: /^add never gonna give you up$/i }));
 
-    expect(await screen.findByText(/never gonna give you up/i)).toBeInTheDocument();
-  });
-
-  it('rejects a link that is not a YouTube video', async () => {
-    const { api } = makeApi();
-    renderGuest(api, '/room/' + roomId + '/search');
-
-    fireEvent.change(await screen.findByLabelText(/paste a youtube link/i), { target: { value: 'https://vimeo.com/123' } });
-    fireEvent.click(screen.getByRole('button', { name: /add to queue/i }));
-
-    expect(await screen.findByRole('alert')).toHaveTextContent(/youtube link/i);
+    expect(await screen.findByText(/never gonna give you up added/i)).toBeInTheDocument();
+    expect(calls).toContain('queue-command');
   });
 
   it('lets a guest leave the room and drops the pass', async () => {

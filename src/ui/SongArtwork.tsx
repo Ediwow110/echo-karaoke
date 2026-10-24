@@ -1,4 +1,4 @@
-import { MusicNotesIcon } from '@phosphor-icons/react';
+import { MusicNotesIcon } from '@phosphor-icons/react/dist/csr/MusicNotes';
 
 export type SongArtworkProps = {
   src: string | null | undefined;

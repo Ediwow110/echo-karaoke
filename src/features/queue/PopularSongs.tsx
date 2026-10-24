@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
-import { CheckIcon, PlusIcon } from '@phosphor-icons/react';
+import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { useRoomApi } from '../../app/RoomApiProvider';
-import { loadGuestToken } from '../rooms/tokenStore';
+import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
 import { addSong, type QueueSong } from './queueApi';
 import { SongArtwork } from '../../ui';
 import type { SearchResult } from '../../types/search';
@@ -33,19 +34,21 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
   useEffect(() => {
     let cancelled = false;
     const guestToken = loadGuestToken(roomId);
-    if (guestToken === null) {
+    const hostToken = loadHostToken(roomId);
+    const tokens = guestToken !== null ? { guestToken } : hostToken !== null ? { hostToken } : null;
+    if (tokens === null) {
       return;
     }
 
     void api
-      .invoke<PopularResponse>('youtube-popular', { roomId }, { guestToken })
+      .invoke<PopularResponse>('youtube-popular', { roomId }, tokens)
       .then((response) => {
         if (!cancelled && response.available === true) {
           setSongs(response.results ?? []);
         }
       })
       .catch(() => {
-        // Search and the paste field below still work without the chart.
+        // The chart is optional; search and the library still work without it.
       });
 
     return () => {

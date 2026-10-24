@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import { ArrowLeftIcon, KeyboardIcon, QrCodeIcon } from '@phosphor-icons/react';
+import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
+import { KeyboardIcon } from '@phosphor-icons/react/dist/csr/Keyboard';
+import { QrCodeIcon } from '@phosphor-icons/react/dist/csr/QrCode';
 import jsQR from 'jsqr';
 import { roomCodeFromScan } from './roomCodeFromScan';
 import { Logo } from '../../ui';

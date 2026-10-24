@@ -1,12 +1,10 @@
 import { useCallback, useRef, useState } from 'react';
 import { Link, useNavigate, useSearchParams } from 'react-router-dom';
-import {
-  ArrowRightIcon,
-  ListBulletsIcon,
-  MicrophoneStageIcon,
-  PlusIcon,
-  QueueIcon,
-} from '@phosphor-icons/react';
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { ListBulletsIcon } from '@phosphor-icons/react/dist/csr/ListBullets';
+import { MicrophoneStageIcon } from '@phosphor-icons/react/dist/csr/MicrophoneStage';
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
 import { useHostRoom } from './useHostRoom';
 import LiveNowPlayingCard from '../features/queue/LiveNowPlayingCard';
 import { UpNextList } from '../features/queue/QueueRows';
@@ -15,6 +13,7 @@ import PopularSongs from '../features/queue/PopularSongs';
 import InviteCard from '../features/rooms/InviteCard';
 import { queueSummary } from '../lib/format';
 import { Button, Chip } from '../ui';
+import { scrollToElement } from '../features/queue/queueAnchor';
 
 export default function HostDiscoverPage() {
   const {
@@ -42,7 +41,7 @@ export default function HostDiscoverPage() {
   const players = roster.filter((member) => member.role === 'guest').length;
 
   const focusSearch = useCallback(() => {
-    searchRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    scrollToElement(searchRef.current, 'center');
     window.setTimeout(() => {
       document.getElementById('song-search')?.focus();
     }, 80);

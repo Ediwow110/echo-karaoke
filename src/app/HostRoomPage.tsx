@@ -1,13 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import {
-  ArrowsOutIcon,
-  SignOutIcon,
-  SlidersHorizontalIcon,
-} from '@phosphor-icons/react';
+import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
+import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
+import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import {
+  removeRoomMember,
   sendHostCommand,
   type HostAction,
 } from '../features/rooms/roomApi';
@@ -49,11 +48,19 @@ export default function HostRoomPage() {
   const playedSong = useRef<string | null>(null);
   const rememberedRoom = useRef<string | null>(null);
   const exitSentRef = useRef(false);
-  const exitArmedRef = useRef(false);
+  const exitTimerRef = useRef<number | null>(null);
+  const wasLiveRef = useRef(false);
+  const lastAutoPlayKey = useRef<string | null>(null);
 
   useEffect(() => {
+    // A cleanup that is immediately followed by the next setup is the
+    // StrictMode development probe. The deferred pause lets that setup cancel
+    // it, while a real unmount has no next setup and still pauses the room.
+    if (exitTimerRef.current !== null) {
+      window.clearTimeout(exitTimerRef.current);
+      exitTimerRef.current = null;
+    }
     exitSentRef.current = false;
-    exitArmedRef.current = false;
     const pauseOnExit = (options?: { keepalive?: boolean }): void => {
       if (exitSentRef.current) {
         return;
@@ -65,17 +72,12 @@ export default function HostRoomPage() {
     };
     const onPageHide = (): void => pauseOnExit({ keepalive: true });
     window.addEventListener('pagehide', onPageHide);
-    // StrictMode runs an effect probe immediately; arm the unmount pause only
-    // after that cycle so opening a playing room does not pause it.
-    const armTimer = window.setTimeout(() => {
-      exitArmedRef.current = true;
-    }, 0);
     return () => {
-      window.clearTimeout(armTimer);
       window.removeEventListener('pagehide', onPageHide);
-      if (exitArmedRef.current) {
+      exitTimerRef.current = window.setTimeout(() => {
+        exitTimerRef.current = null;
         pauseOnExit();
-      }
+      }, 0);
     };
   }, [api, roomId]);
 
@@ -85,6 +87,14 @@ export default function HostRoomPage() {
 
   const room = data !== null && data.status === 'live' ? data.room : undefined;
   const live = data !== null && data.status === 'live' && room !== undefined;
+
+  useEffect(() => {
+    if (wasLiveRef.current && !live) {
+      void sendPlaybackCommand(api, roomId, 'pause').catch(() => undefined);
+    }
+    wasLiveRef.current = live;
+  }, [api, live, roomId]);
+
   const queue = useMemo(() => {
     if (!live) return [];
     return [...(data.queue ?? [])].sort((a, b) => a.position - b.position);
@@ -97,9 +107,9 @@ export default function HostRoomPage() {
   }, [data, live, queue]);
   const upNext = useMemo(() => queue.filter((song) => song.status !== 'playing'), [queue]);
   const roster = live ? (data.roster ?? []) : [];
-  const hostName = roster.find((member) => member.role === 'host')?.displayName
-    ?? getStoredProfileName()
-    ?? 'Host';
+  const hostName = roster.find((member) => member.role === 'host')?.displayName?.trim()
+    || getStoredProfileName()
+    || 'Host';
   const roomName = room?.name ?? 'Karaoke room';
   const code = room?.code ?? '';
   const joinUrl = code.length > 0 ? buildJoinUrl(window.location.origin, code) : '';
@@ -183,6 +193,16 @@ export default function HostRoomPage() {
     }
   }, [api, notify, refresh, roomId]);
 
+  const removeMember = useCallback(async (memberId: string): Promise<void> => {
+    try {
+      await removeRoomMember(api, roomId, memberId);
+      await refresh();
+      notify('Guest removed.', 'Their queued songs and votes were removed too.', 'info');
+    } catch (caught) {
+      notify('The guest could not be removed.', caught instanceof Error ? caught.message : undefined, 'error');
+    }
+  }, [api, notify, refresh, roomId]);
+
   const endRoom = useCallback(async (): Promise<void> => {
     try {
       await sendHostCommand(api, roomId, 'end');
@@ -260,6 +280,25 @@ export default function HostRoomPage() {
     };
   }, [roomName]);
 
+  useEffect(() => {
+    if (!live) {
+      lastAutoPlayKey.current = null;
+      return;
+    }
+    if (data.playback?.isPlaying === true) return;
+    if (data.playback?.currentVideoId !== null) return;
+    if (queue.length === 0) {
+      lastAutoPlayKey.current = null;
+      return;
+    }
+    // One automatic attempt per new head of a stopped queue. A failed attempt
+    // leaves the visible Start playback control instead of retrying forever.
+    const key = queue[0].songId;
+    if (lastAutoPlayKey.current === key) return;
+    lastAutoPlayKey.current = key;
+    void runPlayback('play');
+  }, [live, data?.playback, queue, runPlayback]);
+
   if (loading) {
     return (
       <main className="min-h-dvh bg-graphite px-4 py-7 text-ink lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
@@ -304,7 +343,18 @@ export default function HostRoomPage() {
   }
 
   if (!live || room === undefined) {
-    return null;
+    return (
+      <main className="grid min-h-dvh place-items-center bg-graphite px-4 text-ink">
+        <div className="w-full max-w-[30rem] rounded-panel border border-line bg-surface p-6">
+          <Logo size="sm" />
+          <h1 className="mt-6 font-display text-[1.9rem] font-bold tracking-[-0.02em]">Room unavailable.</h1>
+          <p role="status" className="mt-2 text-[0.8125rem] leading-[1.6] text-ink-2">
+            This room could not be loaded. It may have ended or been cleaned up.
+          </p>
+          <Button variant="primary" size="md" className="mt-5" onClick={() => navigate('/')}>Back home</Button>
+        </div>
+      </main>
+    );
   }
 
   const stageRoute = location.pathname.endsWith('/host/stage');
@@ -331,6 +381,7 @@ export default function HostRoomPage() {
     next,
     removeSong,
     reorderSong,
+    removeMember,
     endRoom,
   };
 
@@ -378,7 +429,7 @@ export default function HostRoomPage() {
           hostName={hostName}
         />
         <div className="min-w-0 flex-1">
-          <header className="border-b border-line bg-graphite/95 backdrop-blur">
+          <header className="relative z-30 border-b border-line bg-graphite/95 backdrop-blur">
             <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
                 <Link to="/" className="lg:hidden" aria-label="ECHO, create a room">
@@ -416,7 +467,7 @@ export default function HostRoomPage() {
                 </Link>
                 <IconButton
                   icon={<SignOutIcon size={17} weight="regular" />}
-                  label="Leave host screen"
+                  label="Back to home"
                   tone="ghost"
                   size="sm"
                   onClick={() => navigate('/')}

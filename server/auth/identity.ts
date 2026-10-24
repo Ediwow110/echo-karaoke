@@ -1,7 +1,20 @@
-import { fetchJwks } from './jwks.js';
+import { fetchJwks, type JwksSource } from './jwks.js';
 import { resolveBaseUrl } from './origins.js';
 
 export type VerifiedIdentity = { userId: string; isAnonymous: boolean };
+
+// Use the same public-key endpoint in-process, avoiding a nested serverless
+// invocation. Keep a stable loader identity for the JWKS cache.
+const localJwks = async () => {
+  const { auth } = await import('./auth.js');
+  return auth.api.getJwks();
+};
+
+// An unknown kid normally means a key rotated. It must not become one database
+// read per request when a caller sends random values, so forced refreshes are
+// rate-limited. A genuinely rotated key is picked up within this window.
+const FORCED_REFRESH_COOLDOWN_MS = 30_000;
+let lastForcedRefreshAt = 0;
 
 export function jwksUrl(env: Record<string, string | undefined> = process.env): string {
   return resolveBaseUrl(env) + '/api/auth/jwks';
@@ -21,7 +34,7 @@ function decodePart(part: string): Record<string, unknown> {
 
 export async function verifyBearerToken(
   token: string,
-  jwksUrl: string,
+  source: JwksSource,
   options: { isAnonymous?: boolean } = {},
 ): Promise<VerifiedIdentity> {
   const parts = token.split('.');
@@ -49,10 +62,11 @@ export async function verifyBearerToken(
     throw new Error('the token has expired');
   }
 
-  let key = (await fetchJwks(jwksUrl)).find((entry) => entry.kid === header.kid);
-  if (key === undefined) {
+  let key = (await fetchJwks(source)).find((entry) => entry.kid === header.kid);
+  if (key === undefined && Date.now() - lastForcedRefreshAt >= FORCED_REFRESH_COOLDOWN_MS) {
     // A rotated key set must not wait out the ten-minute cache.
-    key = (await fetchJwks(jwksUrl, { force: true })).find((entry) => entry.kid === header.kid);
+    lastForcedRefreshAt = Date.now();
+    key = (await fetchJwks(source, { force: true })).find((entry) => entry.kid === header.kid);
   }
   if (key === undefined) {
     throw new Error('the token was signed with an unknown key');
@@ -83,6 +97,6 @@ export async function requireAnonymousCaller(
     throw new Error('a signed-in session is required');
   }
   const token = header.slice('bearer '.length).trim();
-  const identity = await verifyBearerToken(token, jwksUrl());
+  const identity = await verifyBearerToken(token, localJwks);
   return { userId: identity.userId, accessToken: token };
 }

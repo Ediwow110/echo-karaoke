@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowCounterClockwiseIcon,
-  ArrowClockwiseIcon,
-  ArrowsInIcon,
-  ArrowsOutIcon,
-  PauseIcon,
-  PlayIcon,
-  SkipForwardIcon,
-  SpeakerHighIcon,
-} from '@phosphor-icons/react';
+import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
+import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { ArrowsInIcon } from '@phosphor-icons/react/dist/csr/ArrowsIn';
+import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
+import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
+import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
+import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
+import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
 import { useHostRoom } from './useHostRoom';
 import { useHostPlayer } from '../features/playback/useHostPlayer';
 import InviteCard from '../features/rooms/InviteCard';
@@ -119,7 +117,7 @@ export default function HostPartyPage() {
         <div className="flex items-center gap-2">
           {connection === 'offline' ? <Chip tone="gold">Reconnecting</Chip> : null}
           <Button variant="secondary" size="sm" icon={<ArrowsInIcon size={14} />} onClick={exit}>
-            Exit full screen
+            Leave party view
           </Button>
         </div>
       </header>

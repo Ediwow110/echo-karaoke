@@ -1,5 +1,14 @@
-import { describe, expect, it } from 'vitest';
+import { generateKeyPairSync, sign } from 'node:crypto';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { jwksUrl, requireAnonymousCaller, verifyBearerToken } from '../../server/auth/identity';
+
+const { getJwks } = vi.hoisted(() => ({ getJwks: vi.fn() }));
+vi.mock('../../server/auth/auth', () => ({ auth: { api: { getJwks } } }));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+  vi.clearAllMocks();
+});
 
 const JWKS_URL = 'http://127.0.0.1:9/jwks';
 
@@ -12,6 +21,65 @@ function jwt(header: object, payload: object, signature = 'fake-signature'): str
 }
 
 describe('bearer token verification', () => {
+  it('verifies signed callers using local public keys without an HTTP self-fetch', async () => {
+    const { privateKey, publicKey } = generateKeyPairSync('ed25519');
+    const keys = [{ ...publicKey.export({ format: 'jwk' }), kid: 'local-key' }];
+    getJwks.mockResolvedValue({ keys });
+    const fetchSpy = vi.fn(() => { throw new Error('HTTP key lookup must not run'); });
+    vi.stubGlobal('fetch', fetchSpy);
+    const unsigned = jwt(
+      { alg: 'EdDSA', kid: 'local-key' },
+      { sub: 'user-1', isAnonymous: true, exp: Math.floor(Date.now() / 1000) + 60 },
+    ).split('.').slice(0, 2).join('.');
+    const signature = sign(null, Buffer.from(unsigned), privateKey);
+    const token = `${unsigned}.${signature.toString('base64url')}`;
+    const request = new Request('http://untrusted.example/api/host-room-read', {
+      headers: { authorization: `Bearer ${token}` },
+    });
+
+    await expect(requireAnonymousCaller(request))
+      .resolves.toEqual({ userId: 'user-1', accessToken: token });
+    expect(getJwks).toHaveBeenCalledTimes(1);
+    expect(fetchSpy).not.toHaveBeenCalled();
+
+    signature[0] ^= 1;
+    const tampered = `${unsigned}.${signature.toString('base64url')}`;
+    await expect(verifyBearerToken(tampered, async () => ({ keys })))
+      .rejects.toThrow('the token signature does not verify');
+  });
+
+  it('rejects expired tokens before loading keys', async () => {
+    const token = jwt(
+      { alg: 'EdDSA', kid: 'expired' },
+      { sub: 'user-1', isAnonymous: true, exp: Math.floor(Date.now() / 1000) - 1 },
+    );
+    await expect(verifyBearerToken(token, JWKS_URL)).rejects.toThrow('the token has expired');
+  });
+
+  it('refreshes cached local public keys when a signed token uses a rotated key', async () => {
+    const first = generateKeyPairSync('ed25519');
+    const second = generateKeyPairSync('ed25519');
+    let keys = [{ ...first.publicKey.export({ format: 'jwk' }), kid: 'first' }];
+    const source = vi.fn(async () => ({ keys }));
+    const signedToken = (kid: string, privateKey: typeof first.privateKey) => {
+      const unsigned = jwt(
+        { alg: 'EdDSA', kid },
+        { sub: 'user-1', isAnonymous: true, exp: Math.floor(Date.now() / 1000) + 60 },
+      ).split('.').slice(0, 2).join('.');
+      return `${unsigned}.${sign(null, Buffer.from(unsigned), privateKey).toString('base64url')}`;
+    };
+
+    await expect(verifyBearerToken(signedToken('first', first.privateKey), source))
+      .resolves.toEqual({ userId: 'user-1', isAnonymous: true });
+    keys = [{ ...second.publicKey.export({ format: 'jwk' }), kid: 'second' }];
+    await expect(verifyBearerToken(signedToken('second', second.privateKey), source))
+      .resolves.toEqual({ userId: 'user-1', isAnonymous: true });
+    expect(source).toHaveBeenCalledTimes(2);
+
+    await expect(verifyBearerToken(signedToken('unknown', second.privateKey), source))
+      .rejects.toThrow('the token was signed with an unknown key');
+  });
+
   it('rejects a token that is not a well formed JWT', async () => {
     await expect(verifyBearerToken('not-a-token', JWKS_URL)).rejects.toThrow(/token/i);
   });

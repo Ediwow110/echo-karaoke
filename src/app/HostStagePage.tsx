@@ -1,18 +1,16 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowCounterClockwiseIcon,
-  ArrowLeftIcon,
-  ArrowClockwiseIcon,
-  ArrowsOutIcon,
-  HeartIcon,
-  PauseIcon,
-  PlayIcon,
-  QueueIcon,
-  SignOutIcon,
-  SkipForwardIcon,
-  SpeakerHighIcon,
-} from '@phosphor-icons/react';
+import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
+import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
+import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
+import { HeartIcon } from '@phosphor-icons/react/dist/csr/Heart';
+import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
+import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
+import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
+import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
+import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
+import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
 import { useHostRoom } from './useHostRoom';
 import { useHostPlayer } from '../features/playback/useHostPlayer';
 import { UpNextList } from '../features/queue/QueueRows';

@@ -1,14 +1,12 @@
 import { useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
-import {
-  ArrowRightIcon,
-  KeyIcon,
-  MicrophoneStageIcon,
-  MonitorPlayIcon,
-  PlusIcon,
-  QrCodeIcon,
-  SlidersHorizontalIcon,
-} from '@phosphor-icons/react';
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
+import { MicrophoneStageIcon } from '@phosphor-icons/react/dist/csr/MicrophoneStage';
+import { MonitorPlayIcon } from '@phosphor-icons/react/dist/csr/MonitorPlay';
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { QrCodeIcon } from '@phosphor-icons/react/dist/csr/QrCode';
+import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { useRoomApi } from './RoomApiProvider';
 import { createRoom, joinRoom } from '../features/rooms/roomApi';
 import { isValidRoomCode, normalizeRoomCode } from '../features/rooms/roomCode';
@@ -36,7 +34,9 @@ function hostNameDefault(): string {
 export default function HomePage() {
   const api = useRoomApi();
   const navigate = useNavigate();
-  const wide = useMediaQuery('(min-width: 1024px)');
+  // A screen is wide only when both edges reach 640px. The shorter edge, not
+  // the width alone, decides whether this device is a phone remote.
+  const wide = useMediaQuery('(min-width: 640px) and (min-height: 640px)');
   const [mode, setMode] = useState<'join' | 'host'>('join');
   const [roomName, setRoomName] = useState('');
   const [hostName, setHostName] = useState(hostNameDefault);
@@ -348,7 +348,7 @@ export default function HomePage() {
               Create room
             </Button>
             <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
-              Next: search for your first song, start YouTube playback and share your room QR. Nothing plays until you start it.
+              Next: search for your first song, start YouTube playback and share your room QR. The host screen owns the music.
             </p>
             {error === null ? null : (
               <p role="alert" className="mt-3 rounded-media border border-danger/30 bg-danger-soft/50 px-3.5 py-2.5 text-[0.8125rem] text-danger">

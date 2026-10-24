@@ -1,12 +1,11 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import {
-  DoorOpenIcon,
-  LockKeyIcon,
-  ShieldCheckIcon,
-  SignOutIcon,
-  UsersThreeIcon,
-} from '@phosphor-icons/react';
+import { DoorOpenIcon } from '@phosphor-icons/react/dist/csr/DoorOpen';
+import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
+import { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck';
+import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
+import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
+import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { useHostRoom } from './useHostRoom';
 import InviteCard from '../features/rooms/InviteCard';
 import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
@@ -23,12 +22,24 @@ export default function HostSettingsPage() {
     connection,
     runHost,
     endRoom,
+    removeMember,
   } = useHostRoom();
   const navigate = useNavigate();
   const [pending, setPending] = useState<'add' | 'playback' | null>(null);
+  const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
   const offline = connection === 'offline';
+
+  async function removeGuest(memberId: string): Promise<void> {
+    if (removingId !== null) return;
+    setRemovingId(memberId);
+    try {
+      await removeMember(memberId);
+    } finally {
+      setRemovingId(null);
+    }
+  }
 
   async function setGuestAdds(next: boolean): Promise<void> {
     if (pending !== null) return;
@@ -149,6 +160,15 @@ export default function HostSettingsPage() {
                     </p>
                   </div>
                   <span className={['size-1.5 rounded-full', member.online ? 'bg-live' : 'bg-ink-3'].join(' ')} aria-label={member.online ? 'Online' : 'Away'} />
+                  <button
+                    type="button"
+                    onClick={() => void removeGuest(member.memberId)}
+                    disabled={offline || removingId !== null}
+                    aria-label={'Remove ' + member.displayName + ' from the room'}
+                    className="grid size-11 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-danger-soft hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-35"
+                  >
+                    <XIcon size={15} weight="bold" aria-hidden="true" />
+                  </button>
                 </li>
               ))}
             </ul>
@@ -158,7 +178,7 @@ export default function HostSettingsPage() {
               </p>
             ) : null}
             <p className="mt-4 border-t border-line pt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
-              Guests keep their name and queue while they stay in the room. Skipping and moderation stay with you.
+              Guests keep their name and queue while they stay in the room. Remove a guest to free their slot and their songs. Skipping and moderation stay with you.
             </p>
           </section>
 

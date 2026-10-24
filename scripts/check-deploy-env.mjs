@@ -18,6 +18,58 @@ function checkPublicEnvironment(env, errors) {
   }
 }
 
+function checkBackend(env, errors) {
+  const secret = String(env.BETTER_AUTH_SECRET ?? '').trim();
+  if (secret.length < 32) {
+    errors.push('BETTER_AUTH_SECRET must contain at least 32 characters.');
+  }
+  const isPreview = env.VERCEL_ENV === 'preview';
+  const required = isPreview
+    ? ['PREVIEW_DATABASE_URL', 'PREVIEW_AUTH_DATABASE_URL']
+    : ['DATABASE_URL', 'AUTH_DATABASE_URL'];
+  for (const name of required) {
+    const value = String(env[name] ?? '').trim();
+    if (!CONNECTION_STRING.test(value)) {
+      errors.push(name + ' must be a PostgreSQL connection string'
+        + (isPreview ? ' in Preview.' : '.'));
+    }
+  }
+  if (isPreview) {
+    const identity = (value) => {
+      try {
+        const url = new URL(value);
+        return url.hostname + url.pathname;
+      } catch {
+        return null;
+      }
+    };
+    for (const [previewName, productionName] of [
+      ['PREVIEW_DATABASE_URL', 'DATABASE_URL'],
+      ['PREVIEW_AUTH_DATABASE_URL', 'AUTH_DATABASE_URL'],
+    ]) {
+      const preview = identity(String(env[previewName] ?? '').trim());
+      const production = identity(String(env[productionName] ?? '').trim());
+      if (preview !== null && preview === production) {
+        errors.push(previewName + ' must point at a different database than ' + productionName + '.');
+      }
+    }
+  }
+
+  const budget = (name, minimum, maximum) => {
+    const raw = String(env[name] ?? '').trim();
+    if (raw.length === 0) return;
+    const value = Number(raw);
+    if (!Number.isInteger(value) || value < minimum || value > maximum) {
+      errors.push(name + ' must be an integer between ' + minimum + ' and ' + maximum + '.');
+    }
+  };
+  // search.list has a separate 100-call daily bucket.
+  budget('YOUTUBE_DAILY_SEARCH_BUDGET', 1, 100);
+  budget('YOUTUBE_DAILY_POPULAR_BUDGET', 1, 10000);
+  budget('YOUTUBE_DAILY_METADATA_BUDGET', 1, 100000);
+  budget('YOUTUBE_ROOM_METADATA_BUDGET', 1, 100000);
+}
+
 function checkApiBase(env, origins, errors) {
   const base = String(env.VITE_API_BASE_URL ?? '').trim();
   if (base.length === 0) {
@@ -53,6 +105,7 @@ export function checkDeployEnv(env = process.env) {
     .filter((value) => value.length > 0);
 
   checkPublicEnvironment(env, errors);
+  checkBackend(env, errors);
   checkApiBase(env, origins, errors);
 
   if (origins.length === 0) {

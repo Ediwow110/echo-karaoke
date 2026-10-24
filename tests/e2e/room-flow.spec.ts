@@ -1,9 +1,9 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
 
-// These tests drive the real SPA against the local Supabase stack.
-// Start: npx supabase start, npx supabase functions serve, npm run dev
+// These tests drive the real SPA and the same-origin Vercel Function.
+// Start: npx vercel dev, then set E2E_BASE_URL only for a different origin.
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173';
+const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000';
 
 async function createRoom(page: Page, roomName = 'After Hours', hostName = 'Alex'): Promise<{ code: string; joinUrl: string }> {
   await page.goto(BASE + '/');
@@ -34,6 +34,17 @@ async function joinRoom(browser: Browser, code: string, guestName: string, viewp
 
 function roomIdFromUrl(url: string): string {
   return url.split('/room/')[1]?.split(/[/?#]/)[0] ?? '';
+}
+
+async function searchForSong(page: Page) {
+  const search = page.getByLabel('Find a song on YouTube');
+  await expect(search).toBeVisible();
+  await expect(page.getByLabel('Add by YouTube link')).toHaveCount(0);
+  await search.fill('Rick Astley Never Gonna Give You Up');
+  const result = page.getByRole('list', { name: 'Songs', exact: true })
+    .getByRole('listitem').filter({ hasText: /never gonna give you up/i }).first();
+  await expect(result).toBeVisible({ timeout: 20000 });
+  return result.getByRole('button', { name: /^Add /i });
 }
 
 async function undersizedControls(page: Page): Promise<Array<{ label: string; width: number; height: number }>> {
@@ -126,9 +137,10 @@ test('a guest adds a song and the host sees it in the queue', async ({ page, bro
   const guestRoomId = roomIdFromUrl(guest.url());
 
   await guest.getByRole('link', { name: 'Search' }).click();
-  await guest.getByLabel('Paste a YouTube link').fill('https://youtu.be/dQw4w9WgXcQ');
-  await guest.getByRole('button', { name: 'Add to queue' }).click();
-  await expect(guest.getByText(/is in the queue/i)).toBeVisible({ timeout: 20000 });
+  await (await searchForSong(guest)).click();
+  await expect(
+    guest.getByRole('status').filter({ hasText: /never gonna give you up/i })
+  ).toBeVisible({ timeout: 20000 });
 
   await guest.getByRole('link', { name: /queue ·/i }).click();
   await expect(guest.getByRole('list', { name: 'Up next' }).getByText(/never gonna give you up/i)).toBeVisible({ timeout: 15000 });
@@ -155,7 +167,7 @@ test('the host can split request and playback permissions', async ({ page, brows
   await adds.click();
   await expect(guest.getByText(/guest requests are off/i)).toBeVisible({ timeout: 15000 });
   await guest.getByRole('link', { name: 'Search' }).click();
-  await expect(guest.getByRole('button', { name: 'Add to queue' })).toBeDisabled();
+  await expect(await searchForSong(guest)).toBeDisabled();
 
   await page.getByRole('switch', { name: /guests can pause or resume/i }).click();
   await guest.getByRole('link', { name: /queue ·/i }).click();
@@ -217,9 +229,8 @@ test('the phone remote keeps full touch targets and reflows at 200% text', async
 
   const guest = await joinRoom(browser, code, 'Guest Zoe');
   await guest.getByRole('link', { name: 'Search' }).click();
-  await guest.getByLabel('Paste a YouTube link').fill('https://youtu.be/dQw4w9WgXcQ');
-  await guest.getByRole('button', { name: 'Add to queue' }).click();
-  await guest.getByText(/is in the queue/i).waitFor({ timeout: 20000 });
+  await (await searchForSong(guest)).click();
+  await guest.getByText(/never gonna give you up.*added/i).waitFor({ timeout: 20000 });
   await guest.getByRole('link', { name: /queue ·/i }).click();
   await guest.getByRole('list', { name: 'Up next' }).waitFor({ timeout: 15000 });
 

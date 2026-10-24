@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-// The mapper is plain TypeScript, so the unit suite can exercise it directly.
-import { mapSearchResponse } from '../../server/operations/youtube';
+// The mappers are plain TypeScript, so the unit suite can exercise them directly.
+import { mapSearchResponse, mapVideoListResponse } from '../../server/operations/youtube';
 
 function payload(items: unknown[]): unknown {
   return { items };
@@ -70,5 +70,44 @@ describe('youtube search mapping', () => {
     expect(mapSearchResponse(null)).toEqual([]);
     expect(mapSearchResponse({})).toEqual([]);
     expect(mapSearchResponse({ items: 'nope' })).toEqual([]);
+  });
+});
+
+describe('youtube videos.list mapping', () => {
+  it('maps the chart shape where id is a string', () => {
+    const results = mapVideoListResponse(payload([
+      {
+        id: 'dQw4w9WgXcQ',
+        snippet: {
+          title: 'Chart Song &amp; Friends',
+          channelTitle: 'Artist',
+          thumbnails: { high: { url: 'https://img.example/high.jpg' } },
+        },
+      },
+    ]));
+
+    expect(results).toEqual([{
+      videoId: 'dQw4w9WgXcQ',
+      title: 'Chart Song & Friends',
+      channelTitle: 'Artist',
+      thumbnailUrl: 'https://img.example/high.jpg',
+      durationSeconds: null,
+    }]);
+  });
+
+  it('rejects the search shape and malformed chart items', () => {
+    expect(mapVideoListResponse(payload([
+      { id: { videoId: 'abc123XYZ_-' }, snippet: { title: 'Wrong shape' } },
+      { id: 'short', snippet: { title: 'Bad id' } },
+      { id: 'abc123XYZ_-', snippet: {} },
+    ]))).toEqual([]);
+  });
+
+  it('caps chart results at ten', () => {
+    const items = Array.from({ length: 12 }, (_, index) => ({
+      id: 'vid' + String(index).padStart(8, '0'),
+      snippet: { title: 'Song ' + index },
+    }));
+    expect(mapVideoListResponse(payload(items))).toHaveLength(10);
   });
 });

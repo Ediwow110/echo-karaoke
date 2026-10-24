@@ -14,12 +14,12 @@
     "test:db": "supabase test db",
     "verify:deploy": "node scripts/check-deploy-env.mjs",
     "verify:preview": "node scripts/check-preview.mjs",
-    "test:e2e": "playwright test"
+    "test:e2e": "playwright test",
+    "test:e2e:ui": "playwright test --config playwright.ui.config.ts"
   },
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
     "@phosphor-icons/react": "^2.1.10",
-    "@supabase/supabase-js": "^2.118.0",
     "better-auth": "^1.7.12",
     "jsqr": "^1.4.0",
     "pg": "^8.23.1",

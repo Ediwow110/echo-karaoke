@@ -26,16 +26,25 @@ function normalizeRoomCode(value: unknown): string {
   return code;
 }
 
+const UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
 export function requireRoomId(value: unknown): string {
-  if (typeof value !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(value)) {
+  if (typeof value !== 'string' || !UUID.test(value)) {
     throw new HttpError('VALIDATION_ERROR', 400, 'A room identifier is required');
   }
   return value;
 }
 
 export function requireSongId(value: unknown): string {
-  if (typeof value !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(value)) {
+  if (typeof value !== 'string' || !UUID.test(value)) {
     throw new HttpError('VALIDATION_ERROR', 400, 'A song identifier is required');
+  }
+  return value;
+}
+
+export function requireMemberId(value: unknown): string {
+  if (typeof value !== 'string' || !UUID.test(value)) {
+    throw new HttpError('VALIDATION_ERROR', 400, 'A member identifier is required');
   }
   return value;
 }
@@ -48,7 +57,7 @@ export function requireTokenHeader(request: Request, name: string): string {
   return value.trim();
 }
 
-function optionalTokenHeader(request: Request, name: string): string | null {
+export function optionalTokenHeader(request: Request, name: string): string | null {
   const value = request.headers.get(name);
   return value !== null && value.trim().length >= 32 ? value.trim() : null;
 }
@@ -127,6 +136,15 @@ export async function touchMember(request: Request, caller: Caller): Promise<Res
 export async function voteCommand(request: Request, caller: Caller): Promise<Response> {
   const guestToken = requireTokenHeader(request, 'x-room-guest-token');
   const body = await readJsonObject(request);
+  const limit = await callOperation('consume_rate_limit', [
+    caller.userId,
+    'vote',
+    30,
+    60,
+  ]) as { allowed?: boolean };
+  if (limit.allowed !== true) {
+    throw new HttpError('RATE_LIMITED', 429, 'Too many votes. Give it a moment.');
+  }
   const result = await callOperation('vote_toggle', [
     requireRoomId(body.roomId),
     caller.userId,
@@ -175,7 +193,7 @@ export async function playbackReport(request: Request, caller: Caller): Promise<
     }
   }
   if (songId !== undefined && songId !== null
-    && (typeof songId !== 'string' || !/^[0-9a-fA-F-]{36}$/.test(songId))) {
+    && (typeof songId !== 'string' || !UUID.test(songId))) {
     throw new HttpError('VALIDATION_ERROR', 400, 'The playback song is invalid');
   }
 
@@ -203,6 +221,18 @@ export async function hostCommand(request: Request, caller: Caller): Promise<Res
     caller.userId,
     hostToken,
     action,
+  ]);
+  return jsonResponse(result);
+}
+
+export async function removeRoomMember(request: Request, caller: Caller): Promise<Response> {
+  const hostToken = requireTokenHeader(request, 'x-room-host-token');
+  const body = await readJsonObject(request);
+  const result = await callOperation('host_remove_member', [
+    requireRoomId(body.roomId),
+    caller.userId,
+    hostToken,
+    requireMemberId(body.memberId),
   ]);
   return jsonResponse(result);
 }

@@ -1,17 +1,15 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Link, useLocation, useNavigate, useParams } from 'react-router-dom';
-import {
-  ArrowClockwiseIcon,
-  ArrowRightIcon,
-  BellRingingIcon,
-  LockSimpleIcon,
-  MagnifyingGlassIcon,
-  PauseIcon,
-  PlayIcon,
-  QueueIcon,
-  SignOutIcon,
-  SkipForwardIcon,
-} from '@phosphor-icons/react';
+import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
+import { BellRingingIcon } from '@phosphor-icons/react/dist/csr/BellRinging';
+import { LockSimpleIcon } from '@phosphor-icons/react/dist/csr/LockSimple';
+import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
+import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
+import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
+import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
+import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import { sendPlaybackCommand } from '../features/playback/playbackApi';
@@ -62,13 +60,22 @@ export default function GuestRoomPage() {
   const viewer = data?.viewer;
   const room = data?.room;
   const roster = data?.roster ?? [];
-  const hostName = roster.find((member) => member.role === 'host')?.displayName ?? 'Host';
+  const hostEntry = roster.find((member) => member.role === 'host');
+  const hostName = hostEntry?.displayName ?? 'Host';
+  const hostOnline = hostEntry?.online === true;
   const roomName = room?.name ?? 'Karaoke room';
   const code = room?.code ?? '';
   const locked = room?.guestControlLocked === true;
   const playbackLocked = room?.guestPlaybackLocked !== false;
   const offline = connection === 'offline' && data !== null;
   const lastKnownDuration = data?.playback?.durationSeconds ?? nowPlaying?.durationSeconds ?? 0;
+  const rawPlayback = data?.playback;
+  const effectivePlaying = hostOnline && rawPlayback?.isPlaying === true;
+  const playback = rawPlayback === undefined
+    ? undefined
+    : hostOnline
+      ? rawPlayback
+      : { ...rawPlayback, isPlaying: false };
 
   const goTab = useCallback((next: GuestTab) => {
     navigate(next === 'search' ? '/room/' + roomId + '/search' : '/room/' + roomId);
@@ -245,7 +252,9 @@ export default function GuestRoomPage() {
           <p className="eyebrow text-gold">Connection lost</p>
           <h2 className="mt-1 font-display text-[2rem] font-bold leading-[1.03] tracking-[-0.035em]">Finding the room again.</h2>
           <p className="mt-2 text-[0.8125rem] leading-[1.65] text-ink-2">
-            Playback continues on {hostName}'s screen while we reconnect you.
+            {hostOnline
+              ? 'Playback continues on ' + hostName + "'s screen while we reconnect you."
+              : 'The host screen is offline too. Playback is paused until it returns.'}
           </p>
 
           <section className="mt-5 rounded-panel border border-line bg-surface p-4" aria-label="Stale queue">
@@ -283,7 +292,9 @@ export default function GuestRoomPage() {
             ))}
           </div>
           <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
-            Room commands are disabled while offline. The host screen keeps playing.
+            {hostOnline
+              ? 'Room commands are disabled while offline. The host screen keeps playing.'
+              : 'Room commands are disabled while offline. Playback resumes when the host screen returns.'}
           </p>
 
           <Button
@@ -298,7 +309,7 @@ export default function GuestRoomPage() {
             Retry connection
           </Button>
           <div className="mt-4 flex items-center justify-between gap-2 text-[0.75rem]">
-            <Link to={'/join/' + code} className="text-ink-2 hover:text-ink">Use room code instead</Link>
+            <Link to={'/join/' + code} className="inline-flex min-h-11 items-center text-ink-2 hover:text-ink">Use room code instead</Link>
             <span className="font-mono text-[0.6875rem] tracking-[0.06em] text-signal">{formatCode(code)}</span>
           </div>
           <p className="mt-4 text-[0.6875rem] leading-[1.6] text-ink-3">
@@ -329,7 +340,7 @@ export default function GuestRoomPage() {
             <div className="mt-4 flex items-center gap-3 rounded-media border border-line bg-surface px-3 py-2.5">
               <SongArtwork src={nowPlaying.thumbnailUrl} className="h-10 w-10" iconSize={14} />
               <div className="min-w-0 flex-1">
-                <p className="eyebrow text-gold">Playing on host screen</p>
+                <p className="eyebrow text-gold">{hostOnline ? 'Playing on host screen' : 'Host screen offline'}</p>
                 <p className="mt-0.5 truncate text-[0.75rem] text-ink">
                   {nowPlaying.title} · {nowPlaying.channelTitle ?? 'YouTube'}
                 </p>
@@ -369,7 +380,7 @@ export default function GuestRoomPage() {
           <div className="mt-4">
             <NowPlayingCard
               song={nowPlaying}
-              playback={data.playback}
+              playback={playback}
               variant="guest"
               emptyTitle="The stage is quiet."
               emptyDescription="No video is playing yet. Add the first song from Search."
@@ -394,12 +405,12 @@ export default function GuestRoomPage() {
                 <button
                   type="button"
                   onClick={() => void controlPlayback(data.playback?.isPlaying === true ? 'pause' : 'play')}
-                  disabled={playbackLocked || nowPlaying === null || playbackBusy || offline}
-                  aria-label={data.playback?.isPlaying === true ? 'Pause playback' : 'Resume playback'}
+                  disabled={playbackLocked || !hostOnline || nowPlaying === null || playbackBusy || offline}
+                  aria-label={effectivePlaying ? 'Pause playback' : 'Resume playback'}
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface-2 px-2.5 text-[0.6875rem] font-semibold text-ink disabled:pointer-events-none disabled:opacity-35"
                 >
-                  {playbackBusy ? <ArrowClockwiseIcon size={13} className="animate-spin" aria-hidden="true" /> : data.playback?.isPlaying === true ? <PauseIcon size={13} weight="fill" aria-hidden="true" /> : <PlayIcon size={13} weight="fill" aria-hidden="true" />}
-                  {data.playback?.isPlaying === true ? 'Pause' : 'Resume'}
+                  {playbackBusy ? <ArrowClockwiseIcon size={13} className="animate-spin" aria-hidden="true" /> : effectivePlaying ? <PauseIcon size={13} weight="fill" aria-hidden="true" /> : <PlayIcon size={13} weight="fill" aria-hidden="true" />}
+                  {effectivePlaying ? 'Pause' : 'Resume'}
                 </button>
                 <button
                   type="button"
@@ -421,10 +432,19 @@ export default function GuestRoomPage() {
             <div className="mt-3 flex items-start gap-2 rounded-media border border-signal/20 bg-signal-soft/50 px-3.5 py-3">
               <ArrowRightIcon size={14} className="mt-0.5 shrink-0 text-signal" aria-hidden="true" />
               <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
-                <span className="font-semibold text-signal">Automatic advance is on.</span>{' '}
-                {nextSong === null
-                  ? 'The room will wait for the next request when this video ends.'
-                  : 'When the current YouTube video ends, ' + nextSong.title + ' starts automatically on the host screen.'}
+                {hostOnline ? (
+                  <>
+                    <span className="font-semibold text-signal">Automatic advance is on.</span>{' '}
+                    {nextSong === null
+                      ? 'The room will wait for the next request when this video ends.'
+                      : 'When the current YouTube video ends, ' + nextSong.title + ' starts automatically on the host screen.'}
+                  </>
+                ) : (
+                  <>
+                    <span className="font-semibold text-ink">The host screen is offline.</span>{' '}
+                    Playback is paused and will not advance until it returns.
+                  </>
+                )}
               </p>
             </div>
           ) : null}
@@ -456,7 +476,9 @@ export default function GuestRoomPage() {
                   </div>
                 </div>
                 <p className="mt-2.5 text-[0.6875rem] leading-[1.6] text-ink-2">
-                  Get ready for the host screen. Your YouTube video starts there automatically when this song ends.
+                  {hostOnline
+                    ? 'Get ready for the host screen. Your YouTube video starts there automatically when this song ends.'
+                    : 'The host screen is offline. Your song is still next when it returns.'}
                 </p>
               </div>
             </section>

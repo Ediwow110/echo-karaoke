@@ -106,10 +106,24 @@ describe('preview verification', () => {
   });
 
   it('reports a CSP that does not confine the API to the same origin', async () => {
-    const csp = "default-src 'self'; frame-ancestors 'none'; connect-src *";
+    const csp = "default-src 'self'; frame-ancestors 'none'; object-src 'none'; script-src 'self'; connect-src *";
     const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(goodRoutes(csp)) });
 
     expect(result.errors).toContain('The CSP is missing connect-src \'self\'.');
+  });
+
+  it('reports an eval-capable script policy and a zero HSTS lifetime', async () => {
+    const routes = goodRoutes();
+    routes['https://app.example/'].headers['content-security-policy'] = DEFAULT_CSP.replace(
+      "script-src 'self' https://www.youtube.com https://s.ytimg.com",
+      "script-src 'self' 'unsafe-eval'",
+    );
+    routes['https://app.example/'].headers['strict-transport-security'] = 'max-age=0';
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain('The CSP script-src is not restrictive.');
+    expect(result.errors).toContain('Strict-Transport-Security max-age is too short.');
   });
 
   it('reports a database connection string in the HTML', async () => {

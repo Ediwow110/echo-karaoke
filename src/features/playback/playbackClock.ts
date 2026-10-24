@@ -18,6 +18,12 @@ export function estimatePosition(playback: PlaybackWireState | undefined, nowMs 
   if (!Number.isFinite(updated)) {
     return base;
   }
-  const elapsed = Math.max(0, (nowMs - updated) / 1000);
+  const elapsed = (nowMs - updated) / 1000;
+  // A phone clock can be minutes off. Do not turn that skew into a wild
+  // progress position; a plausible report age advances the bar, anything else
+  // holds the server's last position until the next poll.
+  if (!Number.isFinite(elapsed) || elapsed < 0 || elapsed > 60) {
+    return base;
+  }
   return base + elapsed;
 }

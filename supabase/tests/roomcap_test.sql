@@ -42,6 +42,48 @@ select is(
   'guest',
   'an existing guest rejoins at the cap');
 
+update public.members
+set last_seen_at = now() - interval '2 minutes'
+where room_id = (select room_id from cap)
+  and user_id = 'cap-guest-2';
+
+select is(
+  public.join_room('CAPTEST000000001', 'cap-guest-3', 'Guest Three Arrives', repeat('j', 40), 3) ->> 'role',
+  'guest',
+  'an inactive guest frees a room slot');
+
+select throws_ok(
+  format('select public.join_room(%L, %L, %L, %L, 3)', 'CAPTEST000000001', 'cap-guest-2', 'Guest Two Returns', repeat('k', 40)),
+  '22023', 'ROOM_FULL',
+  'a stale guest cannot re-enter a full room');
+
+create temp table cap2 on commit drop as
+select (created ->> 'roomId')::uuid as room_id
+from (
+  select public.create_room(
+    'CAPTEST000000002',
+    'cap-host-2',
+    'Cap Host Two',
+    repeat('l', 40),
+    repeat('n', 40)
+  ) as created
+) s;
+
+select is(
+  public.join_room('CAPTEST000000002', 'cap-guest-7', 'Guest Seven', repeat('p', 40), 2) ->> 'role',
+  'guest',
+  'one guest joins a room capped at two');
+
+update public.members
+set last_seen_at = now() - interval '2 minutes'
+where room_id = (select room_id from cap2)
+  and role = 'host';
+
+select throws_ok(
+  format('select public.join_room(%L, %L, %L, %L, 2)', 'CAPTEST000000002', 'cap-guest-8', 'Guest Eight', repeat('q', 40)),
+  '22023', 'ROOM_FULL',
+  'a stale host still occupies a slot');
+
 select throws_ok(
   format('select public.join_room(%L, %L, %L, %L, 1)', 'CAPTEST000000001', 'cap-guest-4', 'Guest Four', repeat('e', 40)),
   '22023', 'VALIDATION_ERROR',

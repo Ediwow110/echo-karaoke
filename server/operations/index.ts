@@ -1,6 +1,6 @@
 import { requireAnonymousCaller } from '../auth/identity.js';
 import { createRoom } from './createRoom.js';
-import { handleThrown, HttpError, jsonResponse } from './errors.js';
+import { handleThrown, HttpError, jsonResponse, logFailure } from './errors.js';
 import { queueCommand } from './queue.js';
 import {
   hostCommand,
@@ -9,6 +9,7 @@ import {
   playbackReport,
   readRoomGuest,
   readRoomHost,
+  removeRoomMember,
   touchMember,
   voteCommand,
 } from './room.js';
@@ -24,6 +25,7 @@ const OPERATIONS = new Set([
   'playback-command',
   'playback-report',
   'host-command',
+  'host-remove-member',
   'queue-command',
   'youtube-search',
   'youtube-suggest',
@@ -36,12 +38,13 @@ function isAuthFailure(error: unknown): boolean {
 }
 
 export async function handleOperation(request: Request): Promise<Response> {
+  const operation = new URL(request.url).pathname.replace(/^\/api\//, '');
   try {
     if (request.method !== 'POST') {
       throw new HttpError('METHOD_NOT_ALLOWED', 405, 'Use POST');
     }
 
-    const name = new URL(request.url).pathname.replace(/^\/api\//, '');
+    const name = operation;
     if (!OPERATIONS.has(name)) {
       throw new HttpError('NOT_FOUND', 404, 'That operation is not available');
     }
@@ -66,6 +69,8 @@ export async function handleOperation(request: Request): Promise<Response> {
         return await playbackReport(request, caller);
       case 'host-command':
         return await hostCommand(request, caller);
+      case 'host-remove-member':
+        return await removeRoomMember(request, caller);
       case 'queue-command':
         return await queueCommand(request, caller);
       case 'youtube-search':
@@ -78,13 +83,20 @@ export async function handleOperation(request: Request): Promise<Response> {
         throw new HttpError('NOT_IMPLEMENTED', 501, 'That operation is not available');
     }
   } catch (error) {
-    if (error instanceof HttpError) return handleThrown(error);
+    if (error instanceof HttpError) {
+      if (error.status >= 500 || error.status === 401 || error.status === 403) {
+        logFailure(operation, error, error.status, request);
+      }
+      return handleThrown(error);
+    }
     if (isAuthFailure(error)) {
+      logFailure(operation, error, 401, request);
       return jsonResponse(
         { error: { code: 'UNAUTHORIZED', message: 'A signed-in session is required' } },
         401,
       );
     }
+    logFailure(operation, error, 500, request);
     return handleThrown(error);
   }
 }

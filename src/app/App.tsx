@@ -1,6 +1,7 @@
-import { lazy, Suspense } from 'react';
-import { BrowserRouter, Navigate, Route, Routes, useParams } from 'react-router-dom';
+import { lazy, Suspense, useEffect } from 'react';
+import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import HomePage from './HomePage';
+import ErrorBoundary from '../ui/ErrorBoundary';
 
 // The landing screen stays in the entry bundle because it carries the
 // largest contentful paint. Every room screen loads on demand, which keeps
@@ -36,9 +37,53 @@ function GuestRoomRoute() {
   return <GuestRoomPage key={roomId} />;
 }
 
+// A route change should announce the new screen to keyboard and screen-reader
+// users. Lazy routes can take a moment to render, so wait for their heading
+// instead of focusing the loading skeleton that is about to disappear.
+function RouteFocus() {
+  const location = useLocation();
+  useEffect(() => {
+    let disposed = false;
+    let observer: MutationObserver | null = null;
+    let timer = 0;
+    const focusHeading = (): boolean => {
+      const heading = document.querySelector<HTMLElement>('main h1, main h2');
+      if (heading === null) return false;
+      heading.setAttribute('tabindex', '-1');
+      heading.setAttribute('data-route-focus', 'true');
+      heading.focus({ preventScroll: true });
+      return true;
+    };
+    if (focusHeading()) {
+      return () => undefined;
+    }
+    observer = new MutationObserver(() => {
+      if (disposed) return;
+      if (focusHeading()) {
+        observer?.disconnect();
+        observer = null;
+        window.clearTimeout(timer);
+      }
+    });
+    observer.observe(document.body, { childList: true, subtree: true });
+    timer = window.setTimeout(() => {
+      observer?.disconnect();
+      observer = null;
+    }, 3000);
+    return () => {
+      disposed = true;
+      observer?.disconnect();
+      window.clearTimeout(timer);
+    };
+  }, [location.pathname]);
+  return null;
+}
+
 export default function App() {
   return (
     <BrowserRouter>
+      <RouteFocus />
+      <ErrorBoundary>
       <Suspense
         fallback={
           <main className="min-h-dvh bg-graphite px-4 py-6 text-ink sm:px-6">
@@ -76,6 +121,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>
+      </ErrorBoundary>
     </BrowserRouter>
   );
 }

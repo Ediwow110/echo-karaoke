@@ -135,3 +135,15 @@ export async function sendHostCommand<T>(
   }
   return api.invoke<T>('host-command', { roomId, action }, { hostToken });
 }
+
+export async function removeRoomMember(
+  api: EdgeApi,
+  roomId: string,
+  memberId: string,
+): Promise<void> {
+  const hostToken = loadHostToken(roomId);
+  if (hostToken === null) {
+    throw new Error('This browser has no host pass for the room.');
+  }
+  await api.invoke('host-remove-member', { roomId, memberId }, { hostToken });
+}

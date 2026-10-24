@@ -1,11 +1,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import {
-  ArrowsOutIcon,
-  CornersInIcon,
-  PlayIcon,
-  SpinnerGapIcon,
-  WarningCircleIcon,
-} from '@phosphor-icons/react';
+import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
+import { CornersInIcon } from '@phosphor-icons/react/dist/csr/CornersIn';
+import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
+import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
+import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
 import type { PlaybackState } from './playbackApi';
 import { youtubePlayerFactory } from './youtubeIframe';
 import { HostPlayerContext, type HostPlayerValue } from './useHostPlayer';
@@ -84,6 +82,13 @@ export default function HostPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(volumeRef.current);
   const [fullscreen, setFullscreen] = useState(false);
+  const [isLg, setIsLg] = useState(typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
+  useEffect(() => {
+    const mq = window.matchMedia('(min-width: 1024px)');
+    const handler = () => setIsLg(mq.matches);
+    mq.addEventListener('change', handler);
+    return () => mq.removeEventListener('change', handler);
+  }, []);
 
   onNextRef.current = onNext;
   onReportRef.current = onReport;
@@ -336,17 +341,34 @@ export default function HostPlayer({
     }
     const measure = (): void => {
       const box = element.getBoundingClientRect();
-      setRect({ top: box.top, left: box.left, width: box.width, height: box.height });
+      const next = { top: box.top, left: box.left, width: box.width, height: box.height };
+      setRect((current) => (
+        current.top === next.top
+        && current.left === next.left
+        && current.width === next.width
+        && current.height === next.height
+          ? current
+          : next
+      ));
+    };
+    let frame = 0;
+    const schedule = (): void => {
+      if (frame !== 0) return;
+      frame = window.requestAnimationFrame(() => {
+        frame = 0;
+        measure();
+      });
     };
     measure();
-    const observer = new ResizeObserver(measure);
+    const observer = new ResizeObserver(schedule);
     observer.observe(element);
-    window.addEventListener('resize', measure);
-    window.addEventListener('scroll', measure, true);
+    window.addEventListener('resize', schedule);
+    window.addEventListener('scroll', schedule, true);
     slotCleanupRef.current = () => {
       observer.disconnect();
-      window.removeEventListener('resize', measure);
-      window.removeEventListener('scroll', measure, true);
+      if (frame !== 0) window.cancelAnimationFrame(frame);
+      window.removeEventListener('resize', schedule);
+      window.removeEventListener('scroll', schedule, true);
     };
   }, []);
 
@@ -497,9 +519,14 @@ export default function HostPlayer({
     volume,
   ]);
 
-  const layerStyle = slot === null
-    ? { top: 0, left: -10000, width: 320, height: 180, opacity: 0, pointerEvents: 'none' as const }
-    : { top: rect.top, left: rect.left, width: rect.width, height: rect.height, opacity: 1, pointerEvents: 'auto' as const };
+  const isFloatingFrame = slot === null && videoId !== null && isLg;
+  const layerStyle = isFloatingFrame
+    // Keep the frame clear of the host header. The dock already carries the
+    // transport controls; this is only the picture.
+    ? { bottom: 124, right: 16, width: 280, height: 158, opacity: 1, pointerEvents: 'auto' as const }
+    : slot === null
+      ? { top: 0, left: -10000, width: 320, height: 180, opacity: 0, pointerEvents: 'none' as const }
+      : { top: rect.top, left: rect.left, width: rect.width, height: rect.height, opacity: 1, pointerEvents: 'auto' as const };
 
   return (
     <HostPlayerContext.Provider value={value}>
@@ -527,8 +554,8 @@ export default function HostPlayer({
         ref={layerRef}
         data-host-player
         data-stage-visible={slot === null ? 'false' : 'true'}
-        aria-hidden={slot === null ? 'true' : undefined}
-        inert={slot === null}
+        aria-hidden={slot === null && !isFloatingFrame ? 'true' : undefined}
+        inert={slot === null && !isFloatingFrame}
         style={layerStyle}
         className="fixed z-20 overflow-hidden rounded-media bg-graphite-deep"
       >

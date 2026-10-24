@@ -3,7 +3,7 @@ import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/re
 import { createElement } from 'react';
 import SongSearchPanel from '../../src/features/queue/SongSearchPanel';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
-import type { EdgeApi } from '../../src/lib/edgeApi';
+import { RoomApiError, type EdgeApi } from '../../src/lib/edgeApi';
 import type { QueueEntry } from '../../src/features/rooms/useRoomData';
 import '@testing-library/jest-dom/vitest';
 
@@ -14,6 +14,19 @@ const result = {
   channelTitle: 'ABBA',
   thumbnailUrl: null,
   durationSeconds: null,
+};
+const playing: QueueEntry = {
+  songId: 's0',
+  videoId: 'playingSong1',
+  title: 'Current Song',
+  channelTitle: 'ABBA',
+  thumbnailUrl: null,
+  durationSeconds: null,
+  status: 'playing',
+  position: 1,
+  memberId: 'm1',
+  addedBy: 'Alex',
+  voteCount: 0,
 };
 const queued: QueueEntry = {
   songId: 's1',
@@ -42,7 +55,7 @@ function makeApi(available = true): { api: EdgeApi; calls: string[] } {
       if (name === 'youtube-search') {
         return available
           ? { available: true, results: [result] }
-          : { available: false, results: [], message: 'Search is not configured. Paste a YouTube link instead.' };
+          : { available: false, results: [] };
       }
       if (name === 'queue-command') {
         return { ...queued, position: 3 };
@@ -53,7 +66,7 @@ function makeApi(available = true): { api: EdgeApi; calls: string[] } {
   return { api, calls };
 }
 
-function renderPanel(api: EdgeApi, queue: QueueEntry[] = []) {
+function renderPanel(api: EdgeApi, queue: QueueEntry[] = [], variant: 'host' | 'guest' = 'guest') {
   localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass-value');
   return render(
     createElement(RoomApiProvider, {
@@ -61,6 +74,7 @@ function renderPanel(api: EdgeApi, queue: QueueEntry[] = []) {
       children: createElement(SongSearchPanel, {
         roomId,
         queue,
+        variant,
         onAdded: () => undefined,
         onOpenQueue: () => undefined,
       }),
@@ -73,12 +87,37 @@ async function search(term = 'dancing queen') {
 }
 
 describe('song search panel', () => {
+  it.each(['host', 'guest'] as const)('offers search without a paste-link form for %s', async (variant) => {
+    const { api } = makeApi();
+    renderPanel(api, [], variant);
+
+    expect(screen.getByLabelText(/find a song on youtube/i)).toBeInTheDocument();
+    expect(screen.queryByRole('form', { name: /add a song by youtube link/i })).not.toBeInTheDocument();
+    await search();
+    expect(await screen.findByRole('button', { name: /^add dancing queen$/i })).toBeEnabled();
+    expect(screen.queryByRole('form', { name: /add a song by youtube link/i })).not.toBeInTheDocument();
+  });
+
+  it('does not run the debounced search twice when Enter is pressed', async () => {
+    const { api, calls } = makeApi();
+    renderPanel(api);
+
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing queen' } });
+    fireEvent.submit(screen.getByRole('search'));
+
+    await waitFor(() => {
+      expect(calls.filter((name) => name === 'youtube-search')).toHaveLength(1);
+    });
+    await new Promise((resolve) => window.setTimeout(resolve, 500));
+    expect(calls.filter((name) => name === 'youtube-search')).toHaveLength(1);
+  });
+
   it('searches as the singer types and adds a song', async () => {
     const { api, calls } = makeApi();
     renderPanel(api);
 
     await search();
-    const add = await screen.findByRole('button', { name: /^add$/i }, { timeout: 4000 });
+    const add = await screen.findByRole('button', { name: /^add dancing queen$/i }, { timeout: 4000 });
     fireEvent.click(add);
 
     await waitFor(() => {
@@ -90,23 +129,43 @@ describe('song search panel', () => {
 
   it('marks a song that is already active as queued and disables adding it', async () => {
     const { api, calls } = makeApi();
-    renderPanel(api, [queued]);
+    renderPanel(api, [playing, queued]);
 
     await search();
 
-    expect(await screen.findByText(/already in queue · #2/i)).toBeInTheDocument();
-    const added = screen.getByRole('button', { name: /added/i });
+    expect(await screen.findByText(/already in queue · #1/i)).toBeInTheDocument();
+    const added = screen.getByRole('button', { name: /already in the queue/i });
     expect(added).toBeDisabled();
     expect(calls).not.toContain('queue-command');
   });
 
-  it('shows the honest fallback when YouTube search is not configured', async () => {
-    const { api } = makeApi(false);
+  it('shows the manual fallback when YouTube search is not configured', async () => {
+    const { api, calls } = makeApi(false);
     renderPanel(api);
 
     await search();
 
     expect(await screen.findByText(/search is not configured/i)).toBeInTheDocument();
-    expect(screen.getByLabelText(/paste a youtube link/i)).toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/ask the host to enable youtube search/i);
+    const form = screen.getByRole('form', { name: /add a song by youtube link/i });
+    const input = screen.getByLabelText(/add by youtube link/i);
+    fireEvent.change(input, { target: { value: 'https://youtu.be/dQw4w9WgXcQ' } });
+    fireEvent.click(screen.getByRole('button', { name: /^add link$/i }));
+    await waitFor(() => expect(calls).toContain('queue-command'));
+    expect(form).toBeInTheDocument();
+  });
+
+  it('offers retry instead of pasting a link when search is unreachable', async () => {
+    const api: EdgeApi = {
+      invoke: (async () => {
+        throw new RoomApiError('NETWORK_ERROR', 0, 'Network failed');
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderPanel(api);
+    await search();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('YouTube search is unreachable right now. Try again.');
+    expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
+    expect(screen.queryByLabelText(/paste a youtube link/i)).not.toBeInTheDocument();
   });
 });

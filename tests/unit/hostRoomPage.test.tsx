@@ -1,4 +1,4 @@
-import { afterEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
@@ -27,9 +27,19 @@ vi.mock('../../src/features/playback/youtubeIframe', () => ({
 
 const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
 
+beforeEach(() => {
+  vi.stubGlobal('matchMedia', vi.fn(() => ({
+    matches: false,
+    media: '',
+    addEventListener: () => undefined,
+    removeEventListener: () => undefined,
+  })));
+});
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.unstubAllGlobals();
 });
 
 const liveRoom = {
@@ -164,6 +174,19 @@ describe('host room workspace', () => {
     expect(screen.getByRole('button', { name: /leave & end room/i })).toBeInTheDocument();
   });
 
+  it('removes a guest and their queue from settings', async () => {
+    const { api, calls } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    fireEvent.click(await screen.findByRole('button', { name: /remove jamie from the room/i }));
+    await waitFor(() => {
+      expect(calls).toContainEqual(expect.objectContaining({
+        name: 'host-remove-member',
+        body: expect.objectContaining({ memberId: 'm2' }),
+      }));
+    });
+  });
+
   it('can end the room after confirmation', async () => {
     const { api, calls } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/settings');
@@ -180,7 +203,7 @@ describe('host room workspace', () => {
     const { api } = makeApi();
     renderHost(api);
 
-    fireEvent.click(await screen.findByRole('button', { name: /leave host screen/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /back to home/i }));
 
     expect(await screen.findByText('Back at the start')).toBeInTheDocument();
     expect(localStorage.getItem('karaoke.host.' + roomId)).toBe('host-pass-value');
@@ -195,7 +218,7 @@ describe('host room workspace', () => {
     renderHost(api);
 
     expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /leave host screen/i }));
+    fireEvent.click(screen.getByRole('button', { name: /back to home/i }));
 
     expect(await screen.findByText('Back at the start')).toBeInTheDocument();
     await waitFor(() => {
@@ -221,5 +244,49 @@ describe('host room workspace', () => {
       (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'pause',
     );
     expect(pauseCall?.options?.keepalive).toBe(true);
+  });
+
+  it('automatically plays a song added to a stopped queue', async () => {
+    const stoppedRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: false, currentVideoId: null, currentSongId: null },
+      queue: [{ ...liveRoom.queue[1], status: 'queued' }],
+    };
+    const playedCalls: Array<{ name: string; body: unknown }> = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown, _tokens: unknown) => {
+        playedCalls.push({ name, body });
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return stoppedRoom;
+        }
+        if (name === 'playback-command' && (body as { action?: string }).action === 'play') {
+          return { roomId, status: 'live', playback: { ...stoppedRoom.playback, isPlaying: true } };
+        }
+        if (name === 'playback-command') {
+          return { roomId, status: 'live', playback: stoppedRoom.playback };
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderHost(api);
+
+    await waitFor(() => {
+      expect(playedCalls.some(
+        (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
+      )).toBe(true);
+    });
+  });
+
+  it('does not request play when a song is already playing', async () => {
+    const playingRoom = { ...liveRoom, playback: { ...liveRoom.playback, isPlaying: true } };
+    const { api, calls } = makeApi(playingRoom);
+    renderHost(api);
+
+    await waitFor(() => {
+      expect(screen.getByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+    });
+    expect(calls).not.toContainEqual(
+      expect.objectContaining({ name: 'playback-command', body: expect.objectContaining({ action: 'play' }) })
+    );
   });
 });

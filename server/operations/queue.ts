@@ -4,7 +4,13 @@ import { HttpError, jsonResponse } from './errors.js';
 import { fetchVideoMetadata, isValidVideoId } from './metadata.js';
 
 const ACTIONS = new Set(['add', 'remove', 'reorder']);
-const METADATA_DAILY_BUDGET = 1000;
+const DEFAULT_METADATA_DAILY_BUDGET = 5000;
+const DEFAULT_METADATA_ROOM_BUDGET = 500;
+
+function dailyBudget(name: string, fallback: number): number {
+  const raw = Number(process.env[name] ?? String(fallback));
+  return Number.isFinite(raw) && raw >= 1 ? Math.floor(raw) : fallback;
+}
 
 function readCapability(request: Request): { guestToken: string | null; hostToken: string | null } {
   const guest = request.headers.get('x-room-guest-token');
@@ -28,18 +34,14 @@ async function enforceLimit(
   }
 }
 
-async function requireRoomAccess(
-  caller: Caller,
-  roomId: string,
-  capability: { guestToken: string | null; hostToken: string | null },
+async function enforceDaily(
+  name: string,
+  params: unknown[],
+  message: string,
 ): Promise<void> {
-  const access = (capability.hostToken !== null
-    ? await callOperation('host_access_check', [roomId, caller.userId, capability.hostToken])
-    : await callOperation('room_access_check', [roomId, caller.userId, capability.guestToken])) as {
-      status?: string;
-    };
-  if (access.status === 'ended') {
-    throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
+  const result = (await callOperation(name, params)) as { allowed?: boolean };
+  if (result.allowed !== true) {
+    throw new HttpError('LOOKUP_RATE_LIMITED', 429, message);
   }
 }
 
@@ -59,15 +61,36 @@ export async function queueCommand(request: Request, caller: Caller): Promise<Re
       throw new HttpError('VALIDATION_ERROR', 400, 'A valid YouTube video is required');
     }
 
-    await requireRoomAccess(caller, roomId, capability);
+    // Reject locked, duplicate, ended, and over-limit adds before the shared
+    // metadata budget or an outbound oEmbed request is spent.
+    await callOperation('queue_add_preflight', [
+      roomId,
+      caller.userId,
+      capability.guestToken,
+      capability.hostToken,
+      videoId,
+    ]);
     await enforceLimit(
       'consume_rate_limit',
       [caller.userId, 'queue-metadata', 10, 60],
       'Too many song lookups. Give it a moment.',
     );
-    await enforceLimit(
+    await enforceDaily(
       'consume_daily_rate_limit',
-      ['global', 'queue-metadata-day', METADATA_DAILY_BUDGET],
+      [
+        'room:' + roomId,
+        'queue-metadata-day',
+        dailyBudget('YOUTUBE_ROOM_METADATA_BUDGET', DEFAULT_METADATA_ROOM_BUDGET),
+      ],
+      "This room has reached today's song lookup limit. Try again tomorrow.",
+    );
+    await enforceDaily(
+      'consume_daily_rate_limit',
+      [
+        'global',
+        'queue-metadata-day',
+        dailyBudget('YOUTUBE_DAILY_METADATA_BUDGET', DEFAULT_METADATA_DAILY_BUDGET),
+      ],
       'Too many song lookups today. Try again tomorrow.',
     );
 

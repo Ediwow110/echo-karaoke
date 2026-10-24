@@ -4,6 +4,7 @@ export type EdgeFunctionName =
   | 'guest-room-read'
   | 'host-room-read'
   | 'host-command'
+  | 'host-remove-member'
   | 'queue-command'
   | 'youtube-search'
   | 'youtube-suggest'
@@ -96,6 +97,7 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
+          signal: AbortSignal.timeout(10_000),
           ...(options.keepalive === true ? { keepalive: true } : {}),
         });
       } catch {

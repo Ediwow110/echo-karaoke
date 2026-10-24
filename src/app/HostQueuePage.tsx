@@ -1,12 +1,14 @@
 import { useCallback, useRef, useState } from 'react';
 import { Link } from 'react-router-dom';
-import { ListChecksIcon, PlusIcon, SkipForwardIcon } from '@phosphor-icons/react';
+import { ListChecksIcon } from '@phosphor-icons/react/dist/csr/ListChecks';
+import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
+import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { useHostRoom } from './useHostRoom';
 import LiveNowPlayingCard from '../features/queue/LiveNowPlayingCard';
 import { UpNextList } from '../features/queue/QueueRows';
 import SongSearchPanel from '../features/queue/SongSearchPanel';
 import InviteCard from '../features/rooms/InviteCard';
-import { QUEUE_ELEMENT_ID } from '../features/queue/queueAnchor';
+import { QUEUE_ELEMENT_ID, scrollToElement } from '../features/queue/queueAnchor';
 import { queueSummary } from '../lib/format';
 import { Button, Chip } from '../ui';
 
@@ -32,7 +34,7 @@ export default function HostQueuePage() {
   const searchRef = useRef<HTMLDivElement | null>(null);
 
   const focusSearch = useCallback(() => {
-    searchRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    scrollToElement(searchRef.current, 'center');
     window.setTimeout(() => document.getElementById('song-search')?.focus(), 80);
   }, []);
 
@@ -155,7 +157,7 @@ export default function HostQueuePage() {
                 queue={queue}
                 variant="host"
                 onAdded={() => { void refresh(); }}
-                onOpenQueue={() => document.getElementById(QUEUE_ELEMENT_ID)?.scrollIntoView({ behavior: 'smooth', block: 'center' })}
+                onOpenQueue={() => scrollToElement(document.getElementById(QUEUE_ELEMENT_ID), 'center')}
               />
             </div>
           </section>

@@ -60,3 +60,25 @@ export function handleThrown(error: unknown): Response {
     500,
   );
 }
+
+export function logFailure(
+  operation: string,
+  error: unknown,
+  status = 500,
+  request?: Request,
+): void {
+  const code = error instanceof HttpError
+    ? error.code
+    : typeof error === 'object' && error !== null && 'code' in error && typeof error.code === 'string'
+      ? error.code
+      : 'INTERNAL_ERROR';
+  const name = error instanceof Error ? error.name : 'UnknownError';
+  console[status >= 500 ? 'error' : 'warn'](JSON.stringify({
+    level: status >= 500 ? 'error' : 'warn',
+    operation,
+    status,
+    code,
+    name,
+    requestId: request?.headers.get('x-vercel-id') ?? null,
+  }));
+}

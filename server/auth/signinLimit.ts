@@ -1,7 +1,7 @@
 import { createHmac } from 'node:crypto';
 import { operationCall, serviceDatabase } from '../db/client.js';
 import { resolveSignInLimit } from '../operations/limits.js';
-import { jsonResponse } from '../operations/errors.js';
+import { jsonResponse, logFailure } from '../operations/errors.js';
 import { resolveTrustedOrigins } from './origins.js';
 
 const BUCKET = 'anon-sign-in';
@@ -60,7 +60,8 @@ export async function enforceSignInLimit(
     ]);
     const rows = await serviceDatabase().query(call.text, call.params);
     result = (rows[0] as { result?: LimitResult } | undefined)?.result ?? null;
-  } catch {
+  } catch (error) {
+    logFailure('auth/sign-in-limit', error, 503, request);
     return jsonResponse({
       error: {
         code: 'UNAVAILABLE',
@@ -70,6 +71,7 @@ export async function enforceSignInLimit(
   }
 
   if (result === null || typeof result.allowed !== 'boolean') {
+    logFailure('auth/sign-in-limit', new Error('the limiter returned no decision'), 503, request);
     return jsonResponse({
       error: {
         code: 'UNAVAILABLE',

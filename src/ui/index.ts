@@ -14,8 +14,6 @@ export { default as IconButton } from './IconButton';
 export type { IconButtonProps } from './IconButton';
 export { default as Logo } from './Logo';
 export type { LogoProps } from './Logo';
-export { default as Panel } from './Panel';
-export type { PanelProps } from './Panel';
 export { default as QrCode } from './QrCode';
 export type { QrCodeProps } from './QrCode';
 export { default as SongArtwork } from './SongArtwork';

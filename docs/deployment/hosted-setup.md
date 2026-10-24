@@ -1,14 +1,15 @@
 # Hosted Setup Runbook
 
-Date: 2026-10-23
-Status: Deployed and verified at `https://echo-karaoke-mocha.vercel.app` on
-2026-10-23, including the host-heartbeat fix and the abuse controls. The CI workflow
-is green on `master`: verify, database, and integration all passed. Every hosted value
-below is named, never printed.
+Date: 2026-10-24
+Status: `https://echo-karaoke-mocha.vercel.app` was verified on the 2026-10-23 tree.
+The current working tree is uncommitted and includes quota, membership, player, and
+accessibility changes; do not treat the live alias as proof of this tree. Every hosted
+value below is named, never printed.
 
-This runbook takes ECHO from the repository to a deployed, verified site. The local
-gates are already green: 237 unit tests, 243 database assertions against Neon, 7
-operation integration tests, and a production build. This document covers only what a
+This runbook takes ECHO from the repository to a deployed, verified site. On the
+current tree, typecheck, the production build, 264 unit tests, and 6 UI Playwright
+tests pass locally. The pgTAP suite (282 assertions) and the operation integration
+suite (7 tests) pass on a disposable Neon branch. This document covers only what a
 hosted account makes possible.
 
 ## What this procedure produces
@@ -16,7 +17,7 @@ hosted account makes possible.
 - A Neon Postgres database with the full migration chain and the two login roles.
 - A Better Auth service inside the same Vercel Function, with anonymous sessions and
   Ed25519 JWTs.
-- One Vercel Function at `/api/*` that serves auth and the thirteen room operations.
+- One Vercel Function at `/api/*` that serves auth and the fourteen room operations.
 - A production deployment whose browser bundle holds no database credential.
 - A CI workflow that runs the database and operation suites on throwaway Neon branches.
 
@@ -162,9 +163,8 @@ npx vercel dev
 guest link in a second browser, and add a song. The function and the database are both
 local processes; only the database is hosted.
 
-Search and the chart need a YouTube Data API key in the same file. Without one they
-answer "not configured" and paste-a-link still works, so add it only when you want to
-exercise the keyed paths:
+Search and the chart need a YouTube Data API key in the same file. Song entry uses
+the Add buttons in search results, so configure this key to search for and add songs:
 
 ```
 YOUTUBE_API_KEY=your_key_here
@@ -204,40 +204,49 @@ vercel env add YOUTUBE_API_KEY production
 | `ALLOWED_ORIGINS` | `https://echo-karaoke-mocha.vercel.app` |
 | `ROOM_MEMBER_LIMIT` | `50` (allowed 2–500); host plus guests |
 | `ANON_SIGNIN_LIMIT_PER_HOUR` | `120` (allowed 1–1000); per hashed network address |
-| `YOUTUBE_API_KEY` | Optional YouTube Data API v3 key. Without it search and the chart report "not configured" and guests paste links |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key for song search and the chart. Without it these features report "not configured"; search also offers a manual-link fallback |
 | `YOUTUBE_DAILY_SEARCH_BUDGET` | `90` upstream search calls per day across all rooms |
 | `YOUTUBE_DAILY_POPULAR_BUDGET` | `200` upstream chart calls per day |
+| `YOUTUBE_DAILY_METADATA_BUDGET` | `5000` quota-free oEmbed lookups per Pacific day across the deployment |
+| `YOUTUBE_ROOM_METADATA_BUDGET` | `500` quota-free oEmbed lookups per Pacific day per room |
+| `PREVIEW_DATABASE_URL` | Preview-only service URL pointing at a disposable Neon branch |
+| `PREVIEW_AUTH_DATABASE_URL` | Preview-only auth URL pointing at the same branch |
 
 `ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. It is
 not a CORS allowlist any more: the function is same-origin, so no CORS headers are
 needed.
 
-The two abuse limits are optional and have those defaults. The room cap is enforced
-atomically in `join_room` under a room row lock. The sign-in limit is checked before
-Better Auth, uses the first `x-forwarded-for` address, and stores only an
-HMAC-SHA-256 of it. If the limiter store is unavailable, sign-in fails closed with a
-503. Raise `ANON_SIGNIN_LIMIT_PER_HOUR` for a venue network that expects more than 120
-new guests in an hour.
+The two abuse limits are optional and have those defaults. The room cap counts only
+members active in the last 30 seconds and is enforced atomically in `join_room` under
+a room row lock; an inactive guest frees a slot, and the host can remove a guest. The
+sign-in limit is checked before Better Auth, uses the first `x-forwarded-for` address,
+and stores only an HMAC-SHA-256 of it. If the limiter store is unavailable, sign-in
+fails closed with a 503. Raise `ANON_SIGNIN_LIMIT_PER_HOUR` for a venue network that
+expects more than 120 new guests in an hour.
 
-The YouTube budgets are the only defence against a quota blowout, because a single
-`search.list` call costs 100 of the 10,000 units a key gets per day while the chart
-call costs 1. The defaults therefore spend about 9,200 units at full load, and results
-are cached for ten minutes so a popular term bills once. Per-user and per-room limits
-sit in front of them, and the suggest endpoint uses the key-free autocomplete upstream,
-so it never touches the quota. A key with a different daily allowance should change
-`YOUTUBE_DAILY_SEARCH_BUDGET`, not the per-member limits.
+YouTube's current quota model is split. `search.list` has its own bucket of 100 calls
+per day at one unit per call; the chart is `videos.list` and draws one unit from the
+shared 10,000-unit pool. The defaults therefore leave 10 search calls of headroom, and
+searches are cached for ten minutes so a popular term bills once. Per-user, per-room,
+and global limits sit in front of the upstream call. oEmbed metadata is quota-free, but
+the add path still has a per-member minute limit, a 500/day room budget, and a
+5,000/day deployment budget. The add path now runs a SQL preflight before spending
+either budget, and search falls back to manual link entry when it is resting.
 
-Repeat the database, auth secret, and origin variables for the Preview environment.
-Do **not** set `BETTER_AUTH_URL` for Preview; the current deployment host is derived
-from `VERCEL_URL` and trusted automatically. Preview deployments still need the two
-database URLs and the secret, or the function cannot start. `YOUTUBE_API_KEY` is
-optional in both environments: a Preview without it just reports search as not
-configured, which is also how the integration suite keeps its YouTube calls off the
-real quota.
+Preview deployments must not reuse the Production database URLs. Point Preview at a
+Neon branch or a separate preview database, protect the deployment, and keep the
+auth secret compatible with the inherited branch. A different preview secret requires
+deleting the inherited `public.jwks` rows first. The function selects
+`PREVIEW_DATABASE_URL` and `PREVIEW_AUTH_DATABASE_URL` whenever
+`VERCEL_ENV=preview`; the deploy guard refuses a Preview build without both. Do **not**
+set `BETTER_AUTH_URL` for Preview; the current deployment host is derived from
+`VERCEL_URL` and trusted automatically. A Preview without `YOUTUBE_API_KEY` reports
+search as not configured and shows the manual-link fallback.
 
-The guard runs before every build. A missing `ALLOWED_ORIGINS`, a wildcard origin, an
-origin with a path or trailing slash, and any `VITE_*` PostgreSQL URL all stop the
-build.
+The guard runs before every build. It rejects a missing or short
+`BETTER_AUTH_SECRET`, missing PostgreSQL URLs for both roles, a missing or malformed
+`ALLOWED_ORIGINS`, an out-of-range quota budget, a wildcard origin, an origin with a
+path or trailing slash, and any `VITE_*` PostgreSQL URL.
 
 ### Region
 
@@ -312,7 +321,7 @@ The jobs:
 
 1. `verify` runs typecheck, the unit suite, the build, and `npm audit`.
 2. `database` creates a Neon branch through the API, applies the migration chain,
-   runs the 243 pgTAP assertions, and deletes the branch even on failure.
+   runs the pgTAP assertions, and deletes the branch even on failure.
 3. `integration` creates a second branch, applies the chain, deletes the inherited
    `public.jwks` rows so Better Auth generates keys for this run's secret, runs the
    operation suite, and deletes the branch.
@@ -345,20 +354,25 @@ five-minute guarantee; the interval is opportunistic.
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 243/243.
-- [x] `npm run test:integration` reports 7/7 against Neon.
-- [x] `npm test` reports 237 unit tests passing.
-- [x] `npm run build` passes.
-- [x] `vercel deploy --prod` builds with the guard enabled.
-- [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
-- [x] A browser host/guest flow works with a 390px guest viewport.
-- [x] A host heartbeat survives an auth session replacement on the live site.
-- [x] The live sign-in limit returns 429 at the cap and the room limit returns 409.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 282 passing assertions on a fresh branch.
+- [x] `npm run test:integration` passes on the same branch.
+- [x] `npm test` reports 264 passing tests on the current tree.
+- [x] `npm run build` passes on the current tree.
+- [x] `npm run test:e2e:ui` reports 6 passing tests on the current tree.
+- [x] `npm run verify:deploy` passes with the production environment.
+- [ ] `vercel deploy --prod` builds with the guard enabled.
+- [ ] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
+- [ ] A browser host/guest flow works with a 390px guest viewport.
+- [ ] A host heartbeat survives an auth session replacement on the live site.
+- [ ] The live sign-in limit returns 429 at the cap and the room limit returns 409.
 - [ ] A physical phone can scan the camera QR and run the same flow.
-- [x] The CI workflow runs green on `master` after a push.
+- [ ] The CI workflow runs green on `master` after a push.
 
 ## Not covered here
 
-- The YouTube Data API key. Without it, search reports that it is not configured and
-  the paste-a-link path keeps working.
+- The YouTube Data API key. Configure it to use search-based song entry; without it,
+  search and the chart report that they are not configured, and the search panel
+  offers the manual-link fallback.
 - Per-IP sign-in throttling in front of Better Auth.
+- A physical-phone camera run against this tree.
+- A production deployment of this tree; the live alias predates it.
