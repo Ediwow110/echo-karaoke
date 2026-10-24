@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildPopularSearchUrl,
   mapSearchResponse,
+  pickPopularCards,
   selectPopularResults,
 } from '../../server/operations/youtube';
 
@@ -91,7 +92,7 @@ describe('popular karaoke search', () => {
     expect(url.searchParams.get('key')).toBe('test-key');
   });
 
-  it('maps search ids, drops medleys and compilations, and keeps eight cards', () => {
+  it('maps search ids and drops medleys and compilations into a pool', () => {
     const items = [
       { id: { videoId: 'karaoke0001' }, snippet: { title: 'Someone Like You (Karaoke Version)' } },
       { id: { videoId: 'karaoke0002' }, snippet: { title: 'Air Supply Medley (Karaoke Version)' } },
@@ -105,7 +106,7 @@ describe('popular karaoke search', () => {
 
     const results = selectPopularResults({ items });
 
-    expect(results).toHaveLength(8);
+    expect(results).toHaveLength(10);
     expect(results[0].videoId).toBe('karaoke0001');
     expect(results.some((song) => /medley|1 hour|nonstop/i.test(song.title))).toBe(false);
   });
@@ -113,5 +114,30 @@ describe('popular karaoke search', () => {
   it('returns no cards for a malformed payload', () => {
     expect(selectPopularResults(null)).toEqual([]);
     expect(selectPopularResults({ items: 'nope' })).toEqual([]);
+  });
+});
+
+describe('per-screen popular picks', () => {
+  const pool = Array.from({ length: 12 }, (_, index) => ({
+    videoId: 'karaoke2' + String(index).padStart(3, '0'),
+    title: 'Karaoke Pick ' + index,
+    channelTitle: 'Channel',
+    thumbnailUrl: null,
+    durationSeconds: null,
+  }));
+
+  it('serves eight unique cards from a larger pool', () => {
+    const results = pickPopularCards(pool, 8);
+
+    expect(results).toHaveLength(8);
+    expect(new Set(results.map((song) => song.videoId)).size).toBe(8);
+    for (const song of results) {
+      expect(pool).toContain(song);
+    }
+  });
+
+  it('serves the whole pool when it cannot fill a screen', () => {
+    const small = pool.slice(0, 4);
+    expect(pickPopularCards(small, 8)).toEqual(small);
   });
 });

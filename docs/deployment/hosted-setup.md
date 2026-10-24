@@ -228,8 +228,9 @@ YouTube's current quota model is split. `search.list` has its own bucket of 100 
 per day at one unit per call. Both user searches and the karaoke strip use it: the
 defaults are 90 user searches plus 6 strip refreshes, and the deploy guard rejects a
 pair that exceeds 100. User searches are cached for ten minutes; the strip asks for
-embeddable karaoke videos with lyrics, drops medleys and compilations, and caches its
-eight cards for twelve hours. Per-user, per-room, and global limits sit in front of
+embeddable karaoke videos with lyrics, drops medleys and compilations, caches a pool
+of up to twenty for twelve hours, and serves each screen a random eight-song
+selection. Per-user, per-room, and global limits sit in front of
 the upstream call. oEmbed metadata is quota-free, but the add path still has a
 per-member minute limit, a 500/day room budget, and a 5,000/day deployment budget.
 The add path now runs a SQL preflight before spending either budget, and search falls

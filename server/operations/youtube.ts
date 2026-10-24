@@ -24,7 +24,7 @@ const DEFAULT_DAILY_POPULAR_BUDGET = 6;
 const POPULAR_QUERY = 'popular karaoke songs';
 const POPULAR_FETCH_LIMIT = 20;
 const POPULAR_RESULT_LIMIT = 8;
-const POPULAR_CACHE_KEY = '__popular_karaoke_v1';
+const POPULAR_CACHE_KEY = '__popular_karaoke_v2';
 const POPULAR_CACHE_TTL_SECONDS = 12 * 60 * 60;
 const POPULAR_CACHE_TTL_MS = POPULAR_CACHE_TTL_SECONDS * 1000;
 const COMPILATION_PATTERN = /\b(medley|non-?stop|compilation|playlist|full album|1 hour|one hour)\b/i;
@@ -103,8 +103,22 @@ export function buildPopularSearchUrl(apiKey: string): string {
 
 export function selectPopularResults(payload: unknown): SearchResult[] {
   return mapSearchResponse(payload, POPULAR_FETCH_LIMIT)
-    .filter((song) => !COMPILATION_PATTERN.test(song.title))
-    .slice(0, POPULAR_RESULT_LIMIT);
+    .filter((song) => !COMPILATION_PATTERN.test(song.title));
+}
+
+export function pickPopularCards(
+  pool: SearchResult[],
+  limit = POPULAR_RESULT_LIMIT,
+): SearchResult[] {
+  if (pool.length <= limit) {
+    return [...pool];
+  }
+  const shuffled = [...pool];
+  for (let index = shuffled.length - 1; index > 0; index -= 1) {
+    const swap = Math.floor(Math.random() * (index + 1));
+    [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
+  }
+  return shuffled.slice(0, limit);
 }
 
 export function parseSuggestions(payload: unknown): string[] {
@@ -379,13 +393,13 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
   ], 'Karaoke picks are busy. Try again shortly.');
 
   if (popularCached !== null && Date.now() - popularCached.at < POPULAR_CACHE_TTL_MS) {
-    return jsonResponse({ available: true, results: popularCached.results });
+    return jsonResponse({ available: true, results: pickPopularCards(popularCached.results) });
   }
 
   const persisted = await readSearchCache(POPULAR_CACHE_KEY);
   if (persisted !== null && persisted.length > 0) {
     popularCached = { at: Date.now(), results: persisted };
-    return jsonResponse({ available: true, results: persisted });
+    return jsonResponse({ available: true, results: pickPopularCards(persisted) });
   }
 
   const daily = await queryAllowNull('consume_daily_rate_limit', [
@@ -427,12 +441,12 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     throw new HttpError('SEARCH_UNAVAILABLE', 503, 'Karaoke picks returned an unreadable response');
   }
 
-  const results = selectPopularResults(payload);
-  if (results.length > 0) {
-    await writeSearchCache(POPULAR_CACHE_KEY, results, POPULAR_CACHE_TTL_SECONDS);
-    popularCached = { at: Date.now(), results };
+  const pool = selectPopularResults(payload);
+  if (pool.length > 0) {
+    await writeSearchCache(POPULAR_CACHE_KEY, pool, POPULAR_CACHE_TTL_SECONDS);
+    popularCached = { at: Date.now(), results: pool };
   }
-  return jsonResponse({ available: true, results });
+  return jsonResponse({ available: true, results: pickPopularCards(pool) });
 }
 
 async function fetchSuggestions(query: string): Promise<string[]> {
