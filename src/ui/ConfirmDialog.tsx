@@ -77,7 +77,7 @@ export default function ConfirmDialog({
 
   return (
     <div
-      className="fixed inset-0 z-[80] grid place-items-center bg-graphite-deep/75 px-4 backdrop-blur-sm"
+      className="fixed inset-0 z-[80] grid place-items-center bg-graphite-deep/75 px-4 backdrop-blur-sm animate-backdrop-in"
       onPointerDown={(event) => {
         if (event.target === event.currentTarget && !busy) {
           onCancel();
@@ -90,7 +90,7 @@ export default function ConfirmDialog({
         aria-modal="true"
         aria-labelledby="confirm-title"
         aria-describedby="confirm-description"
-        className="w-full max-w-[26rem] rounded-panel border border-line bg-surface p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] animate-console-in"
+        className="w-full max-w-[26rem] rounded-panel border border-line bg-surface p-6 shadow-[0_24px_80px_rgba(0,0,0,0.55)] animate-modal-in"
       >
         <h2 id="confirm-title" className="font-display text-[1.5rem] font-bold tracking-[-0.02em] text-ink">{title}</h2>
         <p id="confirm-description" className="mt-2 text-[0.8125rem] leading-[1.6] text-ink-2">{description}</p>

@@ -140,7 +140,7 @@ export default function HostSettingsPage() {
             </div>
             <ul className="mt-4 divide-y divide-line">
               {host === undefined ? null : (
-                <li className="flex items-center gap-3 py-3 first:pt-0">
+                <li className="stagger-in flex items-center gap-3 py-3 first:pt-0">
                   <Avatar name={host.displayName} size="md" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[0.8125rem] font-semibold text-ink">{host.displayName} {hostName === host.displayName ? '(you)' : ''}</p>
@@ -150,8 +150,12 @@ export default function HostSettingsPage() {
                   <span className="size-1.5 rounded-full bg-live" aria-label="Online" />
                 </li>
               )}
-              {guests.map((member) => (
-                <li key={member.memberId} className="flex items-center gap-3 py-3 last:pb-0">
+              {guests.map((member, index) => (
+                <li
+                  key={member.memberId}
+                  className="stagger-in flex items-center gap-3 py-3 last:pb-0"
+                  style={{ animationDelay: (index + 1) * 40 + 'ms' }}
+                >
                   <Avatar name={member.displayName} size="md" />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[0.8125rem] font-semibold text-ink">{member.displayName}</p>
@@ -165,7 +169,7 @@ export default function HostSettingsPage() {
                     onClick={() => void removeGuest(member.memberId)}
                     disabled={offline || removingId !== null}
                     aria-label={'Remove ' + member.displayName + ' from the room'}
-                    className="grid size-11 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-danger-soft hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-35"
+                    className="grid size-11 shrink-0 place-items-center rounded-full text-ink-3 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-danger-soft hover:text-danger focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-35"
                   >
                     <XIcon size={15} weight="bold" aria-hidden="true" />
                   </button>

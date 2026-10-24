@@ -235,6 +235,42 @@ test('host pauses the server when its controls disappear', async ({ page }) => {
   expect(commands.some((command) => command.action === 'pause')).toBe(true);
 });
 
+async function tooltipRect(page: Page, label: string) {
+  return page.evaluate((wanted) => {
+    const button = [...document.querySelectorAll('button[aria-label]')]
+      .find((element) => element.getAttribute('aria-label') === wanted);
+    const anchor = button?.closest('.tooltip');
+    if (anchor === null || anchor === undefined) return null;
+    const style = getComputedStyle(anchor, '::after');
+    const box = anchor.getBoundingClientRect();
+    const px = (value: string) => Number.parseFloat(value);
+    const height = px(style.height);
+    const width = px(style.width);
+    const top = style.top === 'auto' ? box.bottom - px(style.bottom) - height : box.top + px(style.top);
+    const left = style.left === 'auto' ? box.right - px(style.right) - width : box.left + px(style.left);
+    return { top, left, bottom: top + height, right: left + width, opacity: Number(style.opacity) };
+  }, label);
+}
+
+test('host header labels its back control inside the viewport', async ({ page }) => {
+  await mockApi(page);
+  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
+    await page.setViewportSize(viewport);
+    await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+    const button = page.getByRole('button', { name: 'Back to home' });
+    await expect(button).toBeVisible();
+    await button.hover();
+    await expect.poll(async () => (await tooltipRect(page, 'Back to home'))?.opacity).toBe(1);
+
+    const tip = await tooltipRect(page, 'Back to home');
+    expect(tip).not.toBeNull();
+    expect(tip!.top).toBeGreaterThanOrEqual(0);
+    expect(tip!.left).toBeGreaterThanOrEqual(0);
+    expect(tip!.bottom).toBeLessThanOrEqual(viewport.height);
+    expect(tip!.right).toBeLessThanOrEqual(viewport.width);
+  }
+});
+
 test('host floating video stays clear of header controls', async ({ page }) => {
   await mockApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });

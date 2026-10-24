@@ -161,12 +161,16 @@ export default function SongCollectionView({ mode, roomId = null, queueHref = nu
         />
       ) : (
         <ul className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3" aria-label={meta.title}>
-          {filtered.map((song) => {
+          {filtered.map((song, index) => {
             const saved = favoriteIds.has(song.videoId);
             const isAdded = added.includes(song.videoId);
             const played = 'playedAt' in song ? (song as RecentSong).playedAt : null;
             return (
-              <li key={song.videoId} className="group flex min-w-0 flex-col overflow-hidden rounded-panel border border-line bg-surface transition-[border-color,transform] duration-200 hover:-translate-y-0.5 hover:border-line-strong">
+              <li
+                key={song.videoId}
+                className="stagger-in group flex min-w-0 flex-col overflow-hidden rounded-panel border border-line bg-surface transition-[border-color,translate] duration-200 hover:-translate-y-0.5 hover:border-line-strong"
+                style={{ animationDelay: Math.min(index, 8) * 35 + 'ms' }}
+              >
                 <div className="relative">
                   <SongArtwork src={song.thumbnailUrl} className="aspect-video w-full" rounded="none" iconSize={28} />
                   {song.durationSeconds === null ? null : (

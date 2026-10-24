@@ -138,7 +138,7 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
         <p className="text-[0.625rem] text-ink-3">With lyrics</p>
       </div>
       <div className="relative">
-      <ul id={listId} ref={listRef} aria-label="Popular karaoke songs" className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <ul id={listId} ref={listRef} aria-label="Popular karaoke songs" className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-1">
         {songs.slice(0, 8).map((song) => {
           const isQueued = queuedVideoIds.includes(song.videoId) || added.includes(song.videoId);
           const busy = queued === song.videoId;
@@ -149,7 +149,7 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
                 onClick={() => void queue(song.videoId)}
                 disabled={disabled || isQueued || queued !== null}
                 aria-label={isQueued ? song.title + ' is already queued' : 'Queue ' + song.title}
-                className="group w-full overflow-hidden rounded-panel border border-line bg-surface text-left transition-colors hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:cursor-default disabled:opacity-70"
+                className="group w-full overflow-hidden rounded-panel border border-line bg-surface text-left transition-[border-color,translate,scale] duration-200 hover:-translate-y-0.5 hover:border-line-strong active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-70"
               >
                 <span className="relative block aspect-video w-full overflow-hidden bg-surface-3">
                   <SongArtwork src={song.thumbnailUrl} className="h-full w-full" rounded="none" iconSize={20} />
@@ -174,7 +174,7 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
             disabled={!canPrevious}
             aria-label="Previous popular karaoke songs"
             aria-controls={listId}
-            className="absolute left-0 top-4 z-10 grid size-11 place-items-center rounded-full border border-line bg-graphite-deep/90 text-ink shadow-lg backdrop-blur transition-opacity hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-30"
+            className="absolute left-0 top-4 z-10 grid size-11 place-items-center rounded-full border border-line bg-graphite-deep/90 text-ink shadow-lg backdrop-blur transition-[opacity,scale] duration-200 hover:border-line-strong active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-30"
           >
             <ArrowLeftIcon size={16} weight="bold" aria-hidden="true" />
           </button>
@@ -184,7 +184,7 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
             disabled={!canNext}
             aria-label="Next popular karaoke songs"
             aria-controls={listId}
-            className="absolute right-0 top-4 z-10 grid size-11 place-items-center rounded-full border border-line bg-graphite-deep/90 text-ink shadow-lg backdrop-blur transition-opacity hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-30"
+            className="absolute right-0 top-4 z-10 grid size-11 place-items-center rounded-full border border-line bg-graphite-deep/90 text-ink shadow-lg backdrop-blur transition-[opacity,scale] duration-200 hover:border-line-strong active:scale-95 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-30"
           >
             <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
           </button>

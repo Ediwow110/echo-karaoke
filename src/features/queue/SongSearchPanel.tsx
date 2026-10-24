@@ -289,7 +289,7 @@ export default function SongSearchPanel({
                 key={example}
                 type="button"
                 onClick={() => setQuery(example)}
-                className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface-2 px-3 text-[0.6875rem] text-ink-2 transition-colors hover:border-signal/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+                className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface-2 px-3 text-[0.6875rem] text-ink-2 transition-[background-color,border-color,color,transform,scale] active:scale-95 hover:border-signal/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
               >
                 {example}
               </button>

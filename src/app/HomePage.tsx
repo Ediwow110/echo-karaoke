@@ -376,8 +376,8 @@ export default function HomePage() {
             </div>
             <div className="p-5">
               <ol className="flex flex-col gap-4">
-                {steps.map((step) => (
-                  <li key={step.number} className="flex gap-3">
+                {steps.map((step, index) => (
+                  <li key={step.number} className="stagger-in flex gap-3" style={{ animationDelay: 180 + index * 40 + 'ms' }}>
                     <span className="w-6 shrink-0 font-display text-[0.75rem] tabular text-signal">{step.number}</span>
                     <div>
                       <p className="text-[0.8125rem] font-semibold text-ink">{step.title}</p>

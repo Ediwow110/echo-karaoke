@@ -67,7 +67,7 @@ export default function HostDiscoverPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="relative overflow-hidden rounded-panel border border-line bg-graphite-deep" aria-labelledby="discover-title">
+      <section className="relative overflow-hidden rounded-panel border border-line bg-graphite-deep animate-console-in" aria-labelledby="discover-title">
         <img
           src="/images/discover-spotlight.jpg"
           alt="A singer performing under a warm stage light"
@@ -110,7 +110,7 @@ export default function HostDiscoverPage() {
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_21.5rem]">
         <div className="flex min-w-0 flex-col gap-6">
-          <section ref={searchRef} className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="search-title">
+          <section ref={searchRef} className="rounded-panel border border-line bg-surface p-5 sm:p-6 animate-console-in" style={{ animationDelay: '60ms' }} aria-labelledby="search-title">
             <div className="flex flex-wrap items-end justify-between gap-2">
               <div>
                 <p className="eyebrow text-gold">Add the next chorus</p>
@@ -149,7 +149,7 @@ export default function HostDiscoverPage() {
           />
         </div>
 
-        <aside className="flex min-w-0 flex-col gap-4" aria-label="Room queue">
+        <aside className="flex min-w-0 flex-col gap-4 animate-console-in" style={{ animationDelay: '120ms' }} aria-label="Room queue">
           <section className="rounded-panel border border-line bg-surface p-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-display text-[1.3rem] font-bold tracking-[-0.02em] text-ink">YouTube queue</h2>

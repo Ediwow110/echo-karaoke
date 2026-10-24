@@ -497,6 +497,7 @@ export default function HostRoomPage() {
                   label="Back to home"
                   tone="ghost"
                   size="sm"
+                  placement="bottom"
                   onClick={() => navigate('/')}
                 />
               </div>
@@ -517,7 +518,7 @@ export default function HostRoomPage() {
                       to={link.href}
                       aria-current={isActive ? 'page' : undefined}
                       className={[
-                        'flex min-h-9 shrink-0 items-center rounded-media px-3 text-[0.6875rem] font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98]',
+                        'flex min-h-9 shrink-0 items-center rounded-media px-3 text-[0.6875rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
                         isActive ? 'bg-surface text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
                       ].join(' ')}
                     >

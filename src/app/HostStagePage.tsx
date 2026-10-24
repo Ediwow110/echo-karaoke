@@ -118,7 +118,7 @@ export default function HostStagePage() {
 
   return (
     <div className="min-h-dvh bg-graphite text-ink">
-      <header className="sticky top-0 z-30 border-b border-line bg-graphite/95 backdrop-blur">
+      <header className="sticky top-0 z-30 border-b border-line bg-graphite/95 backdrop-blur animate-console-in">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
             <Logo size="md" />
@@ -152,6 +152,7 @@ export default function HostStagePage() {
               label="Leave host screen"
               tone="ghost"
               size="sm"
+              placement="bottom"
               onClick={() => navigate('/')}
             />
           </div>
@@ -160,7 +161,7 @@ export default function HostStagePage() {
 
       <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
         <main className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3">
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 animate-console-in" style={{ animationDelay: '40ms' }}>
             <div className="flex min-w-0 items-center gap-3">
               <SongArtwork src={nowPlaying?.thumbnailUrl} className="h-11 w-11" iconSize={16} />
               <div className="min-w-0">
@@ -213,7 +214,7 @@ export default function HostStagePage() {
             )}
           </div>
 
-          <div className="mt-4 rounded-panel border border-line bg-surface px-4 py-3.5">
+          <div className="mt-4 rounded-panel border border-line bg-surface px-4 py-3.5 animate-console-in" style={{ animationDelay: '120ms' }}>
             <div className="flex items-center gap-3">
               <span className="w-10 shrink-0 text-[0.6875rem] tabular text-ink-2">{formatTime(current)}</span>
               <input
@@ -316,7 +317,7 @@ export default function HostStagePage() {
           </p>
         </main>
 
-        <aside className="flex min-w-0 flex-col gap-4" aria-label="Room queue">
+        <aside className="flex min-w-0 flex-col gap-4 animate-console-in" style={{ animationDelay: '160ms' }} aria-label="Room queue">
           <section className="rounded-panel border border-line bg-surface p-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>

@@ -113,7 +113,7 @@ export default function HostPartyPage() {
 
   return (
     <div className="flex min-h-dvh flex-col bg-graphite-deep text-ink">
-      <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 sm:px-6">
+      <header className="z-30 flex h-16 shrink-0 items-center justify-between gap-3 border-b border-white/10 px-4 sm:px-6 animate-console-in">
         <Logo size="md" />
         <p className="hidden text-[0.625rem] font-medium uppercase tracking-[0.12em] text-ink-2 sm:block">
           {roomName} · Party view
@@ -152,7 +152,7 @@ export default function HostPartyPage() {
           </div>
         )}
 
-        <div className="absolute bottom-4 right-4 z-30 hidden lg:block">
+        <div className="absolute bottom-4 right-4 z-30 hidden lg:block animate-console-in" style={{ animationDelay: '160ms' }}>
           <InviteCard
             roomName={roomName}
             code={code}
@@ -164,7 +164,7 @@ export default function HostPartyPage() {
         </div>
       </main>
 
-      <section className="z-30 shrink-0 border-t border-white/10 bg-graphite-deep/95 px-4 py-3 backdrop-blur sm:px-6" aria-label="Party transport">
+      <section className="z-30 shrink-0 border-t border-white/10 bg-graphite-deep/95 px-4 py-3 backdrop-blur sm:px-6 animate-console-in" style={{ animationDelay: '80ms' }} aria-label="Party transport">
         <div className="flex items-center gap-3">
           <span className="w-10 shrink-0 text-[0.625rem] tabular text-ink-2">{formatTime(current)}</span>
           <input
@@ -248,7 +248,7 @@ export default function HostPartyPage() {
         </div>
       </section>
 
-      <section className="z-30 flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-graphite-deep px-4 py-2.5 sm:px-6" aria-label="Up next">
+      <section className="z-30 flex shrink-0 items-center justify-between gap-3 border-t border-white/10 bg-graphite-deep px-4 py-2.5 sm:px-6 animate-console-in" style={{ animationDelay: '120ms' }} aria-label="Up next">
         <div className="flex min-w-0 items-center gap-3">
           <span className="text-[0.5625rem] font-semibold uppercase tracking-[0.1em] text-ink-3">Up next</span>
           {nextSong === null ? (

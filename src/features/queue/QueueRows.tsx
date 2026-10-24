@@ -119,7 +119,7 @@ export function UpNextList({
                     onClick={() => onReorder(song.songId, 'up')}
                     disabled={busy || index === 0}
                     aria-label={'Move ' + song.title + ' up'}
-                    className="grid size-8 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-25"
+                    className="grid size-8 place-items-center rounded-full text-ink-2 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 hover:text-ink disabled:opacity-25"
                   >
                     <ArrowUpIcon size={14} weight="bold" aria-hidden="true" />
                   </button>
@@ -128,7 +128,7 @@ export function UpNextList({
                     onClick={() => onReorder(song.songId, 'down')}
                     disabled={busy || index === upNext.length - 1}
                     aria-label={'Move ' + song.title + ' down'}
-                    className="grid size-8 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink disabled:opacity-25"
+                    className="grid size-8 place-items-center rounded-full text-ink-2 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 hover:text-ink disabled:opacity-25"
                   >
                     <ArrowDownIcon size={14} weight="bold" aria-hidden="true" />
                   </button>
@@ -140,7 +140,7 @@ export function UpNextList({
                   onClick={() => onRemove(song.songId)}
                   disabled={busy}
                   aria-label={'Remove ' + song.title}
-                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink-3 transition-colors hover:bg-danger-soft hover:text-danger disabled:opacity-30"
+                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink-3 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-danger-soft hover:text-danger disabled:opacity-30"
                 >
                   <XIcon size={14} weight="bold" aria-hidden="true" />
                 </button>

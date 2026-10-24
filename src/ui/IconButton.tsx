@@ -45,7 +45,7 @@ export default function IconButton({
       aria-pressed={toggle === true ? active : undefined}
       className={[
         'grid shrink-0 place-items-center rounded-full',
-        'transition-[background-color,border-color,color,transform] duration-(--duration-fast) ease-(--ease-console)',
+        'transition-[background-color,border-color,color,transform,translate,scale] duration-(--duration-fast) ease-(--ease-console)',
         'active:scale-95',
         'disabled:pointer-events-none disabled:opacity-40',
         'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',

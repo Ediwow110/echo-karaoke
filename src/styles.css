@@ -112,6 +112,8 @@
   --animate-equalizer: equalizer 900ms ease-in-out infinite alternate;
   --animate-page-in: page-in 380ms var(--ease-console) both;
   --animate-list-in: list-in 320ms var(--ease-console) both;
+  --animate-modal-in: modal-in 240ms var(--ease-console) both;
+  --animate-backdrop-in: backdrop-in 180ms var(--ease-console) both;
   --animate-stage-drift: stage-drift 26s ease-in-out infinite alternate;
 }
 
@@ -192,6 +194,16 @@
   25% { opacity: 0.5; }
   60% { opacity: 0.35; }
   100% { transform: translate3d(35%, 0, 0) rotate(10deg); opacity: 0; }
+}
+
+@keyframes modal-in {
+  from { opacity: 0; transform: translateY(10px) scale(0.98); }
+  to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes backdrop-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 
 /* ---------------------------------------------------------------------------

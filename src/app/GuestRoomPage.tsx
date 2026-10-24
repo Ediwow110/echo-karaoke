@@ -229,6 +229,7 @@ export default function GuestRoomPage() {
               label="Leave room"
               tone="ghost"
               size="sm"
+              placement="bottom"
               className="size-11"
               onClick={leave}
             />
@@ -555,7 +556,7 @@ function BottomNav({
           to={'/room/' + roomId + '/search'}
           aria-current={tab === 'search' ? 'page' : undefined}
           className={[
-            'flex min-h-11 items-center justify-center gap-2 rounded-media text-[0.75rem] font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98]',
+            'flex min-h-11 items-center justify-center gap-2 rounded-media text-[0.75rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
             tab === 'search' ? 'bg-surface text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
           ].join(' ')}
         >
@@ -566,7 +567,7 @@ function BottomNav({
           to={'/room/' + roomId}
           aria-current={tab === 'queue' ? 'page' : undefined}
           className={[
-            'flex min-h-11 items-center justify-center gap-2 rounded-media text-[0.75rem] font-semibold transition-[background-color,color,transform] duration-150 active:scale-[0.98]',
+            'flex min-h-11 items-center justify-center gap-2 rounded-media text-[0.75rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
             tab === 'queue' ? 'bg-surface text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
           ].join(' ')}
         >

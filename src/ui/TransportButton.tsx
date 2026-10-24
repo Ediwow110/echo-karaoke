@@ -34,7 +34,7 @@ export default function TransportButton({
         aria-label={label}
         aria-pressed={active === true ? true : undefined}
         className={[
-          'grid place-items-center rounded-full transition-[background-color,border-color,color,transform] duration-(--duration-fast) ease-(--ease-console)',
+          'grid place-items-center rounded-full transition-[background-color,border-color,color,transform,translate,scale] duration-(--duration-fast) ease-(--ease-console)',
           'active:scale-95 disabled:pointer-events-none disabled:opacity-35',
           'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
           sizes[size],
