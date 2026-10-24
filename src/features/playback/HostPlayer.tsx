@@ -82,6 +82,8 @@ export default function HostPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(volumeRef.current);
   const [fullscreen, setFullscreen] = useState(false);
+  const [controlsVisible, setControlsVisible] = useState(false);
+  const chromeTimerRef = useRef<number | null>(null);
   const [isLg, setIsLg] = useState(typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -379,6 +381,31 @@ export default function HostPlayer({
     };
   }, []);
 
+  const hideControls = useCallback((): void => {
+    if (chromeTimerRef.current !== null) {
+      window.clearTimeout(chromeTimerRef.current);
+      chromeTimerRef.current = null;
+    }
+    setControlsVisible(false);
+  }, []);
+
+  const revealControls = useCallback((): void => {
+    setControlsVisible(true);
+    if (chromeTimerRef.current !== null) {
+      window.clearTimeout(chromeTimerRef.current);
+    }
+    chromeTimerRef.current = window.setTimeout(() => {
+      chromeTimerRef.current = null;
+      setControlsVisible(false);
+    }, 2500);
+  }, []);
+
+  useEffect(() => () => {
+    if (chromeTimerRef.current !== null) {
+      window.clearTimeout(chromeTimerRef.current);
+    }
+  }, []);
+
   const requestPlay = useCallback(() => {
     setNeedsTap(false);
     try {
@@ -561,7 +588,26 @@ export default function HostPlayer({
       >
         <div ref={hostRef} className="absolute inset-0" />
         {slot === null || videoId === null ? null : (
-          <div className="pointer-events-none absolute inset-0">
+          <div
+            data-stage-overlay
+            className="absolute inset-0"
+            onPointerEnter={revealControls}
+            onPointerMove={revealControls}
+            onPointerDown={revealControls}
+            onPointerLeave={(event) => {
+              if (event.pointerType !== 'touch') hideControls();
+            }}
+          >
+            <div
+              data-stage-chrome
+              data-visible={controlsVisible}
+              aria-hidden={!controlsVisible}
+              inert={!controlsVisible}
+              className={[
+                'pointer-events-none absolute inset-0 transition-opacity duration-300',
+                controlsVisible ? 'opacity-100' : 'opacity-0',
+              ].join(' ')}
+            >
             <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,13,24,0.55)_0%,rgba(16,13,24,0.06)_24%,rgba(16,13,24,0.18)_58%,rgba(16,13,24,0.96)_100%)]" aria-hidden="true" />
             <div className="relative flex items-start justify-between gap-3 p-4">
               <Chip tone="overlay">YouTube</Chip>
@@ -609,6 +655,7 @@ export default function HostPlayer({
               >
                 {fullscreen ? <CornersInIcon size={16} aria-hidden="true" /> : <ArrowsOutIcon size={16} aria-hidden="true" />}
               </button>
+            </div>
             </div>
 
             {loading && needsTap === false && playerError === null ? (

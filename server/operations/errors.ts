@@ -9,8 +9,10 @@ export class HttpError extends Error {
   }
 }
 
+export const UNAUTHORIZED_MESSAGE = 'Your room pass is no longer valid. Return home and join the room again.';
+
 const ERROR_MAP: Record<string, { status: number; message: string }> = {
-  UNAUTHORIZED: { status: 401, message: 'A valid room token is required' },
+  UNAUTHORIZED: { status: 401, message: UNAUTHORIZED_MESSAGE },
   ROOM_NOT_FOUND: { status: 404, message: 'No room uses that code' },
   ROOM_ENDED: { status: 409, message: 'This room has ended' },
   ROOM_FULL: { status: 409, message: 'This room is full' },

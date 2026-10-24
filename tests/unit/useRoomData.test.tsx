@@ -252,6 +252,48 @@ describe('room data isolation', () => {
     }
   });
 
+  it('stops polling once the room pass is revoked', async () => {
+    vi.useFakeTimers();
+    let reads = 0;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'touch-member') {
+          return {};
+        }
+        if (name === 'guest-room-read') {
+          reads += 1;
+          if (reads === 1) {
+            return roomA;
+          }
+          throw new RoomApiError('UNAUTHORIZED', 401, 'That room pass is no longer valid');
+        }
+        throw new RoomApiError('NETWORK_ERROR', 0, 'The room service could not be reached');
+      }) as unknown as EdgeApi['invoke'],
+    };
+
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(
+      RoomApiProvider,
+      { api, children },
+    );
+    const { result, unmount } = renderHook(() => useRoomData('room-a', 'guest'), { wrapper });
+
+    try {
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(result.current.data?.roomId).toBe('room-a');
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+      expect(result.current.data).toBeNull();
+      expect(result.current.error).toContain('no longer valid');
+      const readsAfterRevocation = reads;
+      expect(readsAfterRevocation).toBe(2);
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(20_000); });
+      expect(reads).toBe(readsAfterRevocation);
+    } finally {
+      unmount();
+    }
+  });
+
   it('does not wait for a slow heartbeat before displaying the room', async () => {
     let resolveTouch: (value: unknown) => void = () => undefined;
     const api: EdgeApi = {

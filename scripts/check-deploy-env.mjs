@@ -63,11 +63,20 @@ function checkBackend(env, errors) {
       errors.push(name + ' must be an integer between ' + minimum + ' and ' + maximum + '.');
     }
   };
-  // search.list has a separate 100-call daily bucket.
+  // search.list has a separate 100-call daily bucket shared by user searches
+  // and the karaoke strip.
   budget('YOUTUBE_DAILY_SEARCH_BUDGET', 1, 100);
-  budget('YOUTUBE_DAILY_POPULAR_BUDGET', 1, 10000);
+  budget('YOUTUBE_DAILY_POPULAR_BUDGET', 1, 100);
   budget('YOUTUBE_DAILY_METADATA_BUDGET', 1, 100000);
   budget('YOUTUBE_ROOM_METADATA_BUDGET', 1, 100000);
+
+  const searchRaw = String(env.YOUTUBE_DAILY_SEARCH_BUDGET ?? '').trim();
+  const popularRaw = String(env.YOUTUBE_DAILY_POPULAR_BUDGET ?? '').trim();
+  const search = searchRaw === '' ? 90 : Number(searchRaw);
+  const popular = popularRaw === '' ? 6 : Number(popularRaw);
+  if (Number.isInteger(search) && Number.isInteger(popular) && search + popular > 100) {
+    errors.push('YOUTUBE_DAILY_SEARCH_BUDGET + YOUTUBE_DAILY_POPULAR_BUDGET must be at most 100 (the separate search.list bucket).');
+  }
 }
 
 function checkApiBase(env, origins, errors) {

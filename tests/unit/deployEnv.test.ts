@@ -63,6 +63,25 @@ describe('deployment environment guard', () => {
     })).toContain('YOUTUBE_DAILY_SEARCH_BUDGET must be an integer between 1 and 100.');
   });
 
+  it('keeps user searches and karaoke picks inside the 100-call bucket', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      YOUTUBE_DAILY_SEARCH_BUDGET: '90',
+      YOUTUBE_DAILY_POPULAR_BUDGET: '6',
+    })).toEqual([]);
+    expect(checkDeployEnv({
+      ...valid,
+      YOUTUBE_DAILY_SEARCH_BUDGET: '95',
+      YOUTUBE_DAILY_POPULAR_BUDGET: '6',
+    })).toContain(
+      'YOUTUBE_DAILY_SEARCH_BUDGET + YOUTUBE_DAILY_POPULAR_BUDGET must be at most 100 (the separate search.list bucket).',
+    );
+    expect(checkDeployEnv({
+      ...valid,
+      YOUTUBE_DAILY_POPULAR_BUDGET: '101',
+    })).toContain('YOUTUBE_DAILY_POPULAR_BUDGET must be an integer between 1 and 100.');
+  });
+
   it('requires separate preview database branches', () => {
     expect(checkDeployEnv({
       ...valid,

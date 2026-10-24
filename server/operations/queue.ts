@@ -1,6 +1,6 @@
 import { readJsonObject } from './tokens.js';
 import { callOperation, requireRoomId, requireSongId, type Caller } from './room.js';
-import { HttpError, jsonResponse } from './errors.js';
+import { HttpError, jsonResponse, UNAUTHORIZED_MESSAGE } from './errors.js';
 import { fetchVideoMetadata, isValidVideoId } from './metadata.js';
 
 const ACTIONS = new Set(['add', 'remove', 'reorder']);
@@ -18,7 +18,7 @@ function readCapability(request: Request): { guestToken: string | null; hostToke
   const guestToken = guest !== null && guest.trim().length >= 32 ? guest.trim() : null;
   const hostToken = host !== null && host.trim().length >= 32 ? host.trim() : null;
   if (guestToken === null && hostToken === null) {
-    throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+    throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
   }
   return { guestToken, hostToken };
 }

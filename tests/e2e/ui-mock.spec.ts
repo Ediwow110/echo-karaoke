@@ -75,6 +75,7 @@ async function mockApi(
   hostOnline = true,
   commands: Array<{ action?: string }> = [],
   failHost: () => boolean = () => false,
+  popularResults: unknown[] | null = null,
 ): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -84,10 +85,14 @@ async function mockApi(
     else if (path.endsWith('/api/touch-member')) body = { memberId: 'm2' };
     else if (path.endsWith('/api/host-room-read') && failHost()) {
       status = 401;
-      body = { error: { code: 'UNAUTHORIZED', message: 'A valid room token is required' } };
+      body = { error: { code: 'UNAUTHORIZED', message: 'Your room pass is no longer valid. Return home and join the room again.' } };
     } else if (path.endsWith('/api/guest-room-read') || path.endsWith('/api/host-room-read')) body = room(hostOnline);
     else if (path.endsWith('/api/youtube-search')) body = { available: true, results };
-    else if (path.endsWith('/api/youtube-popular')) body = { available: false, results: [], message: 'off' };
+    else if (path.endsWith('/api/youtube-popular')) {
+      body = popularResults === null
+        ? { available: false, results: [], message: 'off' }
+        : { available: true, results: popularResults };
+    }
     else if (path.endsWith('/api/playback-report')) body = room(hostOnline).playback;
     else if (path.endsWith('/api/playback-command')) {
       commands.push(route.request().postDataJSON() as { action?: string });
@@ -163,6 +168,43 @@ test('guest search keeps 44px controls and reflows at 200% text', async ({ page 
   await page.keyboard.press('Tab');
   const outline = await page.evaluate(() => getComputedStyle(document.activeElement as Element).outlineStyle);
   expect(outline).not.toBe('none');
+});
+
+test('popular karaoke strip slides with previous and next controls', async ({ page }) => {
+  const karaoke = Array.from({ length: 8 }, (_, index) => ({
+    videoId: 'karaoke' + String(index).padStart(4, '0'),
+    title: 'Karaoke Song ' + (index + 1),
+    channelTitle: 'Karaoke Channel',
+    thumbnailUrl: null,
+    durationSeconds: null,
+  }));
+  await mockApi(page, true, [], () => false, karaoke);
+  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+  await page.getByRole('link', { name: 'Search' }).click();
+
+  await expect(page.getByText('Popular karaoke')).toBeVisible();
+  await expect(page.getByText('With lyrics')).toBeVisible();
+  const strip = page.getByRole('list', { name: 'Popular karaoke songs' });
+  await expect(strip).toBeVisible();
+
+  const previous = page.getByRole('button', { name: 'Previous popular karaoke songs' });
+  const next = page.getByRole('button', { name: 'Next popular karaoke songs' });
+  await expect(previous).toBeDisabled();
+  await expect(next).toBeEnabled();
+  for (const control of [previous, next]) {
+    const box = await control.boundingBox();
+    expect(box?.width ?? 0).toBeGreaterThanOrEqual(44);
+    expect(box?.height ?? 0).toBeGreaterThanOrEqual(44);
+  }
+
+  const before = await strip.evaluate((element) => element.scrollLeft);
+  await next.click();
+  await expect.poll(async () => strip.evaluate((element) => element.scrollLeft)).toBeGreaterThan(before);
+  await expect(previous).toBeEnabled();
+
+  await previous.click();
+  await expect.poll(async () => strip.evaluate((element) => element.scrollLeft)).toBe(0);
+  await expect(previous).toBeDisabled();
 });
 
 test('guest queue does not promise auto-advance while the host is offline', async ({ page }) => {

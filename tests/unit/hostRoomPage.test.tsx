@@ -1,11 +1,12 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import HostRoomPage from '../../src/app/HostRoomPage';
 import HostDiscoverPage from '../../src/app/HostDiscoverPage';
 import HostQueuePage from '../../src/app/HostQueuePage';
 import HostSettingsPage from '../../src/app/HostSettingsPage';
+import HostStagePage from '../../src/app/HostStagePage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
 import '@testing-library/jest-dom/vitest';
@@ -34,6 +35,11 @@ beforeEach(() => {
     addEventListener: () => undefined,
     removeEventListener: () => undefined,
   })));
+  vi.stubGlobal('ResizeObserver', class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  });
 });
 
 afterEach(() => {
@@ -138,6 +144,7 @@ function renderHost(api: EdgeApi, path = '/room/' + roomId + '/host') {
             createElement(Route, { index: true, element: createElement(HostDiscoverPage) }),
             createElement(Route, { path: 'queue', element: createElement(HostQueuePage) }),
             createElement(Route, { path: 'settings', element: createElement(HostSettingsPage) }),
+            createElement(Route, { path: 'stage', element: createElement(HostStagePage) }),
           ),
         ),
       ),
@@ -247,9 +254,11 @@ describe('host room workspace', () => {
   });
 
   it('automatically plays a song added to a stopped queue', async () => {
+    // A fresh room stores no currentVideoId key at all, so the guard must not
+    // treat a missing key as "a song is already loaded".
     const stoppedRoom = {
       ...liveRoom,
-      playback: { ...liveRoom.playback, isPlaying: false, currentVideoId: null, currentSongId: null },
+      playback: { currentSongId: null, positionSeconds: 0, isPlaying: false, updatedAt: null },
       queue: [{ ...liveRoom.queue[1], status: 'queued' }],
     };
     const playedCalls: Array<{ name: string; body: unknown }> = [];
@@ -275,6 +284,31 @@ describe('host room workspace', () => {
         (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
       )).toBe(true);
     });
+  });
+
+  it('shows the in-frame stage info only while the pointer is active', async () => {
+    const { api } = makeApi();
+    const { container, unmount } = renderHost(api, '/room/' + roomId + '/host/stage');
+
+    const overlay = await waitFor(() => {
+      const node = container.querySelector('[data-stage-overlay]');
+      expect(node).not.toBeNull();
+      return node as HTMLElement;
+    });
+    const chrome = container.querySelector('[data-stage-chrome]');
+    expect(chrome).toHaveAttribute('data-visible', 'false');
+
+    vi.useFakeTimers();
+    try {
+      fireEvent.pointerMove(overlay);
+      expect(chrome).toHaveAttribute('data-visible', 'true');
+      act(() => { vi.advanceTimersByTime(2600); });
+      expect(chrome).toHaveAttribute('data-visible', 'false');
+    } finally {
+      vi.useRealTimers();
+    }
+
+    unmount();
   });
 
   it('does not request play when a song is already playing', async () => {

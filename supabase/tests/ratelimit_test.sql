@@ -61,6 +61,10 @@ select lives_ok(
   $$ select public.youtube_search_cache_put('abba', '{"results":[{"videoId":"x"}]}'::jsonb, 1) $$,
   'the cache stores a result');
 
+select lives_ok(
+  $$ select public.youtube_search_cache_put('karaoke-picks', '{"results":[{"videoId":"x"}]}'::jsonb, 43200) $$,
+  'the cache accepts a twelve-hour karaoke strip entry');
+
 select is(
   public.youtube_search_cache_get('abba'),
   '{"results":[{"videoId":"x"}]}'::jsonb,

@@ -286,7 +286,7 @@ export default function HostRoomPage() {
       return;
     }
     if (data.playback?.isPlaying === true) return;
-    if (data.playback?.currentVideoId !== null) return;
+    if (data.playback?.currentSongId != null) return;
     if (queue.length === 0) {
       lastAutoPlayKey.current = null;
       return;

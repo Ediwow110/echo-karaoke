@@ -1,4 +1,6 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
+import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { useRoomApi } from '../../app/RoomApiProvider';
@@ -30,6 +32,11 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
   const [queued, setQueued] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [canPrevious, setCanPrevious] = useState(false);
+  const [canNext, setCanNext] = useState(false);
+  const [overflowing, setOverflowing] = useState(false);
+  const listRef = useRef<HTMLUListElement | null>(null);
+  const listId = useId();
 
   useEffect(() => {
     let cancelled = false;
@@ -73,6 +80,53 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
     }
   }
 
+  const measure = useCallback((): void => {
+    const list = listRef.current;
+    if (list === null) {
+      return;
+    }
+    const max = list.scrollWidth - list.clientWidth;
+    setOverflowing(max > 2);
+    setCanPrevious(list.scrollLeft > 2);
+    setCanNext(list.scrollLeft < max - 2);
+  }, []);
+
+  useEffect(() => {
+    const list = listRef.current;
+    if (list === null) {
+      return;
+    }
+    measure();
+    list.addEventListener('scroll', measure, { passive: true });
+    window.addEventListener('resize', measure);
+    const observer = typeof ResizeObserver === 'function' ? new ResizeObserver(measure) : null;
+    observer?.observe(list);
+    return () => {
+      list.removeEventListener('scroll', measure);
+      window.removeEventListener('resize', measure);
+      observer?.disconnect();
+    };
+  }, [measure, songs.length]);
+
+  const slide = useCallback((direction: -1 | 1): void => {
+    const list = listRef.current;
+    if (list === null || typeof list.scrollBy !== 'function') {
+      return;
+    }
+    const first = list.firstElementChild as HTMLElement | null;
+    const second = list.children[1] as HTMLElement | null;
+    const pitch = first !== null && second !== null
+      ? second.offsetLeft - first.offsetLeft
+      : first?.getBoundingClientRect().width ?? 0;
+    if (pitch <= 0) {
+      return;
+    }
+    const perPage = Math.max(1, Math.floor(list.clientWidth / pitch));
+    const reduce = typeof window.matchMedia === 'function'
+      && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    list.scrollBy({ left: direction * perPage * pitch, behavior: reduce ? 'auto' : 'smooth' });
+  }, []);
+
   if (songs.length === 0) {
     return null;
   }
@@ -80,10 +134,11 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
   return (
     <div data-suggestions className="flex flex-col gap-3">
       <div className="flex items-center justify-between gap-3">
-        <p className="eyebrow text-ink-2">Popular now</p>
-        <p className="text-[0.625rem] text-ink-3">YouTube chart</p>
+        <p className="eyebrow text-ink-2">Popular karaoke</p>
+        <p className="text-[0.625rem] text-ink-3">With lyrics</p>
       </div>
-      <ul className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
+      <div className="relative">
+      <ul id={listId} ref={listRef} aria-label="Popular karaoke songs" className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1">
         {songs.slice(0, 8).map((song) => {
           const isQueued = queuedVideoIds.includes(song.videoId) || added.includes(song.videoId);
           const busy = queued === song.videoId;
@@ -111,6 +166,31 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
           );
         })}
       </ul>
+      {overflowing ? (
+        <>
+          <button
+            type="button"
+            onClick={() => slide(-1)}
+            disabled={!canPrevious}
+            aria-label="Previous popular karaoke songs"
+            aria-controls={listId}
+            className="absolute left-0 top-4 z-10 grid size-11 place-items-center rounded-full border border-line bg-graphite-deep/90 text-ink shadow-lg backdrop-blur transition-opacity hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ArrowLeftIcon size={16} weight="bold" aria-hidden="true" />
+          </button>
+          <button
+            type="button"
+            onClick={() => slide(1)}
+            disabled={!canNext}
+            aria-label="Next popular karaoke songs"
+            aria-controls={listId}
+            className="absolute right-0 top-4 z-10 grid size-11 place-items-center rounded-full border border-line bg-graphite-deep/90 text-ink shadow-lg backdrop-blur transition-opacity hover:border-line-strong focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-30"
+          >
+            <ArrowRightIcon size={16} weight="bold" aria-hidden="true" />
+          </button>
+        </>
+      ) : null}
+      </div>
       {error === null ? null : (
         <p role="alert" className="rounded-media border border-danger/30 bg-danger-soft/50 px-3 py-2 text-[0.75rem] text-danger">
           {error}

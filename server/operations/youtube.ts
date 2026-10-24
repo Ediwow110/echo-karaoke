@@ -1,5 +1,5 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
-import { HttpError, jsonResponse, logFailure, mapDatabaseError } from './errors.js';
+import { HttpError, jsonResponse, logFailure, mapDatabaseError, UNAUTHORIZED_MESSAGE } from './errors.js';
 import { readJsonObject } from './tokens.js';
 import { requireRoomId, optionalTokenHeader, type Caller } from './room.js';
 
@@ -20,8 +20,14 @@ const ROOM_DAILY_SEARCH_LIMIT = 60;
 const SEARCH_WINDOW_SECONDS = 60;
 const CACHE_TTL_SECONDS = 600;
 const DEFAULT_DAILY_SEARCH_BUDGET = 90;
-const DEFAULT_DAILY_POPULAR_BUDGET = 200;
-const SEARCH_CACHE_TTL_MS = 5 * 60_000;
+const DEFAULT_DAILY_POPULAR_BUDGET = 6;
+const POPULAR_QUERY = 'popular karaoke songs';
+const POPULAR_FETCH_LIMIT = 20;
+const POPULAR_RESULT_LIMIT = 8;
+const POPULAR_CACHE_KEY = '__popular_karaoke_v1';
+const POPULAR_CACHE_TTL_SECONDS = 12 * 60 * 60;
+const POPULAR_CACHE_TTL_MS = POPULAR_CACHE_TTL_SECONDS * 1000;
+const COMPILATION_PATTERN = /\b(medley|non-?stop|compilation|playlist|full album|1 hour|one hour)\b/i;
 const SUGGEST_CACHE_TTL_MS = 60_000;
 const SUGGEST_CACHE_MAX = 500;
 
@@ -64,7 +70,7 @@ function mapItem(videoId: unknown, snippet: Snippet | undefined): SearchResult |
   };
 }
 
-export function mapSearchResponse(payload: unknown): SearchResult[] {
+export function mapSearchResponse(payload: unknown, limit = MAX_RESULTS): SearchResult[] {
   if (payload === null || typeof payload !== 'object') return [];
   const items = (payload as { items?: unknown }).items;
   if (!Array.isArray(items)) return [];
@@ -74,26 +80,31 @@ export function mapSearchResponse(payload: unknown): SearchResult[] {
     const item = raw as { id?: { videoId?: unknown }; snippet?: Snippet } | null;
     const result = mapItem(item?.id?.videoId, item?.snippet);
     if (result !== null) mapped.push(result);
-    if (mapped.length === MAX_RESULTS) break;
+    if (mapped.length === limit) break;
   }
   return mapped;
 }
 
-// videos.list, including chart=mostPopular, returns id as a string. search.list
-// returns id.videoId. The two shapes must not share an id reader.
-export function mapVideoListResponse(payload: unknown): SearchResult[] {
-  if (payload === null || typeof payload !== 'object') return [];
-  const items = (payload as { items?: unknown }).items;
-  if (!Array.isArray(items)) return [];
+export function buildPopularSearchUrl(apiKey: string): string {
+  const params = new URLSearchParams({
+    part: 'snippet',
+    type: 'video',
+    videoCategoryId: '10',
+    videoEmbeddable: 'true',
+    order: 'relevance',
+    maxResults: String(POPULAR_FETCH_LIMIT),
+    regionCode: 'US',
+    relevanceLanguage: 'en',
+    key: apiKey,
+    q: POPULAR_QUERY,
+  });
+  return 'https://www.googleapis.com/youtube/v3/search?' + params.toString();
+}
 
-  const mapped: SearchResult[] = [];
-  for (const raw of items) {
-    const item = raw as { id?: unknown; snippet?: Snippet } | null;
-    const result = mapItem(item?.id, item?.snippet);
-    if (result !== null) mapped.push(result);
-    if (mapped.length === MAX_RESULTS) break;
-  }
-  return mapped;
+export function selectPopularResults(payload: unknown): SearchResult[] {
+  return mapSearchResponse(payload, POPULAR_FETCH_LIMIT)
+    .filter((song) => !COMPILATION_PATTERN.test(song.title))
+    .slice(0, POPULAR_RESULT_LIMIT);
 }
 
 export function parseSuggestions(payload: unknown): string[] {
@@ -149,7 +160,7 @@ async function requireRoomAccess(request: Request, caller: Caller, roomId: strin
       status?: string;
     } | null;
     if (access === null) {
-      throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+      throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
     }
     if (access.status === 'ended') {
       throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
@@ -161,14 +172,14 @@ async function requireRoomAccess(request: Request, caller: Caller, roomId: strin
       status?: string;
     } | null;
     if (access === null) {
-      throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+      throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
     }
     if (access.status === 'ended') {
       throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
     }
     return hostToken;
   }
-  throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+  throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
 }
 
 async function enforceLimit(name: string, params: unknown[], message: string): Promise<void> {
@@ -182,11 +193,19 @@ async function readSearchCache(key: string): Promise<SearchResult[] | null> {
   return (await queryAllowNull('youtube_search_cache_get', [key])) as SearchResult[] | null;
 }
 
-async function writeSearchCache(key: string, results: SearchResult[]): Promise<void> {
+async function writeSearchCache(
+  key: string,
+  results: SearchResult[],
+  ttlSeconds = CACHE_TTL_SECONDS,
+): Promise<void> {
   try {
-    await queryAllowNull('youtube_search_cache_put', [key, results, CACHE_TTL_SECONDS]);
-  } catch {
-    // The search result is still useful when the cache write loses a race.
+    // The driver encodes a JS array as a Postgres array; send JSON text so the
+    // jsonb parameter is parsed instead of rejected.
+    await queryAllowNull('youtube_search_cache_put', [key, JSON.stringify(results), ttlSeconds]);
+  } catch (error) {
+    // The result is still useful when the cache write loses a race, but a
+    // rejected TTL or missing grant must not stay invisible.
+    logFailure('youtube-search/cache-write', error, 500);
   }
 }
 
@@ -348,7 +367,7 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     return jsonResponse({
       available: false,
       results: [],
-      message: 'Suggestions are not configured. Ask the host to enable YouTube search.',
+      message: 'Karaoke picks are not configured. Ask the host to enable YouTube search.',
     });
   }
 
@@ -357,40 +376,62 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     'youtube-popular-member',
     30,
     60,
-  ], 'Suggestions are busy. Try again shortly.');
+  ], 'Karaoke picks are busy. Try again shortly.');
 
-  if (popularCached !== null && Date.now() - popularCached.at < SEARCH_CACHE_TTL_MS) {
+  if (popularCached !== null && Date.now() - popularCached.at < POPULAR_CACHE_TTL_MS) {
     return jsonResponse({ available: true, results: popularCached.results });
   }
 
-  await enforceLimit('consume_daily_rate_limit', [
+  const persisted = await readSearchCache(POPULAR_CACHE_KEY);
+  if (persisted !== null && persisted.length > 0) {
+    popularCached = { at: Date.now(), results: persisted };
+    return jsonResponse({ available: true, results: persisted });
+  }
+
+  const daily = await queryAllowNull('consume_daily_rate_limit', [
     'global',
     'youtube-popular-day',
     dailyBudget('YOUTUBE_DAILY_POPULAR_BUDGET', DEFAULT_DAILY_POPULAR_BUDGET),
-  ], 'The music chart is unavailable right now');
+  ]) as { allowed?: boolean } | null;
+  if (daily?.allowed !== true) {
+    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
+  }
 
-  const target = 'https://www.googleapis.com/youtube/v3/videos?part=snippet&chart=mostPopular&videoCategoryId=10&maxResults=10&regionCode=US&key=' +
-    encodeURIComponent(apiKey);
+  const refund = async (): Promise<void> => {
+    try {
+      await queryAllowNull('refund_daily_rate_limit', ['global', 'youtube-popular-day']);
+    } catch (error) {
+      logFailure('youtube-popular/refund', error, 500, request);
+    }
+  };
+
+  const target = buildPopularSearchUrl(apiKey);
 
   let response: Response;
   try {
     response = await fetch(target, { signal: AbortSignal.timeout(6000) });
   } catch {
-    throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube suggestions are unavailable right now');
+    await refund();
+    throw new HttpError('SEARCH_UNAVAILABLE', 503, 'Karaoke picks are unavailable right now');
   }
   if (!response.ok) {
-    throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube suggestions are unavailable right now');
+    await refund();
+    throw new HttpError('SEARCH_UNAVAILABLE', 503, 'Karaoke picks are unavailable right now');
   }
 
   let payload: unknown;
   try {
     payload = await response.json();
   } catch {
-    throw new HttpError('SEARCH_UNAVAILABLE', 503, 'YouTube suggestions returned an unreadable response');
+    await refund();
+    throw new HttpError('SEARCH_UNAVAILABLE', 503, 'Karaoke picks returned an unreadable response');
   }
 
-  const results = mapVideoListResponse(payload);
-  popularCached = { at: Date.now(), results };
+  const results = selectPopularResults(payload);
+  if (results.length > 0) {
+    await writeSearchCache(POPULAR_CACHE_KEY, results, POPULAR_CACHE_TTL_SECONDS);
+    popularCached = { at: Date.now(), results };
+  }
   return jsonResponse({ available: true, results });
 }
 

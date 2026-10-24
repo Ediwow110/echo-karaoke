@@ -8,7 +8,7 @@ value below is named, never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. On the
 current tree, typecheck, the production build, 264 unit tests, and 6 UI Playwright
-tests pass locally. The pgTAP suite (282 assertions) and the operation integration
+tests pass locally. The pgTAP suite (283 assertions) and the operation integration
 suite (7 tests) pass on a disposable Neon branch. This document covers only what a
 hosted account makes possible.
 
@@ -163,7 +163,7 @@ npx vercel dev
 guest link in a second browser, and add a song. The function and the database are both
 local processes; only the database is hosted.
 
-Search and the chart need a YouTube Data API key in the same file. Song entry uses
+Search and the karaoke strip need a YouTube Data API key in the same file. Song entry uses
 the Add buttons in search results, so configure this key to search for and add songs:
 
 ```
@@ -204,9 +204,9 @@ vercel env add YOUTUBE_API_KEY production
 | `ALLOWED_ORIGINS` | `https://echo-karaoke-mocha.vercel.app` |
 | `ROOM_MEMBER_LIMIT` | `50` (allowed 2–500); host plus guests |
 | `ANON_SIGNIN_LIMIT_PER_HOUR` | `120` (allowed 1–1000); per hashed network address |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 key for song search and the chart. Without it these features report "not configured"; search also offers a manual-link fallback |
-| `YOUTUBE_DAILY_SEARCH_BUDGET` | `90` upstream search calls per day across all rooms |
-| `YOUTUBE_DAILY_POPULAR_BUDGET` | `200` upstream chart calls per day |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key for song search and karaoke picks. Without it these features report "not configured"; search also offers a manual-link fallback |
+| `YOUTUBE_DAILY_SEARCH_BUDGET` | `90` upstream user search calls per day across all rooms |
+| `YOUTUBE_DAILY_POPULAR_BUDGET` | `6` upstream karaoke-strip search calls per day (12-hour cache; must fit the same 100-call bucket as search) |
 | `YOUTUBE_DAILY_METADATA_BUDGET` | `5000` quota-free oEmbed lookups per Pacific day across the deployment |
 | `YOUTUBE_ROOM_METADATA_BUDGET` | `500` quota-free oEmbed lookups per Pacific day per room |
 | `PREVIEW_DATABASE_URL` | Preview-only service URL pointing at a disposable Neon branch |
@@ -225,13 +225,15 @@ fails closed with a 503. Raise `ANON_SIGNIN_LIMIT_PER_HOUR` for a venue network 
 expects more than 120 new guests in an hour.
 
 YouTube's current quota model is split. `search.list` has its own bucket of 100 calls
-per day at one unit per call; the chart is `videos.list` and draws one unit from the
-shared 10,000-unit pool. The defaults therefore leave 10 search calls of headroom, and
-searches are cached for ten minutes so a popular term bills once. Per-user, per-room,
-and global limits sit in front of the upstream call. oEmbed metadata is quota-free, but
-the add path still has a per-member minute limit, a 500/day room budget, and a
-5,000/day deployment budget. The add path now runs a SQL preflight before spending
-either budget, and search falls back to manual link entry when it is resting.
+per day at one unit per call. Both user searches and the karaoke strip use it: the
+defaults are 90 user searches plus 6 strip refreshes, and the deploy guard rejects a
+pair that exceeds 100. User searches are cached for ten minutes; the strip asks for
+embeddable karaoke videos with lyrics, drops medleys and compilations, and caches its
+eight cards for twelve hours. Per-user, per-room, and global limits sit in front of
+the upstream call. oEmbed metadata is quota-free, but the add path still has a
+per-member minute limit, a 500/day room budget, and a 5,000/day deployment budget.
+The add path now runs a SQL preflight before spending either budget, and search falls
+back to manual link entry when it is resting.
 
 Preview deployments must not reuse the Production database URLs. Point Preview at a
 Neon branch or a separate preview database, protect the deployment, and keep the
@@ -354,7 +356,7 @@ five-minute guarantee; the interval is opportunistic.
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 282 passing assertions on a fresh branch.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 283 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch.
 - [x] `npm test` reports 264 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
@@ -371,7 +373,7 @@ five-minute guarantee; the interval is opportunistic.
 ## Not covered here
 
 - The YouTube Data API key. Configure it to use search-based song entry; without it,
-  search and the chart report that they are not configured, and the search panel
+  search and karaoke picks report that they are not configured, and the search panel
   offers the manual-link fallback.
 - Per-IP sign-in throttling in front of Better Auth.
 - A physical-phone camera run against this tree.

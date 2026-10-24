@@ -86,9 +86,10 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
   const queued = useRef(false);
   const operationSeq = useRef(0);
   const initializedFor = useRef<string | null>(null);
+  const passRevoked = useRef(false);
 
   const runRefresh = useCallback(async () => {
-    if (dataRef.current?.status === 'ended') {
+    if (passRevoked.current || dataRef.current?.status === 'ended') {
       return;
     }
     if (typeof document !== 'undefined' && document.hidden && dataRef.current !== null) {
@@ -146,7 +147,9 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
 
       if (authFailure) {
         // A revoked or missing pass must not leave stale room data and live
-        // controls on screen. Send the user back through the error screen.
+        // controls on screen. Send the user back through the error screen and
+        // stop the poll so a removed guest's phone stops hitting the API.
+        passRevoked.current = true;
         dataRef.current = null;
         setData(null);
         setError(message);
@@ -206,7 +209,10 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
     void startRefresh();
   }, [startRefresh]);
 
-  const refresh = useCallback((): Promise<void> => startRefresh(), [startRefresh]);
+  const refresh = useCallback((): Promise<void> => {
+    passRevoked.current = false;
+    return startRefresh();
+  }, [startRefresh]);
 
   useEffect(() => {
     // Route parameters can change without remounting a page. Clear every
@@ -225,6 +231,7 @@ export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
     dataRef.current = null;
     consecutiveFailures.current = 0;
     wasOffline.current = false;
+    passRevoked.current = false;
     setData(null);
     setError(null);
     setLoading(true);

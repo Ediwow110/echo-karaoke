@@ -1,5 +1,5 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
-import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
+import { HttpError, jsonResponse, mapDatabaseError, UNAUTHORIZED_MESSAGE } from './errors.js';
 import { resolveRoomMemberLimit } from './limits.js';
 import { generateToken, normalizeDisplayName, readJsonObject } from './tokens.js';
 
@@ -52,7 +52,7 @@ export function requireMemberId(value: unknown): string {
 export function requireTokenHeader(request: Request, name: string): string {
   const value = request.headers.get(name);
   if (value === null || value.trim().length < 32) {
-    throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+    throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
   }
   return value.trim();
 }
@@ -124,7 +124,7 @@ export async function touchMember(request: Request, caller: Caller): Promise<Res
     return jsonResponse(await callOperation('touch_host', [roomId, hostToken]));
   }
   if (guestToken === null) {
-    throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+    throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
   }
   return jsonResponse(await callOperation('touch_member', [
     roomId,
@@ -158,7 +158,7 @@ export async function playbackCommand(request: Request, caller: Caller): Promise
   const guestToken = optionalTokenHeader(request, 'x-room-guest-token');
   const hostToken = optionalTokenHeader(request, 'x-room-host-token');
   if (guestToken === null && hostToken === null) {
-    throw new HttpError('UNAUTHORIZED', 401, 'A valid room token is required');
+    throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
   }
 
   const body = await readJsonObject(request);

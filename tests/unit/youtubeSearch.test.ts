@@ -1,6 +1,10 @@
 import { describe, expect, it } from 'vitest';
 // The mappers are plain TypeScript, so the unit suite can exercise them directly.
-import { mapSearchResponse, mapVideoListResponse } from '../../server/operations/youtube';
+import {
+  buildPopularSearchUrl,
+  mapSearchResponse,
+  selectPopularResults,
+} from '../../server/operations/youtube';
 
 function payload(items: unknown[]): unknown {
   return { items };
@@ -73,41 +77,41 @@ describe('youtube search mapping', () => {
   });
 });
 
-describe('youtube videos.list mapping', () => {
-  it('maps the chart shape where id is a string', () => {
-    const results = mapVideoListResponse(payload([
-      {
-        id: 'dQw4w9WgXcQ',
-        snippet: {
-          title: 'Chart Song &amp; Friends',
-          channelTitle: 'Artist',
-          thumbnails: { high: { url: 'https://img.example/high.jpg' } },
-        },
-      },
-    ]));
+describe('popular karaoke search', () => {
+  it('asks YouTube for embeddable karaoke and lyric videos', () => {
+    const url = new URL(buildPopularSearchUrl('test-key'));
 
-    expect(results).toEqual([{
-      videoId: 'dQw4w9WgXcQ',
-      title: 'Chart Song & Friends',
-      channelTitle: 'Artist',
-      thumbnailUrl: 'https://img.example/high.jpg',
-      durationSeconds: null,
-    }]);
+    expect(url.pathname).toBe('/youtube/v3/search');
+    expect(url.searchParams.get('q')).toBe('popular karaoke songs');
+    expect(url.searchParams.get('type')).toBe('video');
+    expect(url.searchParams.get('videoCategoryId')).toBe('10');
+    expect(url.searchParams.get('videoEmbeddable')).toBe('true');
+    expect(url.searchParams.get('order')).toBe('relevance');
+    expect(url.searchParams.get('maxResults')).toBe('20');
+    expect(url.searchParams.get('key')).toBe('test-key');
   });
 
-  it('rejects the search shape and malformed chart items', () => {
-    expect(mapVideoListResponse(payload([
-      { id: { videoId: 'abc123XYZ_-' }, snippet: { title: 'Wrong shape' } },
-      { id: 'short', snippet: { title: 'Bad id' } },
-      { id: 'abc123XYZ_-', snippet: {} },
-    ]))).toEqual([]);
+  it('maps search ids, drops medleys and compilations, and keeps eight cards', () => {
+    const items = [
+      { id: { videoId: 'karaoke0001' }, snippet: { title: 'Someone Like You (Karaoke Version)' } },
+      { id: { videoId: 'karaoke0002' }, snippet: { title: 'Air Supply Medley (Karaoke Version)' } },
+      { id: { videoId: 'karaoke0003' }, snippet: { title: 'Best Karaoke Songs 1 Hour' } },
+      { id: { videoId: 'karaoke0004' }, snippet: { title: 'Ballads Nonstop' } },
+      ...Array.from({ length: 9 }, (_, index) => ({
+        id: { videoId: 'karaoke10' + String(index).padStart(2, '0') },
+        snippet: { title: 'Karaoke Song ' + (index + 1) },
+      })),
+    ];
+
+    const results = selectPopularResults({ items });
+
+    expect(results).toHaveLength(8);
+    expect(results[0].videoId).toBe('karaoke0001');
+    expect(results.some((song) => /medley|1 hour|nonstop/i.test(song.title))).toBe(false);
   });
 
-  it('caps chart results at ten', () => {
-    const items = Array.from({ length: 12 }, (_, index) => ({
-      id: 'vid' + String(index).padStart(8, '0'),
-      snippet: { title: 'Song ' + index },
-    }));
-    expect(mapVideoListResponse(payload(items))).toHaveLength(10);
+  it('returns no cards for a malformed payload', () => {
+    expect(selectPopularResults(null)).toEqual([]);
+    expect(selectPopularResults({ items: 'nope' })).toEqual([]);
   });
 });

@@ -52,16 +52,16 @@ YouTube search and chart require a data API key. Without it the app explains tha
 
     YOUTUBE_API_KEY=<your data api v3 key>
     YOUTUBE_DAILY_SEARCH_BUDGET=90
-    YOUTUBE_DAILY_POPULAR_BUDGET=200
+    YOUTUBE_DAILY_POPULAR_BUDGET=6
     YOUTUBE_DAILY_METADATA_BUDGET=5000
     YOUTUBE_ROOM_METADATA_BUDGET=500
 
-Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call, so the default 90-search budget leaves 10 calls of headroom. Chart refreshes use the separate 10,000-unit pool (200/day by default). Song metadata uses quota-free oEmbed, with a per-room daily lookup budget and a larger deployment budget. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
+Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches the result for twelve hours, and hides medleys and compilations. Song metadata uses quota-free oEmbed, with a per-room daily lookup budget and a larger deployment budget. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0029 before deploying this tree; queue and search now call
-`queue_add_preflight`, `peek_daily_rate_limit`, and the search refund, and host
-removal now repairs playback state.
+migrations 0025 through 0030 before deploying this tree; queue and search now call
+`queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
+karaoke-strip cache TTL, and host removal now repairs playback state.
 
     npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
     npx supabase test db --db-url "$NEON_DATABASE_URL"
@@ -87,7 +87,7 @@ Rooms are cleaned up when a room is created. That request first deletes every ro
 
     npm test                 # 264 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 282 pgTAP assertions
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 283 pgTAP assertions
     npm run test:integration # 7 router/auth/operation tests against a Neon branch
     npm run test:e2e:ui      # 6 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows against vercel dev on port 3000
