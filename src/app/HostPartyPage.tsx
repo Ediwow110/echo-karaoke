@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
@@ -32,6 +32,10 @@ export default function HostPartyPage() {
   const player = useHostPlayer();
   const navigate = useNavigate();
   const [busy, setBusy] = useState<'play' | 'next' | null>(null);
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
 
   const attachSlot = useCallback((node: HTMLDivElement | null) => {
     player.registerStageSlot(node);

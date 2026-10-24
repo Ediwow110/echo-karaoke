@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import HostRoomPage from '../../src/app/HostRoomPage';
@@ -40,6 +40,7 @@ beforeEach(() => {
     unobserve(): void {}
     disconnect(): void {}
   });
+  vi.stubGlobal('scrollTo', vi.fn());
 });
 
 afterEach(() => {
@@ -284,31 +285,57 @@ describe('host room workspace', () => {
         (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
       )).toBe(true);
     });
+    expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
   });
 
-  it('shows the in-frame stage info only while the pointer is active', async () => {
-    const { api } = makeApi();
-    const { container, unmount } = renderHost(api, '/room/' + roomId + '/host/stage');
+  it('takes a host on the queue page to the stage when a queued song starts', async () => {
+    const stoppedRoom = {
+      ...liveRoom,
+      playback: { currentSongId: null, positionSeconds: 0, isPlaying: false, updatedAt: null },
+      queue: [{ ...liveRoom.queue[1], status: 'queued' }],
+    };
+    const playedCalls: Array<{ name: string; body: unknown }> = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        playedCalls.push({ name, body });
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return stoppedRoom;
+        }
+        if (name === 'playback-command') {
+          return { roomId, status: 'live', playback: { ...stoppedRoom.playback, isPlaying: true } };
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderHost(api, '/room/' + roomId + '/host/queue');
 
-    const overlay = await waitFor(() => {
-      const node = container.querySelector('[data-stage-overlay]');
-      expect(node).not.toBeNull();
-      return node as HTMLElement;
+    await waitFor(() => {
+      expect(playedCalls.some(
+        (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
+      )).toBe(true);
     });
-    const chrome = container.querySelector('[data-stage-chrome]');
-    expect(chrome).toHaveAttribute('data-visible', 'false');
+    expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
+  });
 
-    vi.useFakeTimers();
+  it('enters the stage at the video frame', async () => {
+    const scrollSpy = vi.spyOn(window, 'scrollTo').mockImplementation(() => undefined);
     try {
-      fireEvent.pointerMove(overlay);
-      expect(chrome).toHaveAttribute('data-visible', 'true');
-      act(() => { vi.advanceTimersByTime(2600); });
-      expect(chrome).toHaveAttribute('data-visible', 'false');
+      const { api } = makeApi();
+      renderHost(api, '/room/' + roomId + '/host/stage');
+      expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
+      expect(scrollSpy).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     } finally {
-      vi.useRealTimers();
+      scrollSpy.mockRestore();
     }
+  });
 
-    unmount();
+  it('keeps the now-playing band outside the video frame', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/stage');
+
+    expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
+    expect(screen.queryByText('Now on the host screen')).toBeNull();
+    expect(screen.getByRole('slider', { name: 'Playback position' })).toBeInTheDocument();
   });
 
   it('does not request play when a song is already playing', async () => {

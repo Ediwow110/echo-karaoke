@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
@@ -36,6 +36,10 @@ export default function HostStagePage() {
   } = useHostRoom();
   const player = useHostPlayer();
   const navigate = useNavigate();
+
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, []);
   const [saved, setSaved] = useState(() => nowPlaying !== null && isFavorite(nowPlaying.videoId));
   const [busy, setBusy] = useState<'play' | 'next' | null>(null);
   const videoId = nowPlaying?.videoId ?? null;

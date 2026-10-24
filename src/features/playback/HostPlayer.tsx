@@ -1,6 +1,4 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
-import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
-import { CornersInIcon } from '@phosphor-icons/react/dist/csr/CornersIn';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
@@ -9,8 +7,7 @@ import { youtubePlayerFactory } from './youtubeIframe';
 import { HostPlayerContext, type HostPlayerValue } from './useHostPlayer';
 import type { PlayerHandle } from './playerTypes';
 import type { QueueEntry } from '../rooms/useRoomData';
-import { formatTime } from '../../lib/format';
-import { Button, Chip } from '../../ui';
+import { Button } from '../../ui';
 
 export type { HostPlayerValue } from './useHostPlayer';
 
@@ -82,8 +79,6 @@ export default function HostPlayer({
   const [duration, setDuration] = useState(0);
   const [volume, setVolumeState] = useState(volumeRef.current);
   const [fullscreen, setFullscreen] = useState(false);
-  const [controlsVisible, setControlsVisible] = useState(false);
-  const chromeTimerRef = useRef<number | null>(null);
   const [isLg, setIsLg] = useState(typeof window !== 'undefined' && window.matchMedia('(min-width: 1024px)').matches);
   useEffect(() => {
     const mq = window.matchMedia('(min-width: 1024px)');
@@ -381,31 +376,6 @@ export default function HostPlayer({
     };
   }, []);
 
-  const hideControls = useCallback((): void => {
-    if (chromeTimerRef.current !== null) {
-      window.clearTimeout(chromeTimerRef.current);
-      chromeTimerRef.current = null;
-    }
-    setControlsVisible(false);
-  }, []);
-
-  const revealControls = useCallback((): void => {
-    setControlsVisible(true);
-    if (chromeTimerRef.current !== null) {
-      window.clearTimeout(chromeTimerRef.current);
-    }
-    chromeTimerRef.current = window.setTimeout(() => {
-      chromeTimerRef.current = null;
-      setControlsVisible(false);
-    }, 2500);
-  }, []);
-
-  useEffect(() => () => {
-    if (chromeTimerRef.current !== null) {
-      window.clearTimeout(chromeTimerRef.current);
-    }
-  }, []);
-
   const requestPlay = useCallback(() => {
     setNeedsTap(false);
     try {
@@ -496,7 +466,6 @@ export default function HostPlayer({
   }, [onFindAlternative, playerError]);
 
   const effectiveDuration = duration > 0 ? duration : nowPlaying?.durationSeconds ?? 0;
-  const progress = effectiveDuration > 0 ? Math.min(100, (currentTime / effectiveDuration) * 100) : 0;
   const loading = videoId !== null
     && needsTap === false
     && playerState !== PLAYER_STATE.playing
@@ -588,76 +557,7 @@ export default function HostPlayer({
       >
         <div ref={hostRef} className="absolute inset-0" />
         {slot === null || videoId === null ? null : (
-          <div
-            data-stage-overlay
-            className="absolute inset-0"
-            onPointerEnter={revealControls}
-            onPointerMove={revealControls}
-            onPointerDown={revealControls}
-            onPointerLeave={(event) => {
-              if (event.pointerType !== 'touch') hideControls();
-            }}
-          >
-            <div
-              data-stage-chrome
-              data-visible={controlsVisible}
-              aria-hidden={!controlsVisible}
-              inert={!controlsVisible}
-              className={[
-                'pointer-events-none absolute inset-0 transition-opacity duration-300',
-                controlsVisible ? 'opacity-100' : 'opacity-0',
-              ].join(' ')}
-            >
-            <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,13,24,0.55)_0%,rgba(16,13,24,0.06)_24%,rgba(16,13,24,0.18)_58%,rgba(16,13,24,0.96)_100%)]" aria-hidden="true" />
-            <div className="relative flex items-start justify-between gap-3 p-4">
-              <Chip tone="overlay">YouTube</Chip>
-              <Chip tone="overlay">
-                <span
-                  aria-hidden="true"
-                  className={[
-                    'size-1.5 rounded-full',
-                    playerError !== null ? 'bg-danger' : advanceStalled ? 'bg-gold' : isPlaying ? 'bg-live' : 'bg-ink-2',
-                  ].join(' ')}
-                />
-                {playerError !== null ? 'Unavailable' : advanceStalled ? 'Playback stalled' : isPlaying ? 'Playing from YouTube' : 'Paused'}
-              </Chip>
-            </div>
-
-            <div className="absolute inset-x-0 bottom-0 px-5 pb-5">
-              <div className="flex items-end justify-between gap-4">
-                <div className="min-w-0">
-                  <p className="eyebrow text-gold">Now on the host screen</p>
-                  <h2 className="mt-1 truncate font-display text-[1.65rem] font-bold tracking-[-0.02em] text-ink">
-                    {nowPlaying?.title ?? 'Karaoke'}
-                  </h2>
-                  <p className="mt-1 truncate text-[0.75rem] text-ink-2">
-                    {nowPlaying?.channelTitle ?? 'YouTube'}
-                    {nowPlaying === null ? '' : ' · Added by ' + nowPlaying.addedBy}
-                  </p>
-                </div>
-                <div className="flex shrink-0 items-center gap-2 text-[0.6875rem] text-ink-2">
-                  <span className="tabular text-ink">{formatTime(currentTime)}</span>
-                  <span>/</span>
-                  <span className="tabular">{effectiveDuration > 0 ? formatTime(effectiveDuration) : '—:—'}</span>
-                </div>
-              </div>
-              <div className="mt-3 h-1 overflow-hidden rounded-full bg-white/15">
-                <div className="h-full rounded-full bg-signal transition-[width] duration-500" style={{ width: progress + '%' }} />
-              </div>
-            </div>
-
-            <div className="absolute right-4 top-14 flex pointer-events-auto items-center gap-2">
-              <button
-                type="button"
-                onClick={toggleFullscreen}
-                aria-label={fullscreen ? 'Exit fullscreen' : 'Fullscreen'}
-                className="grid size-9 place-items-center rounded-full bg-graphite-deep/70 text-ink transition-colors hover:bg-surface-2 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-              >
-                {fullscreen ? <CornersInIcon size={16} aria-hidden="true" /> : <ArrowsOutIcon size={16} aria-hidden="true" />}
-              </button>
-            </div>
-            </div>
-
+          <div className="pointer-events-none absolute inset-0">
             {loading && needsTap === false && playerError === null ? (
               <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-full bg-graphite-deep/70 p-3 text-signal">
                 <SpinnerGapIcon size={22} className="animate-spin" aria-label="Loading video" />

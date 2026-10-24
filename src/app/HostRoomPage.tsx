@@ -51,6 +51,7 @@ export default function HostRoomPage() {
   const exitTimerRef = useRef<number | null>(null);
   const wasLiveRef = useRef(false);
   const lastAutoPlayKey = useRef<string | null>(null);
+  const queueInitialized = useRef(false);
 
   useEffect(() => {
     // A cleanup that is immediately followed by the next setup is the
@@ -144,6 +145,13 @@ export default function HostRoomPage() {
       playbackBusy.current = false;
     }
   }, [api, notify, refresh, roomId]);
+
+  const enterStage = useCallback((): void => {
+    if (location.pathname.endsWith('/host/stage') || location.pathname.endsWith('/host/party')) {
+      return;
+    }
+    navigate('/room/' + roomId + '/host/stage');
+  }, [location.pathname, navigate, roomId]);
 
   const next = useCallback(async (): Promise<boolean> => {
     if (advanceBusy.current) {
@@ -263,7 +271,22 @@ export default function HostRoomPage() {
   }, [nowPlaying]);
 
   useEffect(() => {
+    if (!live) {
+      return;
+    }
     const fresh = queue.filter((song) => !seenSongs.current.has(song.videoId));
+    if (!queueInitialized.current) {
+      // A host opening the room with an existing queue should not be pulled
+      // away from the page they chose; only songs added after this point do.
+      for (const song of fresh) {
+        seenSongs.current.add(song.videoId);
+      }
+      if (fresh.length > 0) {
+        rememberSongs(fresh);
+      }
+      queueInitialized.current = true;
+      return;
+    }
     if (fresh.length === 0) {
       return;
     }
@@ -271,7 +294,8 @@ export default function HostRoomPage() {
       seenSongs.current.add(song.videoId);
     }
     rememberSongs(fresh);
-  }, [queue]);
+    enterStage();
+  }, [enterStage, live, queue]);
 
   useEffect(() => {
     document.title = roomName.length > 0 ? 'ECHO · ' + roomName : 'ECHO | the room sings together';
@@ -296,8 +320,11 @@ export default function HostRoomPage() {
     const key = queue[0].songId;
     if (lastAutoPlayKey.current === key) return;
     lastAutoPlayKey.current = key;
+    // A guest's first request should take the host screen straight to the
+    // stage; the manual "Take the stage" button is only a fallback.
     void runPlayback('play');
-  }, [live, data?.playback, queue, runPlayback]);
+    enterStage();
+  }, [enterStage, live, data?.playback, queue, runPlayback]);
 
   if (loading) {
     return (
