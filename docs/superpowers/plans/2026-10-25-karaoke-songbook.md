@@ -12,14 +12,15 @@
 
 ## Status (2026-10-25, second pass)
 
-Tasks 1–6 remain committed on `feature/songbook` (14 ahead of local `master`, 16 ahead of
-`origin/master`, latest `8780c90`). The branch is still **not pushed** and **migrations 0031–0033
-are still not applied to production Neon `main`**, which is verified to be at 0030 with none of the
-catalog or auto-advance functions. Merging also carries the two local-only `master` commits
-(`9dc5396`, `54b8478`) that were never shipped.
+Tasks 1–6 are committed on `feature/songbook`, and the branch now carries eight more commits
+(`4e4ac1b..7a482b6`) on top of `8780c90`. It is **not pushed**: 22 ahead of local `master`, 24 ahead
+of `origin/master`. Merging also carries the two local-only `master` commits (`9dc5396`, `54b8478`)
+that were never shipped. Production Neon `main` is verified to be at 0030 with none of the catalog
+or auto-advance functions, so **0031–0033 are still not applied**.
 
-A second, uncommitted batch sits in the working tree (55 modified files, 14 untracked, +1787/-231).
-It is not one of this plan's tasks; it hardened the surrounding features after Task 6:
+A second batch sat **uncommitted** in the working tree after Task 6 (55 modified files, 14
+untracked, +1787/-231) and is now committed locally as eight commits, `4e4ac1b..7a482b6`. It is
+beyond this plan; it hardened the surrounding features:
 
 - `0032_playback_auto_advance_once.sql` + `playbackCommand` — an automatic advance passes
   `expectedSongId` and the database re-checks it under the room lock, so a replayed advance can
