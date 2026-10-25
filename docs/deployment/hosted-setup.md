@@ -493,6 +493,19 @@ grants in 0034 are needed even though nothing calls them yet.
 3. **Deploy** by pushing `master`. Note this branch also carries the two local-only `master`
    commits (`9dc5396`, `54b8478`) that were never shipped.
 
+   Nothing else in this tree can fail the build, and that is measured rather than assumed.
+   `npx vercel build --prod` run locally on 2026-10-26 completed in 32 s: `verify:deploy` passed once
+   a ≥32-character `CRON_SECRET` existed (any value satisfies the length check — the guard does not
+   compare it to anything), the Vite bundle built, and `api/router.ts` packaged into
+   `.vercel/output/functions` at 7.6 MB. The same run **without** the secret died on the first
+   command with `BUILD_UTILS_SPAWN_1`, which is what a pushed deploy does in production too: the
+   missing secret is the only build blocker. Note that Vercel withholds stored secrets from local
+   builds, so running this yourself means supplying `BETTER_AUTH_SECRET`, `DATABASE_URL`,
+   `AUTH_DATABASE_URL`, `ALLOWED_ORIGINS`, and a throwaway `CRON_SECRET` in the environment — and
+   `.env.local` wraps `AUTH_DATABASE_URL` in single quotes, which survives a naive shell export.
+   The build output carries no credentials: none of the four production values appears in any file
+   under `.vercel/output`.
+
 4. **Verify on the live origin:**
 
    ```bash
@@ -626,6 +639,8 @@ branch for the app-level proof only, or expect those four assertions to complain
   tables and seven catalog functions exist, and `karaoke_catalog_page` executes as `echo_service`
   rather than merely being granted to it. This line is new — without it the next reader has nothing
   marking step 2 as finished, and a re-apply looks plausible.
+- [x] `npx vercel build --prod` completes locally with the guard satisfied, the router packaged as a
+  Function, and no credential in `.vercel/output` (2026-10-26). Fails on the missing secret alone.
 - [ ] `vercel deploy --prod` builds with the guard enabled.
 - [ ] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
 - [ ] A browser host/guest flow works with a 390px guest viewport.
