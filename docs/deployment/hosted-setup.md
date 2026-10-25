@@ -494,6 +494,16 @@ grants in 0034 are needed even though nothing calls them yet.
    commits (`9dc5396`, `54b8478`) that were never shipped.
 
    Nothing else in this tree can fail the build, and that is measured rather than assumed.
+
+   **What this deploy changes for rooms that are already running.** When a video ends in an open host
+   tab, the queue now advances by itself. Before this push nothing does that: the operation exists only
+   after 0032, and the deployed front-end never sends the field that triggers it. The path is guarded —
+   `HostPlayer.advance()` refuses unless the video it loaded is still the room's current song,
+   `playback_next_if_current` re-checks that song under the room lock, the client latches one advance
+   per song id, and a refusal shows as a stalled-advance state instead of silence. But **there is no
+   host setting that turns it off**: `HostSettingsPage` exposes only the guest-control and
+   guest-playback locks. Treat it as a product decision to ship, not a silent side effect — if you
+   want a per-room switch, that is a follow-up, not something to bolt on mid-ship.
    `npx vercel build --prod` run locally on 2026-10-26 completed in 32 s: `verify:deploy` passed once
    a ≥32-character `CRON_SECRET` existed (any value satisfies the length check — the guard does not
    compare it to anything), the Vite bundle built, and `api/router.ts` packaged into
