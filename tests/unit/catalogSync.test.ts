@@ -162,6 +162,7 @@ type FetchOptions = {
   nextPageToken?: boolean;
   unresolved?: string[];
   unreachable?: string[];
+  failingPlaylists?: string[];
 };
 
 function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
@@ -180,6 +181,8 @@ function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
         items: [{ contentDetails: { relatedPlaylists: { uploads: `UU${handle.slice(1)}` } } }],
       });
     }
+    const playlistId = url.searchParams.get('playlistId') ?? '';
+    if (options.failingPlaylists?.includes(playlistId)) return new Response(null, { status: 503 });
     const body: Record<string, unknown> = { items: options.rows ?? [] };
     if (options.nextPageToken === true) {
       body.nextPageToken = `page-${urls.length}`;
@@ -427,6 +430,36 @@ describe('catalog sync orchestration', () => {
     expect(body.unreachable).toEqual(['@singking']);
     expect(body.unresolved).toEqual([]);
     expect(body.message).toContain('could not reach');
+  });
+
+  it('re-resolves a stored uploads playlist that YouTube no longer serves', async () => {
+    // A channel that is renamed or deleted leaves a cursor pointing at a dead
+    // playlist. Trusting it forever means that channel silently stops updating,
+    // so a first-page failure must fall back to resolving the handle again.
+    useDatabase(baseHandlers({
+      karaoke_catalog_cursors: () => CATALOG_CHANNELS.map((handle) => ({
+        channelId: handle,
+        uploadsPlaylistId: handle === '@vinylktv' ? 'UUstaleplaylist' : `UU${handle.slice(1)}`,
+        nextPageToken: null,
+        exhaustedAt: null,
+        lastSyncedAt: handle === '@vinylktv' ? null : new Date().toISOString(),
+      })),
+    }));
+    const fetches = stubFetch({ rows: [row(1)], failingPlaylists: ['UUstaleplaylist'] });
+
+    const body = await (await catalogSync(syncRequest(), CALLER)).json() as {
+      added: number; unreachable: string[];
+    };
+
+    expect(body.added).toBeGreaterThan(0);
+    expect(body.unreachable).toEqual([]);
+    // The handle was asked for a second time, and the fresh id replaced the dead one.
+    const resolved = fetches.urls.filter((u) => u.pathname.endsWith('/channels'));
+    expect(resolved.some((u) => u.searchParams.get('forHandle') === '@vinylktv')).toBe(true);
+    const saved = db.query.mock.calls
+      .filter(([text]) => String(text).includes('karaoke_catalog_cursor_save'))
+      .map(([, params]) => params);
+    expect(saved).toContainEqual(['@vinylktv', 'UUvinylktv', null, false]);
   });
 
   it('leaves unresolved empty when every handle resolves', async () => {

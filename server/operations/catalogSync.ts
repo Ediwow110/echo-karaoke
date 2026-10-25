@@ -156,6 +156,36 @@ async function upsertRows(channelId: string, rows: CatalogRow[]): Promise<void> 
   await serviceDatabase().query(call.text, call.params);
 }
 
+type HandleLookup
+  = | { state: 'ok'; playlistId: string }
+    | { state: 'unreachable' }
+    | { state: 'unresolved' }
+    | { state: 'out-of-budget' }
+    | { state: 'stopped' };
+
+/** Resolve a handle to its uploads playlist, buying exactly one quota unit. */
+async function lookupUploadsPlaylist(
+  handle: string,
+  apiKey: string,
+  request: Request,
+  started: number,
+): Promise<HandleLookup> {
+  const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
+  if ((spent as { allowed?: boolean } | null)?.allowed !== true) return { state: 'out-of-budget' };
+  const remaining = TIME_BUDGET_MS - (Date.now() - started);
+  if (remaining <= 0) return { state: 'out-of-budget' };
+  const upstream = await fetchUpstream(
+    channelUrl(handle, apiKey),
+    Math.min(5000, Math.max(250, remaining)),
+    request,
+  );
+  if (upstream.state === 'stopped') return { state: 'stopped' };
+  if (upstream.state === 'http-error') return { state: 'unreachable' };
+  const items = (upstream.payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
+  const uploads = items[0]?.contentDetails?.relatedPlaylists?.uploads;
+  return typeof uploads === 'string' ? { state: 'ok', playlistId: uploads } : { state: 'unresolved' };
+}
+
 export async function catalogSync(request: Request, caller: Caller): Promise<Response> {
   const body = await readJsonObject(request);
   const roomId = requireRoomId(body.roomId);
@@ -195,41 +225,36 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     }
 
     let playlistId = cursor?.uploadsPlaylistId ?? null;
+    const fromStoredCursor = playlistId !== null;
     if (playlistId === null) {
-      const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
-      if ((spent as { allowed?: boolean } | null)?.allowed !== true) break;
-      const remaining = TIME_BUDGET_MS - (Date.now() - started);
-      if (remaining <= 0) break;
-      const upstream = await fetchUpstream(
-        channelUrl(handle, apiKey),
-        Math.min(5000, Math.max(250, remaining)),
-        request,
-      );
-      if (upstream.state === 'stopped') {
+      const lookup = await lookupUploadsPlaylist(handle, apiKey, request, started);
+      if (lookup.state === 'stopped') {
         stoppedEarly = true;
         break channels;
       }
-      if (upstream.state === 'http-error') {
+      if (lookup.state === 'out-of-budget') break;
+      if (lookup.state === 'unreachable') {
         // Transient, and it self-heals on the next refresh because no cursor was
         // written — but say so, or "added 0" reads as an empty songbook during a
         // YouTube outage.
         unreachable.push(handle);
         continue;
       }
-      const items = (upstream.payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
-      const uploads = items[0]?.contentDetails?.relatedPlaylists?.uploads;
-      if (typeof uploads !== 'string') {
+      if (lookup.state === 'unresolved') {
         // A handle that names no channel is a configuration fact, not a
         // transient failure: the catalog would silently stay one channel short.
         unresolved.push(handle);
         continue;
       }
-      playlistId = uploads;
+      playlistId = lookup.playlistId;
       await saveCursor(handle, playlistId, null, false);
     }
 
     let token = cursor?.nextPageToken ?? null;
-    for (let page = 0; page < MAX_PAGES_PER_CHANNEL; page += 1) {
+    let reconnected = false;
+    // The page counter advances only on a served page, so a recovery retry
+    // re-asks the same page instead of skipping it.
+    for (let page = 0; page < MAX_PAGES_PER_CHANNEL; ) {
       if (Date.now() - started > TIME_BUDGET_MS) break;
       const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
       if ((spent as { allowed?: boolean } | null)?.allowed !== true) {
@@ -249,7 +274,28 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
         stoppedEarly = true;
         break channels;
       }
-      if (upstream.state === 'http-error') break;
+      if (upstream.state === 'http-error') {
+        // A cursor can outlive its channel. A renamed or deleted uploads
+        // playlist would otherwise be trusted forever and that channel would
+        // stop contributing rows in silence, so re-resolve the handle once.
+        if (!reconnected && fromStoredCursor && page === 0) {
+          reconnected = true;
+          const lookup = await lookupUploadsPlaylist(handle, apiKey, request, started);
+          if (lookup.state === 'stopped') {
+            stoppedEarly = true;
+            break channels;
+          }
+          if (lookup.state === 'ok' && lookup.playlistId !== playlistId) {
+            playlistId = lookup.playlistId;
+            token = null;
+            await saveCursor(handle, playlistId, null, false);
+            continue;
+          }
+          if (lookup.state === 'unresolved') unresolved.push(handle);
+          if (lookup.state === 'unreachable') unreachable.push(handle);
+        }
+        break;
+      }
       const rows = mapPlaylistItems(upstream.payload);
       await upsertRows(handle, rows);
       added += rows.length;
@@ -257,6 +303,7 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
       await saveCursor(handle, playlistId, next, next === null);
       if (next === null) break;
       token = next;
+      page += 1;
     }
   }
 
