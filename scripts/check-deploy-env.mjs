@@ -25,7 +25,9 @@ function checkBackend(env, errors) {
   }
   if (env.VERCEL_ENV === 'production'
     && String(env.CRON_SECRET ?? '').trim().length < 32) {
-    errors.push('CRON_SECRET must contain at least 32 characters in Production.');
+    errors.push('CRON_SECRET must contain at least 32 characters in Production.'
+      + ' Add it with: npx vercel env add CRON_SECRET production --force --sensitive'
+      + ' (the daily catalog retention call answers 503 without it).');
   }
   const isPreview = env.VERCEL_ENV === 'preview';
   const required = isPreview

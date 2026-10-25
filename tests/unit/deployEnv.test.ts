@@ -11,12 +11,13 @@ const valid = {
 describe('deployment environment guard', () => {
   it('requires a strong cron secret for a production deployment, not preview', () => {
     const production = { ...valid, VERCEL_ENV: 'production' };
-    expect(checkDeployEnv(production)).toContain(
-      'CRON_SECRET must contain at least 32 characters in Production.',
-    );
-    expect(checkDeployEnv({ ...production, CRON_SECRET: 'short' })).toContain(
-      'CRON_SECRET must contain at least 32 characters in Production.',
-    );
+    for (const env of [production, { ...production, CRON_SECRET: 'short' }]) {
+      const cronError = checkDeployEnv(env).find((message) => message.includes('CRON_SECRET'));
+      expect(cronError, 'a missing or short CRON_SECRET must block the build').toBeDefined();
+      // The operator hitting this is mid-deploy, so say how to fix it and what breaks without it.
+      expect(cronError).toContain('npx vercel env add CRON_SECRET production');
+      expect(cronError).toContain('retention');
+    }
     expect(checkDeployEnv({ ...production, CRON_SECRET: 'c'.repeat(40) })).toEqual([]);
   });
   it('accepts a list of explicit deployed origins', () => {
