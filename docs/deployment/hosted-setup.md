@@ -464,6 +464,14 @@ order; step 1 is the only one that is not a command, and nothing after it is saf
    curl -s -o /dev/null -w '%{http_code}\n' https://echo-karaoke-mocha.vercel.app/api/cron/catalog-retention
    ```
 
+   Before the push, `verify:preview` fails **exactly two** checks on production (measured
+   2026-10-25): `referrer-policy does not contain strict-origin-when-cross-origin` and `The
+   kara-echo title is missing from the HTML`. Both are the branch's own values asserting themselves
+   against the older deployment — every other check (headers, CSP, SPA fallback, asset caching,
+   credential-free HTML, JWKS, JSON on an unknown `/api` route) passes, so the live origin is
+   healthy. Treat those two as the ship's signal: after a successful deploy they must clear, and if
+   they still fail the new build is not the one being served. Expect nothing else to differ.
+
    Expect `401` from the cron — reachable, and rejecting an unauthenticated caller. Then open a
    room as host, press **Refresh the songbook**, and confirm the note reports songs added with no
    "could not find" clause; the first run fills roughly 400 rows from four channels for about 16
