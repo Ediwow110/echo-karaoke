@@ -554,7 +554,13 @@ and authenticated roles.
 
 - **Production has no grant drift today.** Read-only comparison on `main` found zero functions
   reachable by `service_role` and unreachable by `echo_service`. The rotation copied everything that
-  existed at 0030; 0034 is needed only because 0031–0033 land on top of that copy.
+  existed at 0030; 0034 is needed only because 0031–0033 land on top of that copy. Checked the other
+  direction on 2026-10-26 as well, because it is the one that can redden the push: read every ACL
+  with `aclexplode` on `main` and all 32 functions `echo_service` may execute are named explicitly
+  (none lean on default `PUBLIC` execute, which is why `anon` is denied), and every one of those 32
+  names appears in a `grant execute` statement in the migration chain. So the freshly migrated branch
+  CI builds will grant what production already has, and the runtime-role grant gate cannot fail there
+  for a reason it passes here.
 - **The cron schedule is allowed on every plan.** `0 2 * * *` runs once per day, which satisfies the
   Hobby restriction that cron expressions running more frequently fail during deployment. A
   more frequent schedule would break the build on that plan.
