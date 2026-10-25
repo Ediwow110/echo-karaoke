@@ -484,6 +484,20 @@ describe('catalog sync orchestration', () => {
     expect(body.message).toContain('could not reach');
   });
 
+  it('does not blame the daily quota when the limiter itself fails', async () => {
+    // The limiter call swallowed its own error, so a database failure looked
+    // like a refusal and the host was told "paused for today" — a false cause
+    // they would believe until the Pacific-day reset. The router maps this
+    // rejection to a 500, and keeps the driver's code for the log.
+    useDatabase(baseHandlers({
+      karaoke_catalog_cursors: () => [],
+      consume_daily_rate_limit: () => new Error('connection terminated unexpectedly'),
+    }));
+    stubFetch({ rows: [row(1)] });
+
+    await expect(catalogSync(syncRequest(), CALLER)).rejects.toThrow('connection terminated');
+  });
+
   it('leaves unresolved empty when every handle resolves', async () => {
     useDatabase(baseHandlers({
       karaoke_catalog_cursors: () => cursors('@singking', new Date().toISOString()),

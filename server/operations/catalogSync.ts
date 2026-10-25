@@ -124,14 +124,21 @@ type Cursor = {
   lastSyncedAt: string | null;
 };
 
-async function queryAllowNull(name: string, params: unknown[]): Promise<unknown> {
-  try {
-    const call = operationCall(name, params);
-    const rows = await serviceDatabase().query(call.text, call.params);
-    return (rows[0] as { result?: unknown } | undefined)?.result ?? null;
-  } catch {
-    return null;
+/**
+ * Ask the daily limiter, and fail loudly when the limiter itself cannot answer.
+ * Its only return shape is a jsonb object with `allowed`, so a swallowed error
+ * used to be indistinguishable from a refusal — and a database failure was
+ * reported to the host as "paused for today", a false cause they would believe
+ * until the Pacific-day reset.
+ */
+async function quotaAllows(name: string, params: unknown[]): Promise<boolean> {
+  const call = operationCall(name, params);
+  const rows = await serviceDatabase().query(call.text, call.params);
+  const result = (rows[0] as { result?: unknown } | undefined)?.result;
+  if (result === null || typeof result !== 'object') {
+    throw new HttpError('INTERNAL_ERROR', 500, 'The songbook budget could not be checked. Try again.');
   }
+  return (result as { allowed?: unknown }).allowed === true;
 }
 
 async function loadCursors(): Promise<Cursor[]> {
@@ -170,8 +177,9 @@ async function lookupUploadsPlaylist(
   request: Request,
   started: number,
 ): Promise<HandleLookup> {
-  const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
-  if ((spent as { allowed?: boolean } | null)?.allowed !== true) return { state: 'out-of-budget' };
+  if (!(await quotaAllows('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]))) {
+    return { state: 'out-of-budget' };
+  }
   const remaining = TIME_BUDGET_MS - (Date.now() - started);
   if (remaining <= 0) return { state: 'out-of-budget' };
   const upstream = await fetchUpstream(
@@ -256,8 +264,7 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     // re-asks the same page instead of skipping it.
     for (let page = 0; page < MAX_PAGES_PER_CHANNEL; ) {
       if (Date.now() - started > TIME_BUDGET_MS) break;
-      const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
-      if ((spent as { allowed?: boolean } | null)?.allowed !== true) {
+      if (!(await quotaAllows('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]))) {
         return jsonResponse({
           available: true, added, skipped, unresolved, unreachable,
           message: 'Songbook refresh paused for today',
