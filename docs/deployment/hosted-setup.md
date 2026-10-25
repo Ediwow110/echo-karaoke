@@ -412,6 +412,13 @@ connects as `echo_service`, so without it every songbook call answers 500 while 
 owner-run database suite still passes. Grant new functions to both roles from now on;
 `supabase/tests/role_grant_parity_test.sql` fails if they drift apart.
 
+Apply the **whole chain in one `db push`**, never a single file. 0031 defines
+`karaoke_catalog_page` and 0033 replaces it with the version that hides metadata older than 28
+days, so re-running 0031 on its own quietly removes that privacy filter and nothing errors — the
+rows stay and the expiry disappears. Re-applying an edited migration must always be followed by
+everything that overrides it; this happened during local work on 2026-10-25 and the retention
+test is what caught it.
+
 ## Step 9: Shipping the songbook
 
 Production `main` is at migration 0030, so the catalog does not exist there yet. Run these in
