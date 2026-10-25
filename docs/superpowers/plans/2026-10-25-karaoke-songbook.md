@@ -12,14 +12,14 @@
 
 ## Status (2026-10-25, second pass)
 
-Tasks 1–6 are committed on `feature/songbook`, and the branch now carries eight more commits
-(`4e4ac1b..7a482b6`) on top of `8780c90`. It is **not pushed**: 22 ahead of local `master`, 24 ahead
-of `origin/master`. Merging also carries the two local-only `master` commits (`9dc5396`, `54b8478`)
-that were never shipped. Production Neon `main` is verified to be at 0030 with none of the catalog
-or auto-advance functions, so **0031–0033 are still not applied**.
+Tasks 1–6 are committed on `feature/songbook`, and the branch now carries the second batch below on
+top of `8780c90`. It is **not pushed**; read the live gap with `git rev-list --count
+origin/master..HEAD`. Pushing also carries the two local-only `master` commits (`9dc5396`,
+`54b8478`) that were never shipped. Production Neon `main` is verified to be at 0030 with none of
+the catalog or auto-advance functions, so **0031–0033 are still not applied**.
 
 A second batch sat **uncommitted** in the working tree after Task 6 (55 modified files, 14
-untracked, +1787/-231) and is now committed locally as eight commits, `4e4ac1b..7a482b6`. It is
+untracked, +1787/-231) and is now committed locally on this branch, starting at `4e4ac1b`. It is
 beyond this plan; it hardened the surrounding features:
 
 - `0032_playback_auto_advance_once.sql` + `playbackCommand` — an automatic advance passes
