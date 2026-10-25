@@ -574,6 +574,16 @@ and authenticated roles.
   failing a host's refresh. Proven to have teeth by planting `operationCall('temp_probe_rpc', [])`
   into an operation file, which failed the run naming that RPC; the privilege half discriminates
   because `anon` reads false for the same functions `echo_service` reads true on.
+- **The deploy does not log anyone out.** `server/auth/auth.ts` is in the diff, and its only change
+  is `appName: 'ECHO'` → `'kara-echo'`. In the installed Better Auth, `appName` is stored on the
+  context and consumed at exactly two places, both the fallback TOTP issuer for two-factor
+  authenticator URLs — it is not part of session tokens, cookie naming, or secret derivation, and this
+  tree has **zero** call sites for two-factor, TOTP, or multi-factor. `BETTER_AUTH_SECRET` is
+  unchanged, and none of 0031–0034 touches an auth table, so live rooms keep their sessions and host
+  passes across the deploy. The other file on every request's path, `api/router.ts`, gains one exact
+  `pathname === '/api/cron/catalog-retention'` guard ahead of the auth branch; every other path falls
+  through untouched. If two-factor is ever added, that issuer string becomes the thing a re-brand
+  changes for already-enrolled authenticators.
 - **Every environment variable the Function reads is present in Production except
   `CRON_SECRET`.** Enumerated from `server/` and `api/` including the dynamic
   `process.env[name]` budget reads: `DATABASE_URL`, `AUTH_DATABASE_URL`,
