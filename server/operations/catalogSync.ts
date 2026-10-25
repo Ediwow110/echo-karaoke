@@ -183,6 +183,7 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
   let skipped = 0;
   let stoppedEarly = false;
   const unresolved: string[] = [];
+  const unreachable: string[] = [];
 
   channels: for (const handle of CATALOG_CHANNELS) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
@@ -208,7 +209,13 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
         stoppedEarly = true;
         break channels;
       }
-      if (upstream.state === 'http-error') continue;
+      if (upstream.state === 'http-error') {
+        // Transient, and it self-heals on the next refresh because no cursor was
+        // written — but say so, or "added 0" reads as an empty songbook during a
+        // YouTube outage.
+        unreachable.push(handle);
+        continue;
+      }
       const items = (upstream.payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
       const uploads = items[0]?.contentDetails?.relatedPlaylists?.uploads;
       if (typeof uploads !== 'string') {
@@ -227,7 +234,7 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
       const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
       if ((spent as { allowed?: boolean } | null)?.allowed !== true) {
         return jsonResponse({
-          available: true, added, skipped, unresolved,
+          available: true, added, skipped, unresolved, unreachable,
           message: 'Songbook refresh paused for today',
         });
       }
@@ -258,6 +265,9 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     unresolved.length === 0
       ? null
       : 'Songbook refresh could not find: ' + unresolved.join(', '),
+    unreachable.length === 0
+      ? null
+      : 'Songbook refresh could not reach: ' + unreachable.join(', '),
   ].filter((note): note is string => note !== null);
 
   return jsonResponse({
@@ -265,6 +275,7 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     added,
     skipped,
     unresolved,
+    unreachable,
     ...(notes.length === 0 ? {} : { message: notes.join('. ') }),
   });
 }

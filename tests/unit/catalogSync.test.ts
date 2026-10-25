@@ -161,6 +161,7 @@ type FetchOptions = {
   rows?: unknown[];
   nextPageToken?: boolean;
   unresolved?: string[];
+  unreachable?: string[];
 };
 
 function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
@@ -173,6 +174,7 @@ function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
     db.timeline.push('fetch');
     if (url.pathname.endsWith('/channels')) {
       const handle = url.searchParams.get('forHandle') ?? '@channel';
+      if (options.unreachable?.includes(handle)) return new Response(null, { status: 503 });
       if (options.unresolved?.includes(handle)) return upstream({ items: [] });
       return upstream({
         items: [{ contentDetails: { relatedPlaylists: { uploads: `UU${handle.slice(1)}` } } }],
@@ -347,6 +349,7 @@ describe('catalog sync orchestration', () => {
       added: 0,
       skipped: 0,
       unresolved: [],
+      unreachable: [],
       message: 'Songbook refresh paused for today',
     });
   });
@@ -396,6 +399,34 @@ describe('catalog sync orchestration', () => {
     // ...but a handle that returned no channel must never disappear silently.
     expect(body.unresolved).toEqual(['@vinylktv']);
     expect(body.message).toContain('@vinylktv');
+  });
+
+  it('says so when a channel could not be reached, without blaming the handle', async () => {
+    // A 5xx from YouTube is transient, not a bad handle: naming it under
+    // "could not find" would push the host to edit config that is already right.
+    useDatabase(baseHandlers({
+      karaoke_catalog_cursors: () => cursors('@vinylktv', new Date().toISOString())
+        .map((row) => {
+          const cursor = row as {
+            channelId: string;
+            uploadsPlaylistId: string | null;
+            lastSyncedAt: string | null;
+          };
+          return cursor.channelId === '@vinylktv' || cursor.channelId === '@singking'
+            ? { ...cursor, uploadsPlaylistId: null, lastSyncedAt: null }
+            : row;
+        }),
+    }));
+    stubFetch({ rows: [row(1)], unreachable: ['@singking'] });
+
+    const body = await (await catalogSync(syncRequest(), CALLER)).json() as {
+      added: number; message?: string; unreachable: string[]; unresolved: string[];
+    };
+
+    expect(body.added).toBeGreaterThan(0);
+    expect(body.unreachable).toEqual(['@singking']);
+    expect(body.unresolved).toEqual([]);
+    expect(body.message).toContain('could not reach');
   });
 
   it('leaves unresolved empty when every handle resolves', async () => {

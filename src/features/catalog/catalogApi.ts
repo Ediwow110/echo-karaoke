@@ -49,6 +49,7 @@ export type CatalogSyncResult = {
   added: number;
   skipped: number;
   unresolved?: string[];
+  unreachable?: string[];
   message?: string;
 };
 
