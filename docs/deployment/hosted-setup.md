@@ -434,8 +434,23 @@ order; step 1 is the only one that is not a command, and nothing after it is saf
 
 **Rolling back** is cheap because every catalog object is additive: redeploy the previous commit to
 drop the feature from the app and leave the tables and grants in place. Do not drop `karaoke_catalog`
-to undo a deploy — 0033's RLS and grant hygiene is what keeps the metadata unreachuable by the anon
+to undo a deploy — 0033's RLS and grant hygiene is what keeps the metadata unreachable by the anon
 and authenticated roles.
+
+### Already verified, so you do not re-check it
+
+- **Production has no grant drift today.** Read-only comparison on `main` found zero functions
+  reachable by `service_role` and unreachable by `echo_service`. The rotation copied everything that
+  existed at 0030; 0034 is needed only because 0031–0033 land on top of that copy.
+- **The cron schedule is allowed on every plan.** `0 2 * * *` runs once per day, which satisfies the
+  Hobby restriction that cron expressions running more frequently fail during deployment. A
+  more frequent schedule would break the build on that plan.
+- **Vercel's rewrite cannot swallow the cron path.** `/api/(.*)` is matched before the SPA fallback,
+  and the fallback's negative lookahead already excludes `api/`. `restoreApiRequest` rebuilds the
+  pathname as `/api/cron/catalog-retention`, which is what the router compares — covered by
+  `tests/unit/catalogRetentionRouter.test.ts` using the real rewrite helper, not a mock.
+- **The first refresh is bounded**: four channels, at most three pages each, roughly 400 rows and
+  about 16 quota units, against a 40-unit daily cap. Browsing the songbook costs nothing.
 
 ## Verification checklist
 
