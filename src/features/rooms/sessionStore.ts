@@ -18,7 +18,6 @@ export type LastRoom = {
 const SESSIONS_KEY = 'karaoke.sessions';
 const LAST_ROOM_KEY = 'karaoke.last-room';
 const PROFILE_KEY = 'karaoke.profile.name';
-const CHANGE_EVENT = 'karaoke:sessions-change';
 const SESSION_LIMIT = 8;
 
 function readJson<T>(key: string, fallback: T): T {
@@ -41,13 +40,6 @@ function writeJson(key: string, value: unknown): void {
   }
 }
 
-function notify(): void {
-  if (typeof window === 'undefined') {
-    return;
-  }
-  window.dispatchEvent(new Event(CHANGE_EVENT));
-}
-
 function isSession(value: unknown): value is RoomSession {
   if (value === null || typeof value !== 'object') {
     return false;
@@ -61,7 +53,7 @@ function isSession(value: unknown): value is RoomSession {
     && typeof session.lastSeenAt === 'string';
 }
 
-export function getSessions(): RoomSession[] {
+function getSessions(): RoomSession[] {
   const stored = readJson<unknown>(SESSIONS_KEY, []);
   if (!Array.isArray(stored)) {
     return [];
@@ -76,7 +68,6 @@ export function rememberSession(session: Omit<RoomSession, 'lastSeenAt'>): void 
   const existing = getSessions().filter((entry) => entry.roomId !== session.roomId);
   writeJson(SESSIONS_KEY, [{ ...session, lastSeenAt: now }, ...existing].slice(0, SESSION_LIMIT));
   writeJson(LAST_ROOM_KEY, { roomId: session.roomId, role: session.role } satisfies LastRoom);
-  notify();
 }
 
 export function touchSession(roomId: string, patch?: Partial<Pick<RoomSession, 'roomName' | 'hostName'>>): void {
@@ -92,7 +83,6 @@ export function touchSession(roomId: string, patch?: Partial<Pick<RoomSession, '
     .sort((a, b) => b.lastSeenAt.localeCompare(a.lastSeenAt));
   writeJson(SESSIONS_KEY, next);
   writeJson(LAST_ROOM_KEY, { roomId, role: current.role } satisfies LastRoom);
-  notify();
 }
 
 export function getLastRoom(): LastRoom | null {
@@ -128,7 +118,6 @@ export function clearLastRoom(): void {
   } catch {
     // Ignore unavailable storage.
   }
-  notify();
 }
 
 export function getStoredProfileName(): string {
@@ -152,14 +141,3 @@ export function saveProfileName(name: string): void {
   }
 }
 
-export function subscribeSessions(listener: () => void): () => void {
-  if (typeof window === 'undefined') {
-    return () => undefined;
-  }
-  window.addEventListener(CHANGE_EVENT, listener);
-  window.addEventListener('storage', listener);
-  return () => {
-    window.removeEventListener(CHANGE_EVENT, listener);
-    window.removeEventListener('storage', listener);
-  };
-}

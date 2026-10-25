@@ -1,4 +1,3 @@
-import { useEffect, useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
 import { CompassIcon } from '@phosphor-icons/react/dist/csr/Compass';
@@ -8,13 +7,7 @@ import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { Avatar, Logo } from '../../ui';
-import { loadGuestToken, loadHostToken } from './tokenStore';
-import {
-  getSessions,
-  getStoredProfileName,
-  subscribeSessions,
-  type RoomSession,
-} from './sessionStore';
+import { getStoredProfileName } from './sessionStore';
 
 export type SidebarNav =
   | 'discover'
@@ -78,29 +71,10 @@ function hrefFor(item: NavItem, activeRoom: ActiveRoom | null | undefined): stri
   return item.href;
 }
 
-function sessionHref(session: RoomSession): string {
-  const host = loadHostToken(session.roomId) !== null;
-  const guest = loadGuestToken(session.roomId) !== null;
-  if (session.role === 'host' && host) {
-    return '/room/' + session.roomId + '/host';
-  }
-  if (guest) {
-    return '/room/' + session.roomId;
-  }
-  return '/join/' + session.code;
-}
-
 export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
   const location = useLocation();
-  const [sessions, setSessions] = useState<RoomSession[]>(() => getSessions());
   const name = hostName ?? getStoredProfileName() ?? '';
   const displayName = name.length > 0 ? name : 'Host';
-
-  useEffect(() => {
-    const sync = (): void => setSessions(getSessions());
-    sync();
-    return subscribeSessions(sync);
-  }, []);
 
   return (
     <aside aria-label="Room navigation" className="hidden h-dvh w-[232px] shrink-0 flex-col border-r border-line bg-graphite-deep px-4 pb-5 pt-7 lg:sticky lg:top-0 lg:flex">
@@ -108,7 +82,7 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
         <Logo size="lg" />
       </Link>
 
-      <nav aria-label="Primary" className="mt-9 flex flex-col gap-1">
+      <nav aria-label="Primary" className="mt-9 mb-5 flex flex-col gap-1">
         {items.map((item) => {
           const disabled = item.requiresRoom === true && (activeRoom === null || activeRoom === undefined);
           const href = hrefFor(item, activeRoom);
@@ -155,39 +129,7 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
         })}
       </nav>
 
-      <div className="mt-8 min-h-0 flex-1 overflow-y-auto">
-        <p className="eyebrow px-3 text-ink-2">My sessions</p>
-        {sessions.length === 0 ? (
-          <p className="mt-3 px-3 text-[0.6875rem] leading-[1.6] text-ink-3">
-            Rooms you host or join appear here.
-          </p>
-        ) : (
-          <ul className="mt-3 flex flex-col gap-0.5">
-            {sessions.slice(0, 6).map((session) => {
-              const current = activeRoom?.roomId === session.roomId;
-              return (
-                <li key={session.roomId}>
-                  <Link
-                    to={sessionHref(session)}
-                    className={[
-                      'flex min-h-9 items-center gap-2 rounded-badge px-3 text-[0.6875rem] transition-colors',
-                      current ? 'text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
-                    ].join(' ')}
-                  >
-                    <span
-                      aria-hidden="true"
-                      className={['size-1.5 shrink-0 rounded-full', current ? 'bg-live' : 'bg-ink-3'].join(' ')}
-                    />
-                    <span className="truncate">{session.roomName}</span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        )}
-      </div>
-
-      <div className="mt-5 rounded-panel border border-line bg-surface p-4">
+      <div className="mt-auto rounded-panel border border-line bg-surface p-4">
         {activeRoom === undefined || activeRoom === null ? (
           <>
             <p className="eyebrow text-gold">Your next session</p>
