@@ -20,7 +20,7 @@ type PlayerError = {
 type Props = {
   playback: PlaybackState | undefined;
   nowPlaying: QueueEntry | null;
-  onNext: () => Promise<boolean>;
+  onNext: (expectedSongId?: string | null) => Promise<boolean>;
   onReport: (seconds: number, duration: number, songId: string | null) => void;
   onFindAlternative: (query: string) => void;
   children: ReactNode;
@@ -31,8 +31,9 @@ const PLAYER_STATE = { unstarted: -1, ended: 0, playing: 1, paused: 2, buffering
 // Karaoke videos usually end on an outro card; finishing this early keeps the
 // set moving instead of waiting out the tail.
 const EARLY_END_SECONDS = 5;
-const FLOAT_WIDTH = 280;
-const FLOAT_HEIGHT = 158;
+const FLOAT_WIDTH = 356;
+// The floating chrome is separate from the required 200px video viewport.
+const FLOAT_HEIGHT = 244;
 const FLOAT_MARGIN = 12;
 
 function clampFloat(x: number, y: number): { x: number; y: number } {
@@ -111,6 +112,12 @@ export default function HostPlayer({
   const videoId = playback?.currentVideoId ?? null;
   const currentSongId = playback?.currentSongId ?? null;
   const isPlaying = playback?.isPlaying === true;
+  const isFloatingFrame = slot === null && videoId !== null && isLg;
+  // Never drive a YouTube video from the hidden parking location. A mounted
+  // player is not necessarily a displayed player.
+  const playerVisible = isFloatingFrame || (
+    slot !== null && rect.width >= 200 && rect.height >= 200
+  );
 
   const handlePlayerError = useCallback((code: number) => {
     const current = playbackRef.current;
@@ -128,9 +135,15 @@ export default function HostPlayer({
   }, []);
 
   const advance = useCallback(async (): Promise<boolean> => {
+    const current = playbackRef.current;
+    const expectedSongId = current?.currentSongId;
+    if (expectedSongId === null || expectedSongId === undefined
+      || loadedVideoRef.current !== current?.currentVideoId) {
+      return false;
+    }
     let advanced = false;
     try {
-      advanced = await onNextRef.current();
+      advanced = await onNextRef.current(expectedSongId);
     } catch {
       advanced = false;
     }
@@ -198,6 +211,10 @@ export default function HostPlayer({
       }
       return;
     }
+    if (!playerVisible) {
+      player.pause();
+      return;
+    }
     if (loadedVideoRef.current !== videoId) {
       loadedVideoRef.current = videoId;
       autoSkippedRef.current = null;
@@ -208,7 +225,7 @@ export default function HostPlayer({
       setDuration(nowPlaying?.durationSeconds ?? 0);
       player.load(videoId, Math.max(0, playback?.positionSeconds ?? 0));
     }
-  }, [factoryReady, nowPlaying?.durationSeconds, playback?.positionSeconds, videoId]);
+  }, [factoryReady, nowPlaying?.durationSeconds, playback?.positionSeconds, playerVisible, videoId]);
 
   useEffect(() => {
     const player = playerRef.current;
@@ -216,7 +233,9 @@ export default function HostPlayer({
       return;
     }
     try {
-      if (isPlaying) {
+      if (!playerVisible) {
+        player.pause();
+      } else if (isPlaying) {
         player.play();
       } else {
         player.pause();
@@ -226,7 +245,7 @@ export default function HostPlayer({
         setNeedsTap(true);
       }
     }
-  }, [factoryReady, isPlaying, videoId]);
+  }, [factoryReady, isPlaying, playerVisible, videoId]);
 
   useEffect(() => {
     if (!isPlaying || videoId === null) {
@@ -547,8 +566,6 @@ export default function HostPlayer({
     volume,
   ]);
 
-  const isFloatingFrame = slot === null && videoId !== null && isLg;
-
   const startFloatDrag = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
     const box = layerRef.current?.getBoundingClientRect();
     if (box === undefined) {
@@ -635,12 +652,16 @@ export default function HostPlayer({
             onPointerMove={moveFloat}
             onPointerUp={endFloatDrag}
             onPointerCancel={endFloatDrag}
-            className="absolute inset-x-0 top-0 z-10 flex h-5 cursor-grab touch-none items-center justify-center bg-graphite-deep/75 active:cursor-grabbing"
+            className="absolute inset-x-0 top-0 z-10 flex h-11 cursor-grab touch-none items-center justify-center bg-graphite-deep/75 active:cursor-grabbing"
           >
             <span aria-hidden="true" className="h-0.5 w-8 rounded-full bg-ink-4" />
           </button>
         ) : null}
-        <div ref={hostRef} className="absolute inset-0" />
+        <div
+          ref={hostRef}
+          data-youtube-frame
+          className={isFloatingFrame ? 'absolute inset-x-0 bottom-0 top-11' : 'absolute inset-0'}
+        />
         {slot === null || videoId === null ? null : (
           <div className="pointer-events-none absolute inset-0">
             {loading && needsTap === false && playerError === null ? (

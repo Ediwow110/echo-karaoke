@@ -167,6 +167,21 @@ export async function playbackCommand(request: Request, caller: Caller): Promise
     throw new HttpError('VALIDATION_ERROR', 400, 'That playback action is not supported');
   }
 
+  // Automatic advances are scoped to a song, unlike deliberate host skips.
+  // The database rechecks the song under the room lock before advancing.
+  if (body.expectedSongId !== undefined) {
+    if (action !== 'next' || hostToken === null) {
+      throw new HttpError('FORBIDDEN', 403, 'Only the host can auto-advance a song');
+    }
+    const result = await callOperation('playback_next_if_current', [
+      requireRoomId(body.roomId),
+      caller.userId,
+      hostToken,
+      requireSongId(body.expectedSongId),
+    ]);
+    return jsonResponse(result);
+  }
+
   const result = await callOperation('playback_command', [
     requireRoomId(body.roomId),
     caller.userId,

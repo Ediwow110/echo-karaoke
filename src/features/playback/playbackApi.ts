@@ -23,17 +23,19 @@ export async function sendPlaybackCommand(
   roomId: string,
   action: PlaybackAction,
   options?: EdgeInvokeOptions,
+  expectedSongId?: string,
 ): Promise<PlaybackResponse> {
+  const body = { roomId, action, ...(expectedSongId === undefined ? {} : { expectedSongId }) };
   const hostToken = loadHostToken(roomId);
   if (hostToken !== null) {
-    return api.invoke<PlaybackResponse>('playback-command', { roomId, action }, { hostToken }, options);
+    return api.invoke<PlaybackResponse>('playback-command', body, { hostToken }, options);
   }
 
   const guestToken = loadGuestToken(roomId);
   if (guestToken === null) {
     throw new Error('This browser has no guest pass for the room.');
   }
-  return api.invoke<PlaybackResponse>('playback-command', { roomId, action }, { guestToken }, options);
+  return api.invoke<PlaybackResponse>('playback-command', body, { guestToken }, options);
 }
 
 export async function reportPlaybackPosition(

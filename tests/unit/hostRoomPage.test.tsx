@@ -12,13 +12,22 @@ import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
 import '@testing-library/jest-dom/vitest';
 
-const playerClock = vi.hoisted(() => ({ currentTime: 0, duration: 0 }));
+const playerClock = vi.hoisted(() => ({
+  currentTime: 0,
+  duration: 0,
+  loadCalls: 0,
+  playCalls: 0,
+  pauseCalls: 0,
+  onEnded: null as (() => void) | null,
+}));
 
 vi.mock('../../src/features/playback/youtubeIframe', () => ({
-  youtubePlayerFactory: () => ({
-    load: () => undefined,
-    play: () => undefined,
-    pause: () => undefined,
+  youtubePlayerFactory: (_element: unknown, callbacks: { onEnded: () => void }) => {
+    playerClock.onEnded = callbacks.onEnded;
+    return ({
+    load: () => { playerClock.loadCalls += 1; },
+    play: () => { playerClock.playCalls += 1; },
+    pause: () => { playerClock.pauseCalls += 1; },
     seekTo: () => undefined,
     getCurrentTime: () => playerClock.currentTime,
     getDuration: () => playerClock.duration,
@@ -26,7 +35,8 @@ vi.mock('../../src/features/playback/youtubeIframe', () => ({
     getVolume: () => 100,
     getState: () => -1,
     destroy: () => undefined,
-  }),
+    });
+  },
 }));
 
 const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
@@ -34,6 +44,10 @@ const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
 beforeEach(() => {
   playerClock.currentTime = 0;
   playerClock.duration = 0;
+  playerClock.loadCalls = 0;
+  playerClock.playCalls = 0;
+  playerClock.pauseCalls = 0;
+  playerClock.onEnded = null;
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
     media: '',
@@ -160,6 +174,15 @@ function renderHost(api: EdgeApi, path = '/room/' + roomId + '/host') {
 }
 
 describe('host room workspace', () => {
+  it('removes all live invite controls when the server ends a room', async () => {
+    const ended = { ...liveRoom, status: 'ended' };
+    const { api } = makeApi(ended);
+    renderHost(api, '/room/' + roomId + '/host');
+    expect(await screen.findByRole('heading', { name: 'This room has ended.' })).toBeInTheDocument();
+    expect(screen.queryByRole('region', { name: 'Invite your people' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /copy link|copy join link/i })).not.toBeInTheDocument();
+    expect(screen.queryByText(/ABCD EFGH JKMN PQRS/)).not.toBeInTheDocument();
+  });
   it('shows the room identity, real join code and invite tools', async () => {
     const { api } = makeApi();
     renderHost(api);
@@ -184,6 +207,16 @@ describe('host room workspace', () => {
     expect(await screen.findByRole('heading', { name: /keep the night moving/i })).toBeInTheDocument();
     expect(screen.getByText('Midnight City')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /skip current song/i })).toBeInTheDocument();
+    expect(screen.getByRole('region', { name: 'Invite your people' })).toHaveTextContent('1 in');
+    expect(screen.getByRole('region', { name: 'Invite your people' })).not.toHaveTextContent('2 in');
+  });
+
+  it('counts guests rather than the host in the stage invitation', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/stage');
+    const invite = await screen.findByRole('region', { name: 'Invite your people' });
+    expect(invite).toHaveTextContent('1 in');
+    expect(invite).not.toHaveTextContent('2 in');
   });
 
   it('exposes the two independent guest permissions', async () => {
@@ -331,6 +364,13 @@ describe('host room workspace', () => {
   });
 
   it('finishes the song five seconds before the video ends', async () => {
+    // Desktop has a visible floating player while the host is on this route.
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
     const actions: string[] = [];
     const playingRoom = {
       ...liveRoom,
@@ -358,6 +398,49 @@ describe('host room workspace', () => {
     }, { timeout: 5000 });
   });
 
+  it('coalesces repeated YouTube end events into one automatic next request', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    const actions: Array<{ action?: string; expectedSongId?: string }> = [];
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true },
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return playingRoom;
+        }
+        if (name === 'playback-command') {
+          actions.push(body as { action?: string; expectedSongId?: string });
+          return { roomId, status: 'live', playback: playingRoom.playback };
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderHost(api, '/room/' + roomId + '/host/queue');
+    await waitFor(() => expect(playerClock.loadCalls).toBeGreaterThan(0));
+    expect(playerClock.onEnded).not.toBeNull();
+    playerClock.onEnded?.();
+    playerClock.onEnded?.();
+    await waitFor(() => {
+      expect(actions.filter((body) => body.action === 'next')).toHaveLength(1);
+    });
+    // The old timer-only guard forgets the first event after 1500 ms.
+    // Repeated delivery for the same song must still be idempotent.
+    await new Promise((resolve) => window.setTimeout(resolve, 1600));
+    playerClock.onEnded?.();
+    await new Promise((resolve) => window.setTimeout(resolve, 25));
+    expect(actions.filter((body) => body.action === 'next')).toHaveLength(1);
+    expect(actions.find((body) => body.action === 'next')).toMatchObject({
+      action: 'next', expectedSongId: 's1',
+    });
+  });
+
   it('names the singer on the host now-playing card', async () => {
     const { api } = makeApi();
     renderHost(api);
@@ -383,6 +466,26 @@ describe('host room workspace', () => {
     const layer = document.querySelector('[data-host-player]') as HTMLElement;
     expect(layer.style.left).toBe('300px');
     expect(layer.style.top).toBe('150px');
+    expect(Number.parseInt(layer.style.width, 10)).toBeGreaterThanOrEqual(200);
+    expect(Number.parseInt(layer.style.height, 10)).toBeGreaterThanOrEqual(200);
+  });
+
+  it('does not load or play a song inside an off-screen mobile host player', async () => {
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true },
+    };
+    const { api } = makeApi(playingRoom);
+    renderHost(api, '/room/' + roomId + '/host/queue');
+
+    expect(await screen.findByRole('heading', { name: /keep the night moving/i })).toBeInTheDocument();
+    const layer = document.querySelector('[data-host-player]') as HTMLElement;
+    expect(layer.style.opacity).toBe('0');
+    await waitFor(() => {
+      expect(playerClock.pauseCalls).toBeGreaterThan(0);
+    });
+    expect(playerClock.loadCalls).toBe(0);
+    expect(playerClock.playCalls).toBe(0);
   });
 
   it('returns from party view to the stage, not the discovery page', async () => {

@@ -44,6 +44,9 @@ export default function HostRoomPage() {
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone: ToastTone } | null>(null);
   const playbackBusy = useRef(false);
   const advanceBusy = useRef(false);
+  const playbackSettled = useRef<Promise<void> | null>(null);
+  const autoAdvance = useRef<{ songId: string; promise: Promise<boolean> } | null>(null);
+  const lastAutoAdvance = useRef<string | null>(null);
   const reportFailures = useRef(0);
   const seenSongs = useRef(new Set<string>());
   const playedSong = useRef<string | null>(null);
@@ -122,13 +125,19 @@ export default function HostRoomPage() {
   const code = room?.code ?? '';
   const joinUrl = code.length > 0 ? buildJoinUrl(window.location.origin, code) : '';
 
-  const runPlayback = useCallback(async (action: 'play' | 'pause' | 'next'): Promise<boolean> => {
+  const runPlayback = useCallback(async (action: 'play' | 'pause' | 'next', expectedSongId?: string): Promise<boolean> => {
     if (playbackBusy.current) {
-      return false;
+      if (action !== 'next' || playbackSettled.current === null) return false;
+      // Wait for a concurrent play/pause to settle rather than treating a
+      // legitimate end-of-song event as an immediate playback failure.
+      await playbackSettled.current;
+      if (playbackBusy.current) return false;
     }
+    let settle: () => void = () => undefined;
+    playbackSettled.current = new Promise<void>((resolve) => { settle = resolve; });
     playbackBusy.current = true;
     try {
-      await sendPlaybackCommand(api, roomId, action);
+      await sendPlaybackCommand(api, roomId, action, undefined, expectedSongId);
       await refresh();
       return true;
     } catch (caught) {
@@ -137,7 +146,7 @@ export default function HostRoomPage() {
         caught instanceof Error ? caught.message : undefined,
         'error',
       );
-      if (action === 'next') {
+      if (action === 'next' && expectedSongId === undefined) {
         // If advancing failed, try to leave the room in a paused state rather
         // than letting every phone believe a finished video is still playing.
         try {
@@ -150,6 +159,8 @@ export default function HostRoomPage() {
       return false;
     } finally {
       playbackBusy.current = false;
+      playbackSettled.current = null;
+      settle();
     }
   }, [api, notify, refresh, roomId]);
 
@@ -160,10 +171,8 @@ export default function HostRoomPage() {
     navigate('/room/' + roomId + '/host/party');
   }, [location.pathname, navigate, roomId]);
 
-  const next = useCallback(async (): Promise<boolean> => {
-    if (advanceBusy.current) {
-      return true;
-    }
+  const runManualNext = useCallback(async (): Promise<boolean> => {
+    if (advanceBusy.current) return false;
     advanceBusy.current = true;
     try {
       return await runPlayback('next');
@@ -173,6 +182,23 @@ export default function HostRoomPage() {
       }, 800);
     }
   }, [runPlayback]);
+
+  const next = useCallback((expectedSongId?: string | null): Promise<boolean> => {
+    if (expectedSongId !== null && expectedSongId !== undefined) {
+      if (lastAutoAdvance.current === expectedSongId) return Promise.resolve(true);
+      const inFlight = autoAdvance.current;
+      if (inFlight !== null && inFlight.songId === expectedSongId) return inFlight.promise;
+      const task = runPlayback('next', expectedSongId).then((success) => {
+        if (success) lastAutoAdvance.current = expectedSongId;
+        return success;
+      }).finally(() => {
+        if (autoAdvance.current?.promise === task) autoAdvance.current = null;
+      });
+      autoAdvance.current = { songId: expectedSongId, promise: task };
+      return task;
+    }
+    return runManualNext();
+  }, [runManualNext, runPlayback]);
 
   const togglePlay = useCallback(async (): Promise<void> => {
     await runPlayback(data?.playback?.isPlaying === true ? 'pause' : 'play');
@@ -305,9 +331,9 @@ export default function HostRoomPage() {
   }, [openPartyView, live, queue]);
 
   useEffect(() => {
-    document.title = roomName.length > 0 ? 'ECHO · ' + roomName : 'ECHO | the room sings together';
+    document.title = roomName.length > 0 ? 'kara-echo · ' + roomName : 'kara-echo | the room sings together';
     return () => {
-      document.title = 'ECHO | the room sings together';
+      document.title = 'kara-echo | the room sings together';
     };
   }, [roomName]);
 
@@ -466,7 +492,7 @@ export default function HostRoomPage() {
           <header className="relative z-30 border-b border-line bg-graphite/95 backdrop-blur">
             <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
-                <Link to="/" className="lg:hidden" aria-label="ECHO, create a room">
+                <Link to="/" className="lg:hidden" aria-label="kara-echo, create a room">
                   <Logo size="sm" withWordmark={false} />
                 </Link>
                 <div className="min-w-0">
