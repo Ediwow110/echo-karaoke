@@ -455,6 +455,18 @@ order; step 1 is the only one that is not a command, and nothing after it is saf
    `ep-long-leaf-b3708f3l` before running it, and never point `supabase test db` at it (the pgTAP
    fixtures create and delete rows; they belong on a disposable branch).
 
+   Confirm the pending set first — `--dry-run` reads the remote history and applies nothing
+   (measured 2026-10-26 with CLI 2.122.0: it printed exactly these four files, and `main` was still
+   0030 with zero catalog objects afterward). The CLI warns that `--db-url` must be percent-encoded;
+   the production URL in `server/.env.neon` passes as it is.
+
+   ```bash
+   npx supabase db push --dry-run --db-url "$NEON_DATABASE_URL"
+   ```
+
+   If that lists anything other than 0031 through 0034, stop: the remote is not where this branch
+   expects to find it.
+
    ```bash
    npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
    ```
