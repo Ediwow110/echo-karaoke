@@ -159,7 +159,8 @@ export default function HostPartyPage() {
             code={code}
             hostName={hostName}
             joinUrl={joinUrl}
-            guests={roster.length}
+            guests={roster.filter((member) => member.role === 'guest').length}
+            shareReady={connection === 'live'}
             variant="party"
           />
         </div>

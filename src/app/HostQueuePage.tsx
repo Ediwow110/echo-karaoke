@@ -20,6 +20,7 @@ export default function HostQueuePage() {
     code,
     joinUrl,
     roster,
+    connection,
     queue,
     nowPlaying,
     upNext,
@@ -180,7 +181,8 @@ export default function HostQueuePage() {
             code={code}
             hostName={hostName}
             joinUrl={joinUrl}
-            guests={roster.length}
+            guests={roster.filter((member) => member.role === 'guest').length}
+            shareReady={connection === 'live'}
             variant="compact"
           />
         </aside>

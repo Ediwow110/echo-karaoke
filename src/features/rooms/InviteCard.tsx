@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import { CopyIcon } from '@phosphor-icons/react/dist/csr/Copy';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
@@ -11,6 +11,8 @@ type Props = {
   hostName: string;
   joinUrl: string;
   guests: number;
+  /** Whether the host's latest room state is verified, not an offline snapshot. */
+  shareReady?: boolean;
   variant?: 'panel' | 'compact' | 'party';
   className?: string;
 };
@@ -21,25 +23,68 @@ export default function InviteCard({
   hostName,
   joinUrl,
   guests,
+  shareReady = true,
   variant = 'panel',
   className = '',
 }: Props) {
   const [copied, setCopied] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const copyVersion = useRef(0);
+  const copiedTimer = useRef<number | null>(null);
+
+  useEffect(() => {
+    // A new URL or an offline transition invalidates any pending clipboard
+    // write. Never announce success for an earlier room invitation.
+    copyVersion.current += 1;
+    setCopied(false);
+    setError(null);
+    if (copiedTimer.current !== null) {
+      window.clearTimeout(copiedTimer.current);
+      copiedTimer.current = null;
+    }
+    return () => {
+      copyVersion.current += 1;
+      if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
+    };
+  }, [joinUrl, shareReady]);
 
   async function copy(): Promise<void> {
+    if (!shareReady || joinUrl.length === 0) return;
+    copyVersion.current += 1;
+    const version = copyVersion.current;
     setError(null);
+    setCopied(false);
+    if (copiedTimer.current !== null) window.clearTimeout(copiedTimer.current);
     try {
       if (navigator.clipboard === undefined) {
         throw new Error('Clipboard unavailable');
       }
       await navigator.clipboard.writeText(joinUrl);
+      if (version !== copyVersion.current) return;
       setCopied(true);
-      window.setTimeout(() => setCopied(false), 2500);
+      copiedTimer.current = window.setTimeout(() => {
+        if (version === copyVersion.current) setCopied(false);
+        copiedTimer.current = null;
+      }, 2500);
     } catch {
+      if (version !== copyVersion.current) return;
       setCopied(false);
       setError('Copy is blocked here. Select the code or the link below.');
     }
+  }
+
+  // An offline host may have a cached room URL and guest count. Neither is
+  // authoritative while disconnected, so don't present an old QR as active.
+  if (!shareReady) {
+    return (
+      <section className={['rounded-panel border border-line bg-surface p-5', className].join(' ')} aria-label="Invite your people">
+        <p className="eyebrow text-ink-2">Room remote</p>
+        <h2 className="mt-1 font-display text-[1.2rem] font-bold tracking-[-0.02em] text-ink">Invite your people.</h2>
+        <p role="status" className="mt-4 rounded-media border border-line bg-surface-2 px-4 py-4 text-[0.75rem] leading-[1.6] text-ink-2">
+          Cannot verify this room while the connection is offline. The invitation and guest count will return after reconnection.
+        </p>
+      </section>
+    );
   }
 
   if (variant === 'party') {
