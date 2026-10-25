@@ -574,7 +574,7 @@ and authenticated roles.
   0001→0034 chain applies, `npx supabase test db` reports 328/328, and `npm run test:integration`
   reports 8/8 connecting as `echo_service` **without** a YouTube key — the same conditions CI runs
   under. `npm audit --audit-level=high` is clean, and locally `tsc`, 420 unit tests, the build and
-  15 mocked UI flows pass. The push should be green; if it is not, the difference is in CI's
+  16 mocked UI flows pass. The push should be green; if it is not, the difference is in CI's
   environment, not in this tree.
 
 ### What the app-level live proof showed (and what it cost)
@@ -592,7 +592,14 @@ branch for the app-level proof only, or expect those four assertions to complain
 - [x] `npm test` reports 420 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
-- [x] `npm run verify:deploy` passes with the production environment.
+- [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
+  Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
+  guard's only complaint was that missing secret — so this line was checked while false, and it is
+  the one that tells you whether the build will be refused. Tick it after the secret exists.
+- [x] 0031–0034 applied to production `main` (2026-10-26): remote history reads 0034, two catalog
+  tables and seven catalog functions exist, and `karaoke_catalog_page` executes as `echo_service`
+  rather than merely being granted to it. This line is new — without it the next reader has nothing
+  marking step 2 as finished, and a re-apply looks plausible.
 - [ ] `vercel deploy --prod` builds with the guard enabled.
 - [ ] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
 - [ ] A browser host/guest flow works with a 390px guest viewport.
