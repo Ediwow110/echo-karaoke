@@ -96,6 +96,8 @@ The karaoke songbook is a local catalog of embeddable karaoke videos, filled onl
     npm run test:e2e:ui      # 15 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows against vercel dev on port 3000
 
+`vercel dev` reads `.env.local`, whose database URLs name production Neon, so `npm run test:e2e` with no `E2E_BASE_URL` creates real rooms in production. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
+
 The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.
 
 The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app; start `vercel dev` first or set `E2E_BASE_URL`. One E2E test decodes the rendered QR through the local Vite dev resolver.

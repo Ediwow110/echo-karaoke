@@ -8,11 +8,18 @@ and deployment contract.
 - `npm run dev`: Vite only. `/api` is not served unless the optional local backend is
   running.
 - `npx vercel dev`: the full app and the same-origin Function on port 3000.
+  **Caution:** `.env.local`'s `DATABASE_URL`, `AUTH_DATABASE_URL`, and
+  `NEON_DATABASE_URL` all name production Neon `main`, so this command writes real
+  rooms, queue rows, and catalog cursors to production. Point it at a disposable
+  branch first, or do not run it.
 - `npm run build`: `tsc --noEmit` then the production Vite build.
 - `npm test`: unit and component tests in jsdom.
 - `npm run test:e2e:ui`: Playwright UI checks against Vite with mocked `/api` calls.
   This suite must stay database-free and key-free.
 - `npm run test:e2e`: real host/guest flows against `vercel dev` or `E2E_BASE_URL`.
+  Its default base URL is `127.0.0.1:3000`, so with no `E2E_BASE_URL` set it drives
+  whatever `vercel dev` is serving — which is production unless you repointed it.
+  Set `E2E_BASE_URL` to a branch-backed server before running it.
 - `npm run test:integration`: router/auth/operation path against a disposable Neon
   branch. It skips without `DATABASE_URL`, `AUTH_DATABASE_URL`, and
   `BETTER_AUTH_SECRET`.
