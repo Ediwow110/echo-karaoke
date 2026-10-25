@@ -1,4 +1,6 @@
 import { requireAnonymousCaller } from '../auth/identity.js';
+import { catalogPage } from './catalogBrowse.js';
+import { catalogSync } from './catalogSync.js';
 import { createRoom } from './createRoom.js';
 import { handleThrown, HttpError, jsonResponse, logFailure } from './errors.js';
 import { queueCommand } from './queue.js';
@@ -30,6 +32,8 @@ const OPERATIONS = new Set([
   'youtube-search',
   'youtube-suggest',
   'youtube-popular',
+  'catalog-page',
+  'catalog-sync',
 ]);
 
 function isAuthFailure(error: unknown): boolean {
@@ -79,6 +83,10 @@ export async function handleOperation(request: Request): Promise<Response> {
         return await youtubeSuggest(request, caller);
       case 'youtube-popular':
         return await youtubePopular(request, caller);
+      case 'catalog-page':
+        return await catalogPage(request, caller);
+      case 'catalog-sync':
+        return await catalogSync(request, caller);
       default:
         throw new HttpError('NOT_IMPLEMENTED', 501, 'That operation is not available');
     }

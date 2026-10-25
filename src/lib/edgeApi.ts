@@ -9,6 +9,8 @@ export type EdgeFunctionName =
   | 'youtube-search'
   | 'youtube-suggest'
   | 'youtube-popular'
+  | 'catalog-page'
+  | 'catalog-sync'
   | 'playback-command'
   | 'playback-report'
   | 'vote-command'

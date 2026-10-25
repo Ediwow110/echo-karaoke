@@ -1,4 +1,4 @@
-import { HttpError, jsonResponse } from './errors.js';
+import { HttpError, jsonResponse, logFailure } from './errors.js';
 import { readJsonObject } from './tokens.js';
 import { requireRoomId, type Caller } from './room.js';
 import { operationCall, serviceDatabase } from '../db/client.js';
@@ -93,6 +93,30 @@ function channelUrl(handle: string, apiKey: string): string {
   return url.toString();
 }
 
+type UpstreamPage =
+  | { state: 'ok'; payload: unknown }
+  | { state: 'http-error' }
+  | { state: 'stopped' };
+
+function isAbortError(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null)?.name;
+  return name === 'AbortError' || name === 'TimeoutError';
+}
+
+async function fetchUpstream(url: string, timeoutMs: number, request: Request): Promise<UpstreamPage> {
+  try {
+    const response = await fetch(url, { signal: AbortSignal.timeout(timeoutMs) });
+    if (!response.ok) return { state: 'http-error' };
+    return { state: 'ok', payload: await response.json() };
+  } catch (error) {
+    if (!isAbortError(error)) throw error;
+    // The budget or the platform cancelled a slow upstream call after quota
+    // was spent. Keep the rows already synced instead of failing the request.
+    logFailure('catalog-sync', error, 500, request);
+    return { state: 'stopped' };
+  }
+}
+
 type Cursor = {
   channelId: string;
   uploadsPlaylistId: string;
@@ -153,8 +177,9 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
   const byChannel = new Map(cursors.map((row) => [row.channelId, row]));
   let added = 0;
   let skipped = 0;
+  let stoppedEarly = false;
 
-  for (const handle of CATALOG_CHANNELS) {
+  channels: for (const handle of CATALOG_CHANNELS) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
     let cursor = byChannel.get(handle);
     if (cursor !== undefined && cursor.lastSyncedAt !== null
@@ -169,12 +194,17 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
       if ((spent as { allowed?: boolean } | null)?.allowed !== true) break;
       const remaining = TIME_BUDGET_MS - (Date.now() - started);
       if (remaining <= 0) break;
-      const response = await fetch(channelUrl(handle, apiKey), {
-        signal: AbortSignal.timeout(Math.min(5000, Math.max(250, remaining))),
-      });
-      if (!response.ok) continue;
-      const payload = await response.json();
-      const items = (payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
+      const upstream = await fetchUpstream(
+        channelUrl(handle, apiKey),
+        Math.min(5000, Math.max(250, remaining)),
+        request,
+      );
+      if (upstream.state === 'stopped') {
+        stoppedEarly = true;
+        break channels;
+      }
+      if (upstream.state === 'http-error') continue;
+      const items = (upstream.payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
       const uploads = items[0]?.contentDetails?.relatedPlaylists?.uploads;
       if (typeof uploads !== 'string') continue;
       playlistId = uploads;
@@ -190,19 +220,33 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
       }
       const remaining = TIME_BUDGET_MS - (Date.now() - started);
       if (remaining <= 0) break;
-      const response = await fetch(playlistUrl(playlistId, token, apiKey), {
-        signal: AbortSignal.timeout(Math.min(5000, Math.max(250, remaining))),
-      });
-      if (!response.ok) break;
-      const payload = await response.json();
-      const rows = mapPlaylistItems(payload);
+      const upstream = await fetchUpstream(
+        playlistUrl(playlistId, token, apiKey),
+        Math.min(5000, Math.max(250, remaining)),
+        request,
+      );
+      if (upstream.state === 'stopped') {
+        stoppedEarly = true;
+        break channels;
+      }
+      if (upstream.state === 'http-error') break;
+      const rows = mapPlaylistItems(upstream.payload);
       await upsertRows(handle, rows);
       added += rows.length;
-      const next = readNextToken(payload);
+      const next = readNextToken(upstream.payload);
       await saveCursor(handle, playlistId, next, next === null);
       if (next === null) break;
       token = next;
     }
+  }
+
+  if (stoppedEarly) {
+    return jsonResponse({
+      available: true,
+      added,
+      skipped,
+      message: 'Songbook refresh stopped early',
+    });
   }
 
   return jsonResponse({ available: true, added, skipped });
