@@ -10,6 +10,22 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-25-karaoke-songbook-design.md`
 
+## Status (2026-10-25)
+
+Tasks 1–6 are complete and committed on `feature/songbook` (13 commits ahead of `master`); the
+branch is **not pushed** and **migration 0031 is not applied to production Neon**, so production
+still has no `karaoke_catalog` tables. Local evidence at `0062146`: unit 304/304, pgTAP 298/298,
+`tsc` clean, build passes, mocked e2e 9/9.
+
+Task 7 (apply 0031 to production, push/deploy, seed once, prove the loop) is **not started** —
+it needs the owner's approval because a push deploys production.
+
+One thing the task list missed: Tasks 4–5 shipped the warming-up message but never wired the
+host-only Retry the spec requires, so nothing could call `catalog-sync`. That landed separately
+in `0062146`. The five channel handles in `CATALOG_CHANNELS` have **never been resolved against
+a real YouTube key** — the first real sync is the proof they exist and of how deep each uploads
+playlist actually goes.
+
 ## Global Constraints
 
 - Playback is always the YouTube embed; never store or serve video. Catalog rows hold ids and display metadata only.
@@ -60,7 +76,7 @@
 - Produces: `public.karaoke_catalog_cursor_save(p_channel_id text, p_uploads_playlist_id text, p_page_token text, p_exhausted boolean) returns void`
 - Produces: `public.karaoke_catalog_cursors() returns jsonb` → `[{ "channelId", "uploadsPlaylistId", "nextPageToken", "exhaustedAt", "lastSyncedAt" }]`
 
-- [ ] **Step 1: Write the failing pgTAP test**
+- [x] **Step 1: Write the failing pgTAP test**
 
 Create `supabase/tests/catalog_test.sql`:
 
@@ -124,7 +140,7 @@ select * from finish();
 rollback;
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `npx supabase db push && npm run test:db`
 Expected: FAIL — `function public.karaoke_catalog_page(text, text, integer, integer) does not exist`.
@@ -133,7 +149,7 @@ The local container is only a portable Postgres harness; production is Neon. CI 
 same suite against a disposable Neon branch (`supabase test db --db-url "$NEON_DATABASE_URL"`),
 and that run is the authoritative Neon proof.
 
-- [ ] **Step 3: Write the migration**
+- [x] **Step 3: Write the migration**
 
 Create `supabase/migrations/0031_karaoke_catalog.sql`:
 
@@ -305,12 +321,12 @@ revoke all on function public.karaoke_catalog_cursors() from public, anon, authe
 grant execute on function public.karaoke_catalog_cursors() to service_role;
 ```
 
-- [ ] **Step 4: Run the suite and confirm it passes**
+- [x] **Step 4: Run the suite and confirm it passes**
 
 Run: `npx supabase db push && npm run test:db`
 Expected: `catalog_test.sql ... ok`, all other files still pass. CI repeats this on a Neon branch.
 
-- [ ] **Step 5: Commit** (only with the owner's approval)
+- [x] **Step 5: Commit** (only with the owner's approval)
 
 ```bash
 git add supabase/migrations/0031_karaoke_catalog.sql supabase/tests/catalog_test.sql
@@ -331,7 +347,7 @@ git commit -m "feat: add the karaoke catalog schema and paging function"
 - Produces: `readNextToken(payload: unknown): string | null`
 - Produces: `catalogSync(request: Request, caller: Caller): Promise<Response>`
 
-- [ ] **Step 1: Write the failing unit test**
+- [x] **Step 1: Write the failing unit test**
 
 Create `tests/unit/catalogSync.test.ts`:
 
@@ -381,12 +397,12 @@ describe('catalog sync helpers', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `npx vitest run tests/unit/catalogSync.test.ts`
 Expected: FAIL — cannot resolve `mapPlaylistItems`.
 
-- [ ] **Step 3: Implement the module**
+- [x] **Step 3: Implement the module**
 
 Create `server/operations/catalogSync.ts`:
 
@@ -596,7 +612,7 @@ The catalog stores the channel **handle** (`@musisikaraoke`) as `channel_id`, so
 function's `p_channel` filter and the client chips use handles; display names come from the
 label map below.
 
-- [ ] **Step 4: Add the shared access guard**
+- [x] **Step 4: Add the shared access guard**
 
 Create `server/operations/catalogAccess.ts`, moving the existing `requireRoomAccess` body out of `youtube.ts` so both modules share one implementation:
 
@@ -639,12 +655,12 @@ export async function requireRoomAccess(request: Request, caller: Caller, roomId
 Then in `server/operations/youtube.ts` replace the local `requireRoomAccess` with `import { requireRoomAccess } from './catalogAccess.js';` and delete the local copy. Import `catalogSync`'s guard from the same file rather than the dynamic import shown above:
 `import { requireHostAccess } from './catalogAccess.js';` at the top of `catalogSync.ts`.
 
-- [ ] **Step 5: Run the unit test and the whole suite**
+- [x] **Step 5: Run the unit test and the whole suite**
 
 Run: `npx vitest run tests/unit/catalogSync.test.ts && npx tsc --noEmit && npm test`
 Expected: 2 new tests pass, `tsc` clean, 50 files pass (plus the new file).
 
-- [ ] **Step 6: Commit** (only with the owner's approval)
+- [x] **Step 6: Commit** (only with the owner's approval)
 
 ```bash
 git add server/operations/catalogSync.ts server/operations/catalogAccess.ts server/operations/youtube.ts tests/unit/catalogSync.test.ts
@@ -665,7 +681,7 @@ git commit -m "feat: sync karaoke channels into the catalog"
 - Produces: `catalogPage(request: Request, caller: Caller): Promise<Response>` → `{ total, items }`
 - Produces: `'catalog-page'` and `'catalog-sync'` accepted by the router and typed on the client
 
-- [ ] **Step 1: Implement the read operation**
+- [x] **Step 1: Implement the read operation**
 
 Create `server/operations/catalogBrowse.ts`:
 
@@ -700,7 +716,7 @@ export async function catalogPage(request: Request, caller: Caller): Promise<Res
 }
 ```
 
-- [ ] **Step 2: Register both operations**
+- [x] **Step 2: Register both operations**
 
 In `server/operations/index.ts`: add `import { catalogPage } from './catalogBrowse.js';` and `import { catalogSync } from './catalogSync.js';`, add `'catalog-page'` and `'catalog-sync'` to the `OPERATIONS` set, and add both cases to the switch:
 
@@ -711,7 +727,7 @@ In `server/operations/index.ts`: add `import { catalogPage } from './catalogBrow
         return await catalogSync(request, caller);
 ```
 
-- [ ] **Step 3: Type them on the client**
+- [x] **Step 3: Type them on the client**
 
 In `src/lib/edgeApi.ts`, extend the union:
 
@@ -721,12 +737,12 @@ In `src/lib/edgeApi.ts`, extend the union:
   | 'catalog-sync'
 ```
 
-- [ ] **Step 4: Prove the router accepts them**
+- [x] **Step 4: Prove the router accepts them**
 
 Run: `npm run build`
 Expected: `tsc --noEmit` clean and the Vite build succeeds.
 
-- [ ] **Step 5: Commit** (only with the owner's approval)
+- [x] **Step 5: Commit** (only with the owner's approval)
 
 ```bash
 git add server/operations/catalogBrowse.ts server/operations/index.ts src/lib/edgeApi.ts
@@ -749,7 +765,7 @@ git commit -m "feat: expose the songbook read and sync operations"
 - Produces: `readCatalogPage(api, roomId, params): Promise<{ total: number; items: CatalogSong[] }>`
 - Produces: `<SongbookList api roomId onAdded />`
 
-- [ ] **Step 1: Write the failing test**
+- [x] **Step 1: Write the failing test**
 
 Create `tests/unit/songbook.test.tsx`:
 
@@ -819,12 +835,12 @@ describe('songbook list', () => {
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `npx vitest run tests/unit/songbook.test.tsx`
 Expected: FAIL — cannot resolve `SongbookList`.
 
-- [ ] **Step 3: Implement the client API**
+- [x] **Step 3: Implement the client API**
 
 Create `src/features/catalog/catalogApi.ts`:
 
@@ -877,7 +893,7 @@ export async function queueCatalogSong(api: EdgeApi, roomId: string, videoId: st
 }
 ```
 
-- [ ] **Step 4: Implement the shared list**
+- [x] **Step 4: Implement the shared list**
 
 Create `src/features/catalog/SongbookList.tsx`:
 
@@ -1006,12 +1022,12 @@ export default function SongbookList({ api, roomId, onAdded }: {
 
 (The channel chips come in Task 5 together with the guest screen, so this task stays reviewable on its own.)
 
-- [ ] **Step 5: Run the test**
+- [x] **Step 5: Run the test**
 
 Run: `npx vitest run tests/unit/songbook.test.tsx`
 Expected: PASS.
 
-- [ ] **Step 6: Add the host page and route**
+- [x] **Step 6: Add the host page and route**
 
 Create `src/app/HostSongbookPage.tsx`:
 
@@ -1047,12 +1063,12 @@ with the matching import.
 
 In `src/features/rooms/Sidebar.tsx`, add to `NavItem`-driven lists a `{ key: 'songbook', label: 'Songbook', href: '/songbook', icon: MusicNotesIcon }` entry and map `key === 'songbook'` in `hrefFor` to `'/room/' + activeRoom.roomId + '/host/songbook'`; return `'songbook'` from `navFor` in `HostRoomPage.tsx` for paths ending `/host/songbook`.
 
-- [ ] **Step 7: Run the suites**
+- [x] **Step 7: Run the suites**
 
 Run: `npx tsc --noEmit && npm test`
 Expected: clean, all files pass.
 
-- [ ] **Step 8: Commit** (only with the owner's approval)
+- [x] **Step 8: Commit** (only with the owner's approval)
 
 ```bash
 git add src/features/catalog src/app/HostSongbookPage.tsx src/app/App.tsx src/app/HostRoomPage.tsx src/features/rooms/Sidebar.tsx tests/unit/songbook.test.tsx
@@ -1075,7 +1091,7 @@ git commit -m "feat: add the host songbook page"
 - Produces: route `/room/:roomId/songbook` rendering `GuestSongbook`
 - Produces: `PopularSongs` prop `moreHref?: string`
 
-- [ ] **Step 1: Extend the failing test for chips and the guest screen**
+- [x] **Step 1: Extend the failing test for chips and the guest screen**
 
 Append to `tests/unit/songbook.test.tsx`:
 
@@ -1092,12 +1108,12 @@ Append to `tests/unit/songbook.test.tsx`:
   });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `npx vitest run tests/unit/songbook.test.tsx`
 Expected: FAIL — no `channels` prop / no chip.
 
-- [ ] **Step 3: Add channel chips**
+- [x] **Step 3: Add channel chips**
 
 In `SongbookList.tsx`, accept `channels?: { id: string; label: string }[]` and render, under the search row:
 
@@ -1129,7 +1145,7 @@ In `SongbookList.tsx`, accept `channels?: { id: string; label: string }[]` and r
       )}
 ```
 
-- [ ] **Step 4: Add the guest screen**
+- [x] **Step 4: Add the guest screen**
 
 Create `src/app/GuestSongbook.tsx`:
 
@@ -1166,7 +1182,7 @@ export default function GuestSongbook({ roomId, onAdded }: {
 }
 ```
 
-- [ ] **Step 5: Route the guest screen and keep two tabs**
+- [x] **Step 5: Route the guest screen and keep two tabs**
 
 In `src/app/App.tsx` add:
 
@@ -1182,7 +1198,7 @@ In `src/app/GuestRoomPage.tsx`, add near the existing tab derivation:
 
 and render `<GuestSongbook roomId={roomId} onAdded={() => { void refresh(); }} />` in place of the search/queue body when `songbook` is true, keeping `BottomNav` mounted so both tabs stay reachable. `useGuestTab()` must keep returning `'search' | 'queue'` only.
 
-- [ ] **Step 6: Add "View more" to the strip**
+- [x] **Step 6: Add "View more" to the strip**
 
 In `src/features/queue/PopularSongs.tsx`, extend the props with `moreHref?: string` and change the header row:
 
@@ -1201,12 +1217,12 @@ In `src/features/queue/PopularSongs.tsx`, extend the props with `moreHref?: stri
 
 Pass `moreHref={'/room/' + roomId + '/host/songbook'}` from `HostDiscoverPage` and `moreHref={'/room/' + roomId + '/songbook'}` from the guest search screen.
 
-- [ ] **Step 7: Run the suites**
+- [x] **Step 7: Run the suites**
 
 Run: `npx tsc --noEmit && npx vitest run tests/unit/songbook.test.tsx && npm test`
 Expected: clean and green.
 
-- [ ] **Step 8: Commit** (only with the owner's approval)
+- [x] **Step 8: Commit** (only with the owner's approval)
 
 ```bash
 git add src/app/GuestSongbook.tsx src/app/GuestRoomPage.tsx src/app/App.tsx src/features/catalog/SongbookList.tsx src/features/queue/PopularSongs.tsx src/app/HostDiscoverPage.tsx tests/unit/songbook.test.tsx
@@ -1223,7 +1239,7 @@ git commit -m "feat: open the songbook from the karaoke strip on both screens"
 **Interfaces:**
 - Consumes: mocked `catalog-page`, `queue-command`
 
-- [ ] **Step 1: Write the failing e2e test**
+- [x] **Step 1: Write the failing e2e test**
 
 Add to `tests/e2e/ui-mock.spec.ts`, and extend `mockApi` with a `catalog-page` branch returning `{ total: 31, items: [...30 entries...] }`:
 
@@ -1246,12 +1262,12 @@ test('host opens the songbook from the karaoke strip and queues a song', async (
 });
 ```
 
-- [ ] **Step 2: Run it and watch it fail**
+- [x] **Step 2: Run it and watch it fail**
 
 Run: `npx playwright test --config playwright.ui.config.ts -g "opens the songbook"`
 Expected: FAIL at the missing "View more" link.
 
-- [ ] **Step 3: Implement the mock branch**
+- [x] **Step 3: Implement the mock branch**
 
 In `mockApi`, before the generic fallback:
 
@@ -1268,12 +1284,12 @@ In `mockApi`, before the generic fallback:
     }
 ```
 
-- [ ] **Step 4: Run the whole mocked suite**
+- [x] **Step 4: Run the whole mocked suite**
 
 Run: `npx playwright test --config playwright.ui.config.ts`
 Expected: 9 passed.
 
-- [ ] **Step 5: Commit** (only with the owner's approval)
+- [x] **Step 5: Commit** (only with the owner's approval)
 
 ```bash
 git add tests/e2e/ui-mock.spec.ts
