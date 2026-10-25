@@ -5,10 +5,16 @@ import type { EdgeApi } from '../../lib/edgeApi';
 import { queueCatalogSong, readCatalogPage, runCatalogSync, type CatalogSong } from './catalogApi';
 import { SongArtwork } from '../../ui';
 
-const PAGE_SIZE = 30;
+export const PAGE_SIZE = 30;
 // The database clamps paging at this offset, so a request past it replays the
 // same rows forever. Stop offering Load more before that happens.
-const MAX_OFFSET = 5000;
+export const MAX_OFFSET = 5000;
+
+// The paging stop lives here rather than inline so its boundary is testable: the
+// walk to 5,000 would otherwise need 166 renders of five thousand rows.
+export function offersMoreRows(pageLength: number, nextOffset: number): boolean {
+  return pageLength >= PAGE_SIZE && nextOffset + PAGE_SIZE <= MAX_OFFSET;
+}
 
 export type SongbookListProps = {
   api: EdgeApi;
@@ -57,7 +63,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
         const known = new Set(current.map((song) => song.videoId));
         return [...current, ...page.items.filter((song) => !known.has(song.videoId))];
       });
-      setMore(page.items.length >= PAGE_SIZE && nextOffset + PAGE_SIZE <= MAX_OFFSET);
+      setMore(offersMoreRows(page.items.length, nextOffset));
       setHasLoaded(true);
       setError(null);
     } catch (caught) {

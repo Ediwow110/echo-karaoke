@@ -7,8 +7,8 @@ import { requireRoomAccess } from './catalogAccess.js';
 // Mirrors the clamps inside karaoke_catalog_page. Number.isInteger accepts 1e15,
 // but Postgres rejects it as an integer out of range, so a wildly paging client
 // got a 500 instead of a page.
-const MAX_OFFSET = 5000;
-const MAX_LIMIT = 50;
+export const MAX_OFFSET = 5000;
+export const MAX_LIMIT = 50;
 
 function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
   if (typeof value !== 'number' || !Number.isSafeInteger(value)) return fallback;

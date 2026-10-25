@@ -91,7 +91,7 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 420 unit and component tests (jsdom)
+    npm test                 # 425 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # 328 pgTAP assertions
     npm run test:integration # 8 router/auth/operation tests against a Neon branch
