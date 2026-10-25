@@ -7,7 +7,7 @@ import { addSong, type QueueSong } from './queueApi';
 import { parseYouTubeVideoId } from './youtubeVideo';
 import type { SearchResult } from '../../types/search';
 
-type SearchResponse = { available: boolean; results: SearchResult[]; message?: string };
+type SearchResponse = { available: boolean; results: SearchResult[]; message?: string; source?: 'songbook' };
 
 export type SongNotice = {
   title: string;
@@ -110,7 +110,8 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       setAvailable(ready);
       setSearchBlocked(!ready);
       setResults(ready ? (response.results ?? []) : []);
-      setMessage(ready ? null : (response.message ?? 'Search is not configured. Ask the host to enable YouTube search.'));
+      setMessage(ready ? (response.source === 'songbook' ? response.message ?? 'Recent songbook matches' : null)
+        : (response.message ?? 'Search is not configured. Ask the host to enable YouTube search.'));
     } catch (caught) {
       if (!mounted.current || requestId.current !== current) {
         return;
@@ -144,6 +145,13 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       setError(null);
       return;
     }
+    if (parseYouTubeVideoId(term) !== null) {
+      requestId.current += 1;
+      setLoading(false);
+      setSearched(false);
+      setResults([]);
+      return;
+    }
     requestId.current += 1;
     setLoading(true);
     if (debounceTimer.current !== null) {
@@ -159,15 +167,6 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
         debounceTimer.current = null;
       }
     };
-  }, [query, search]);
-
-  const submit = useCallback(() => {
-    // Enter must not also fire the pending debounce timer.
-    if (debounceTimer.current !== null) {
-      window.clearTimeout(debounceTimer.current);
-      debounceTimer.current = null;
-    }
-    void search(query);
   }, [query, search]);
 
   const addVideo = useCallback(async (videoId: string, fallbackTitle: string) => {
@@ -216,6 +215,21 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     }
     return addVideo(videoId, 'YouTube video');
   }, [addVideo]);
+
+  const submit = useCallback(() => {
+    if (debounceTimer.current !== null) {
+      window.clearTimeout(debounceTimer.current);
+      debounceTimer.current = null;
+    }
+    const term = query.trim();
+    if (parseYouTubeVideoId(term) !== null) {
+      void addByLink(term).then((success) => {
+        if (success && mounted.current) setQuery('');
+      });
+      return;
+    }
+    void search(query);
+  }, [query, search, addByLink]);
 
   const clear = useCallback(() => {
     setQuery('');

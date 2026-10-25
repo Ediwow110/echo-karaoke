@@ -178,6 +178,52 @@ async function readSearchCache(key: string): Promise<SearchResult[] | null> {
   return (await queryAllowNull('youtube_search_cache_get', [key])) as SearchResult[] | null;
 }
 
+// This is a fallback, never an unbounded copy of YouTube search. The catalog
+// RPC also filters expired entries, but independently reject rows from any
+// older database function that does not return an observed freshness date.
+export function mapFreshCatalogResults(value: unknown, now = Date.now()): SearchResult[] {
+  const items = value !== null && typeof value === 'object'
+    ? (value as { items?: unknown }).items : null;
+  if (!Array.isArray(items)) return [];
+  const cutoff = now - 28 * 24 * 60 * 60 * 1000;
+  return items.flatMap((item): SearchResult[] => {
+    if (item === null || typeof item !== 'object') return [];
+    const row = item as Record<string, unknown>;
+    const checked = typeof row.syncedAt === 'string' ? Date.parse(row.syncedAt) : NaN;
+    if (!Number.isFinite(checked) || checked <= cutoff || checked > now + 60_000) return [];
+    const videoId = row.videoId;
+    const title = text(row.title, 500);
+    if (typeof videoId !== 'string' || !VIDEO_ID_PATTERN.test(videoId) || title === null) return [];
+    return [{
+      videoId, title,
+      channelTitle: text(row.channelTitle, 200),
+      thumbnailUrl: text(row.thumbnailUrl, 500),
+      durationSeconds: null,
+    }];
+  }).slice(0, MAX_RESULTS);
+}
+
+async function freshCatalogFallback(query: string): Promise<SearchResult[]> {
+  try {
+    const rows = await queryAllowNull('karaoke_catalog_page', [query, '', 0, MAX_RESULTS]);
+    return mapFreshCatalogResults(rows);
+  } catch {
+    // During staged migration rollout the catalog RPC may not exist yet.
+    return [];
+  }
+}
+
+async function localSearchOrUnavailable(query: string, message: string): Promise<Response> {
+  const results = await freshCatalogFallback(query);
+  if (results.length > 0) {
+    return jsonResponse({
+      available: true, results, source: 'songbook',
+      message: 'YouTube search is unavailable. Showing recent songbook entries instead.',
+    });
+  }
+  return jsonResponse({ available: false, results: [], message });
+}
+
 async function writeSearchCache(
   key: string,
   results: SearchResult[],
@@ -200,15 +246,6 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
   const query = requireQuery(body.query);
   await requireRoomAccess(request, caller, roomId);
 
-  const apiKey = process.env.YOUTUBE_API_KEY ?? '';
-  if (apiKey.length === 0) {
-    return jsonResponse({
-      available: false,
-      results: [],
-      message: 'Search is not configured. Ask the host to enable YouTube search.',
-    });
-  }
-
   await enforceLimit('consume_rate_limit', [
     caller.userId,
     'youtube-search-member',
@@ -222,6 +259,11 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     return jsonResponse({ available: true, results: cached });
   }
 
+  const apiKey = process.env.YOUTUBE_API_KEY ?? '';
+  if (apiKey.length === 0) {
+    return localSearchOrUnavailable(query, 'Search is not configured. Ask the host to enable YouTube search.');
+  }
+
   // Peek at the shared limits before charging the caller's personal day. A
   // room that is already out, or a depleted global pool, must not cost a user
   // one of their thirty searches.
@@ -231,11 +273,7 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     ROOM_DAILY_SEARCH_LIMIT,
   ]) as { allowed?: boolean } | null;
   if (roomPeek?.allowed !== true) {
-    return jsonResponse({
-      available: false,
-      results: [],
-      message: 'This room has reached its search limit for today. Try again tomorrow.',
-    });
+    return localSearchOrUnavailable(query, 'This room has reached its search limit for today. Try again tomorrow.');
   }
 
   const globalPeek = await queryAllowNull('peek_daily_rate_limit', [
@@ -244,11 +282,7 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     dailyBudget('YOUTUBE_DAILY_SEARCH_BUDGET', DEFAULT_DAILY_SEARCH_BUDGET),
   ]) as { allowed?: boolean } | null;
   if (globalPeek?.allowed !== true) {
-    return jsonResponse({
-      available: false,
-      results: [],
-      message: 'Search is resting for today. Try again tomorrow.',
-    });
+    return localSearchOrUnavailable(query, 'Search is resting for today. Try again tomorrow.');
   }
 
   const userPeek = await queryAllowNull('peek_daily_rate_limit', [
@@ -314,7 +348,7 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     });
   }
 
-  const target = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&maxResults=10&key=' +
+  const target = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&maxResults=10&key=' +
     encodeURIComponent(apiKey) + '&q=' + encodeURIComponent(query);
 
   let upstream: Response;

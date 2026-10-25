@@ -111,6 +111,18 @@ describe('song search panel', () => {
     await new Promise((resolve) => window.setTimeout(resolve, 500));
     expect(calls.filter((name) => name === 'youtube-search')).toHaveLength(1);
   });
+  it('adds a pasted YouTube link directly without spending YouTube search quota', async () => {
+    const { api, calls } = makeApi();
+    renderPanel(api);
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), {
+      target: { value: 'https://youtu.be/dQw4w9WgXcQ' },
+    });
+    fireEvent.submit(screen.getByRole('search'));
+    await waitFor(() => expect(calls).toContain('queue-command'));
+    await new Promise((resolve) => window.setTimeout(resolve, 480));
+    expect(calls).not.toContain('youtube-search');
+    expect(screen.getByLabelText(/find a song on youtube/i)).toHaveValue('');
+  });
 
   it('searches as the singer types and adds a song', async () => {
     const { api, calls } = makeApi();

@@ -143,7 +143,7 @@ export default function SongSearchPanel({
         </div>
       ) : null}
 
-      {available === false && message !== null ? (
+      {message !== null && (available === false || results.length > 0) ? (
         <div role="status" className="rounded-media border border-line bg-surface-2 px-4 py-3 text-[0.75rem] leading-[1.6] text-ink-2">
           {message}
         </div>

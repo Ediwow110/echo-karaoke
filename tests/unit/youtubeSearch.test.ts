@@ -2,10 +2,29 @@ import { describe, expect, it } from 'vitest';
 // The mappers are plain TypeScript, so the unit suite can exercise them directly.
 import {
   buildPopularSearchUrl,
+  mapFreshCatalogResults,
   mapSearchResponse,
   pickPopularCards,
   selectPopularResults,
 } from '../../server/operations/youtube';
+
+describe('freshness-limited local karaoke fallback', () => {
+  const now = Date.parse('2026-10-25T06:00:00Z');
+  it('accepts a recently checked catalog entry and preserves source metadata', () => {
+    expect(mapFreshCatalogResults({ items: [{
+      videoId: 'dQw4w9WgXcQ', title: 'Live Song', channelTitle: 'Example',
+      thumbnailUrl: null, syncedAt: '2026-10-24T06:00:00Z',
+    }] }, now)).toMatchObject([{ videoId: 'dQw4w9WgXcQ', title: 'Live Song', channelTitle: 'Example' }]);
+  });
+  it('rejects stale, missing-date, future and invalid video records', () => {
+    expect(mapFreshCatalogResults({ items: [
+      { videoId: 'dQw4w9WgXcQ', title: 'Old', syncedAt: '2026-09-01T00:00:00Z' },
+      { videoId: 'abc123XYZ_-', title: 'Unknown age' },
+      { videoId: 'abc123XYZ_-', title: 'From future', syncedAt: '2026-10-27T00:00:00Z' },
+      { videoId: 'bad', title: 'Bad video', syncedAt: '2026-10-24T00:00:00Z' },
+    ] }, now)).toEqual([]);
+  });
+});
 
 function payload(items: unknown[]): unknown {
   return { items };
