@@ -16,10 +16,18 @@ let currentState = -1;
 let volume = 100;
 let reportedCurrentTime = 42;
 let reportedDuration = 210;
+let swapped: HTMLElement | null = null;
 
 class FakePlayer {
-  constructor(_element: HTMLElement, given: Record<string, unknown>) {
+  constructor(element: HTMLElement, given: Record<string, unknown>) {
     options = given as unknown as FakeOptions;
+    // The real IFrame API replaces the element it is handed with its own
+    // iframe. Modelling that here is the only way this suite can catch a caller
+    // that passes React a node the API then removes from under it.
+    const frame = document.createElement('iframe');
+    frame.setAttribute('data-fake-youtube', 'true');
+    element.replaceWith(frame);
+    swapped = frame;
   }
   loadVideoById(input: { videoId: string; startSeconds?: number }) { loaded.push(input); }
   playVideo() { calls.push('play'); }
@@ -48,6 +56,7 @@ beforeEach(() => {
   volume = 100;
   reportedCurrentTime = 42;
   reportedDuration = 210;
+  swapped = null;
 });
 
 function ready(): void {
@@ -60,6 +69,23 @@ function state(data: number): void {
 }
 
 describe('the YouTube player factory', () => {
+  it('keeps the caller’s container attached when the API swaps its own node', async () => {
+    // HostPlayer hands this factory a div React rendered. The API replaces the
+    // element it receives, so a factory that forwards that element detaches a
+    // node React still owns — the host screen then dies on any route change away
+    // from the player with "NotFoundError: insertBefore".
+    const parent = document.createElement('div');
+    const container = document.createElement('div');
+    parent.appendChild(container);
+
+    youtubePlayerFactory(container, { onEnded: () => undefined });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(swapped, 'the fake stopped replacing nodes, so this test proves nothing').not.toBeNull();
+    expect(container.parentNode).toBe(parent);
+    expect(parent.contains(swapped)).toBe(true);
+  });
+
   it('holds a song that arrives before the player is ready', async () => {
     const handle = youtubePlayerFactory(document.createElement('div'), { onEnded: () => undefined });
 

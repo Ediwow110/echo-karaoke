@@ -88,6 +88,10 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
   let volume = 100;
   let starting = false;
   let destroyed = false;
+  // The API replaces whatever element it is given. Handing it the caller's node
+  // detaches a node React still owns, and the next route change dies with
+  // NotFoundError: insertBefore. So the factory owns this throwaway child instead.
+  let mount: HTMLElement | null = null;
 
   // A blocked or failed script must remain retryable. A single failed load
   // used to leave the host clicking an overlay that could never work.
@@ -99,7 +103,15 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
     void loadApi()
       .then((api) => {
         if (destroyed) return;
-        player = new api.Player(element, {
+        if (mount === null) {
+          mount = document.createElement('div');
+          mount.style.width = '100%';
+          mount.style.height = '100%';
+        }
+        if (mount.parentNode === null) {
+          element.appendChild(mount);
+        }
+        player = new api.Player(mount, {
           height: '100%',
           width: '100%',
           playerVars: {
@@ -207,6 +219,10 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
       ready = false;
       pending = null;
       wantsPlay = false;
+      // destroy() drops the iframe the API swapped in; the mount we appended
+      // stays behind and would accumulate across retries if it were not removed.
+      mount?.remove();
+      mount = null;
     },
   };
 
