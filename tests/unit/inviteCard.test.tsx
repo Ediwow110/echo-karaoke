@@ -25,6 +25,25 @@ function stubClipboard(writeText: (url: string) => Promise<void>) {
   });
 }
 
+describe('invitation card presence', () => {
+  it.each([['default', undefined], ['compact', 'compact'] as const])(
+    'keeps the %s invitation lit by the same ambient layer as the stage',
+    async (_label, variant) => {
+      // The card used to carry a moving visual and now renders a static panel;
+      // the smoke layer is what makes it feel part of the room instead of a form.
+      // It must stay decorative, or a screen reader announces a gradient.
+      render(variant === undefined
+        ? <InviteCard {...props} />
+        : <InviteCard {...props} variant={variant} />);
+      const card = await screen.findByRole('region', { name: 'Invite your people' });
+      const smoke = card.querySelector('.stage-smoke');
+      expect(smoke).not.toBeNull();
+      expect(smoke).toHaveAttribute('aria-hidden', 'true');
+      expect(card).toHaveClass('isolate');
+    },
+  );
+});
+
 describe('host QR invitation safety', () => {
   it('resets the copied confirmation when the live URL is replaced', async () => {
     const write = vi.fn(async () => undefined);

@@ -103,7 +103,8 @@ export default function InviteCard({
 
   if (variant === 'compact') {
     return (
-      <section className={['rounded-panel border border-line bg-surface p-5', className].join(' ')} aria-label="Invite your people">
+      <section className={['relative isolate overflow-hidden rounded-panel border border-line bg-surface p-5', className].join(' ')} aria-label="Invite your people">
+        <div className="stage-smoke absolute inset-0 -z-10" aria-hidden="true" />
         <div className="flex items-start justify-between gap-3">
           <div>
             <p className="eyebrow text-ink-2">Room remote</p>
@@ -137,7 +138,8 @@ export default function InviteCard({
   }
 
   return (
-    <section className={['rounded-panel border border-line bg-surface p-5', className].join(' ')} aria-label="Invite your people">
+    <section className={['relative isolate overflow-hidden rounded-panel border border-line bg-surface p-5', className].join(' ')} aria-label="Invite your people">
+      <div className="stage-smoke absolute inset-0 -z-10" aria-hidden="true" />
       <div className="flex items-start justify-between gap-3">
         <div>
           <p className="eyebrow text-ink-2">Room remote</p>
