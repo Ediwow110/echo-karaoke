@@ -486,6 +486,13 @@ and authenticated roles.
   and the fallback's negative lookahead already excludes `api/`. `restoreApiRequest` rebuilds the
   pathname as `/api/cron/catalog-retention`, which is what the router compares — covered by
   `tests/unit/catalogRetentionRouter.test.ts` using the real rewrite helper, not a mock.
+- **CI has everything it needs on the remote, and the push cannot conflict.** The repository
+  variable `NEON_PROJECT_ID` and the secrets `NEON_API_KEY`, `NEON_DATABASE_URL`,
+  `NEON_SERVICE_DATABASE_URL`, `NEON_AUTH_DATABASE_URL` and `BETTER_AUTH_SECRET` are all set, and
+  there is **no** `YOUTUBE_API_KEY` in CI — which is exactly the condition the local simulation ran
+  under, so the search assertions behave identically. Both `master` and `origin/master` are already
+  ancestors of the feature branch, so the push is a fast-forward and cannot produce a merge
+  conflict.
 - **The first refresh is bounded**: four channels, at most three pages each, roughly 400 rows and
   about 16 quota units, against a 40-unit daily cap. Browsing the songbook costs nothing.
 - **Every environment variable the Function reads is present in Production except
