@@ -338,7 +338,7 @@ export default function GuestRoomPage() {
 
       {songbook ? (
         <main key="songbook" className="page-enter px-4 pb-8 pt-6">
-          <GuestSongbook roomId={roomId} onAdded={() => { void refresh(); }} />
+          <GuestSongbook roomId={roomId} locked={locked} onAdded={() => { void refresh(); }} />
         </main>
       ) : tab === 'search' ? (
         <main key="search" className="page-enter px-4 pb-8 pt-6">

@@ -16,10 +16,13 @@ export type SongbookListProps = {
   // The guest screen and the host page pass the synced channel labels; a
   // caller that omits them gets no chips.
   channels?: { id: string; label: string }[];
+  // The guest screen passes the room's guest-control lock. Browsing stays
+  // usable; only queueing is gated. The host page never sets this.
+  disabled?: boolean;
   onAdded?: () => void;
 };
 
-export default function SongbookList({ api, roomId, channels, onAdded }: SongbookListProps) {
+export default function SongbookList({ api, roomId, channels, disabled = false, onAdded }: SongbookListProps) {
   const [query, setQuery] = useState('');
   const [channel, setChannel] = useState('');
   const [items, setItems] = useState<CatalogSong[]>([]);
@@ -67,6 +70,7 @@ export default function SongbookList({ api, roomId, channels, onAdded }: Songboo
   }, [load]);
 
   async function add(song: CatalogSong): Promise<void> {
+    if (disabled) return;
     setAdding(song.videoId);
     try {
       await queueCatalogSong(api, roomId, song.videoId);
@@ -98,7 +102,7 @@ export default function SongbookList({ api, roomId, channels, onAdded }: Songboo
       </div>
 
       {channels === undefined || channels.length === 0 ? null : (
-        <div className="flex flex-wrap gap-2">
+        <div role="group" aria-label="Filter by channel" className="flex flex-wrap gap-2">
           <button
             type="button"
             onClick={() => setChannel('')}
@@ -153,7 +157,7 @@ export default function SongbookList({ api, roomId, channels, onAdded }: Songboo
                   <button
                     type="button"
                     onClick={() => void add(song)}
-                    disabled={isAdded || adding !== null}
+                    disabled={disabled || isAdded || adding !== null}
                     aria-label={isAdded ? song.title + ' is already queued' : 'Add ' + song.title}
                     className="grid size-11 shrink-0 place-items-center rounded-full border border-line text-ink transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 disabled:pointer-events-none disabled:opacity-45"
                   >

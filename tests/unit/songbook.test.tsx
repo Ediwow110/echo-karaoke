@@ -142,10 +142,39 @@ describe('songbook list', () => {
     const { api, calls } = makeApi();
     render(<SongbookList api={api} roomId={roomId} channels={[{ id: 'UC_sing', label: 'Sing King' }]} />);
 
+    expect(screen.getByRole('group', { name: 'Filter by channel' })).toBeInTheDocument();
     fireEvent.click(await screen.findByRole('button', { name: 'Sing King' }));
     await waitFor(() => {
       expect(calls.some((call) => call.name === 'catalog-page'
         && (call.body as { channel?: string }).channel === 'UC_sing')).toBe(true);
+    });
+  });
+
+  it('keeps every Add button inert while the guest lock is on', async () => {
+    const { api, calls } = makeApi();
+    // Without a pass the queue helper throws before invoking, which would make
+    // the "no queue-command" assertion pass for the wrong reason.
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass-value');
+    render(<SongbookList api={api} roomId={roomId} disabled />);
+
+    const adds = await screen.findAllByRole('button', { name: /^add /i });
+    expect(adds).toHaveLength(PAGE_SIZE);
+
+    await act(async () => {
+      for (const add of adds) {
+        fireEvent.click(add);
+      }
+    });
+    expect(calls.some((call) => call.name === 'queue-command')).toBe(false);
+    for (const add of adds) {
+      expect(add).toBeDisabled();
+    }
+
+    // Browsing still works behind the lock, so the guest can plan a set.
+    fireEvent.change(screen.getByLabelText(/search the songbook/i), { target: { value: 'halo' } });
+    await waitFor(() => {
+      expect(calls.some((call) => call.name === 'catalog-page'
+        && (call.body as { query?: string }).query === 'halo')).toBe(true);
     });
   });
 
