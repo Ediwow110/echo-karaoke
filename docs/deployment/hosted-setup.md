@@ -387,11 +387,61 @@ connects as `echo_service`, so without it every songbook call answers 500 while 
 owner-run database suite still passes. Grant new functions to both roles from now on;
 `supabase/tests/role_grant_parity_test.sql` fails if they drift apart.
 
+## Step 9: Shipping the songbook
+
+Production `main` is at migration 0030, so the catalog does not exist there yet. Run these in
+order; step 1 is the only one that is not a command, and nothing after it is safe to skip.
+
+1. **Create `CRON_SECRET`** (at least 32 random characters) in the Vercel Production environment.
+   Pipe it so it does not land in shell history or a transcript:
+
+   ```bash
+   npx vercel env add CRON_SECRET production --force --sensitive < secret.txt
+   ```
+
+   Without it `npm run verify:deploy` refuses the build (proved: it is the only remaining
+   complaint once the other variables are set) and the daily retention run answers 503. A new
+   environment value only reaches a running deployment through a new deployment, so add it before
+   pushing, not after.
+
+2. **Apply 0031–0034 to production `main`.** `server/.env.neon`'s `NEON_DATABASE_URL` is the owner
+   credential **for production**, so this command writes to production — confirm the hostname is
+   `ep-long-leaf-b3708f3l` before running it, and never point `supabase test db` at it (the pgTAP
+   fixtures create and delete rows; they belong on a disposable branch).
+
+   ```bash
+   npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
+   ```
+
+   0034 must be included: it grants the catalog and `playback_next_if_current` to `echo_service`,
+   the role the app actually connects as. Without it every songbook call answers 500 while the
+   owner-run database suite stays green.
+
+3. **Deploy** by pushing `master`. Note this branch also carries the two local-only `master`
+   commits (`9dc5396`, `54b8478`) that were never shipped.
+
+4. **Verify on the live origin:**
+
+   ```bash
+   npm run verify:preview -- https://echo-karaoke-mocha.vercel.app
+   curl -s -o /dev/null -w '%{http_code}\n' https://echo-karaoke-mocha.vercel.app/api/cron/catalog-retention
+   ```
+
+   Expect `401` from the cron — reachable, and rejecting an unauthenticated caller. Then open a
+   room as host, press **Refresh the songbook**, and confirm the note reports songs added with no
+   "could not find" clause; the first run fills roughly 400 rows from four channels for about 16
+   quota units, and browses afterward cost nothing.
+
+**Rolling back** is cheap because every catalog object is additive: redeploy the previous commit to
+drop the feature from the app and leave the tables and grants in place. Do not drop `karaoke_catalog`
+to undo a deploy — 0033's RLS and grant hygiene is what keeps the metadata unreachuable by the anon
+and authenticated roles.
+
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 323 passing assertions on a fresh branch.
-- [x] `npm run test:integration` passes on the same branch.
-- [x] `npm test` reports 401 passing tests on the current tree.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 325 passing assertions on a fresh branch.
+- [x] `npm run test:integration` passes on the same branch, as `echo_service`.
+- [x] `npm test` reports 405 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 15 passing tests on the current tree.
 - [x] `npm run verify:deploy` passes with the production environment.

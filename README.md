@@ -89,10 +89,10 @@ The karaoke songbook is a local catalog of embeddable karaoke videos, filled onl
 
 ## Tests
 
-    npm test                 # 401 unit and component tests (jsdom)
+    npm test                 # 405 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 323 pgTAP assertions
-    npm run test:integration # 7 router/auth/operation tests against a Neon branch
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 325 pgTAP assertions
+    npm run test:integration # 8 router/auth/operation tests against a Neon branch
     npm run test:e2e:ui      # 15 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows against vercel dev on port 3000
 
@@ -105,6 +105,7 @@ The UI suite needs no database or YouTube key. The real E2E suite creates rooms 
 - Guest and host passes live in localStorage, so any same-origin script can read them. An XSS bug can take over a session.
 - Losing the host pass leaves a live room without host controls. There is no recovery flow.
 - The `service_role` and `echo_auth` connection strings exist only in the function environment. They must never reach the browser bundle, logs, or the repository. The browser has no database credential at all.
+- The function connects as `echo_service`. A new SQL function must be granted to `echo_service` as well as `service_role`, or the feature 500s in production while every owner-run database test passes; `supabase/tests/role_grant_parity_test.sql` fails if the two roles' surfaces drift.
 - The owner connection string is used only for migrations and CI. It is never set on Vercel.
 - `ALLOWED_ORIGINS` is a trusted auth origin, not a CORS policy. The function is same-origin, so a browser on another origin cannot call it through CORS.
 - Rotating `BETTER_AUTH_SECRET` requires deleting `public.jwks` first; otherwise the stored private key cannot be decrypted.

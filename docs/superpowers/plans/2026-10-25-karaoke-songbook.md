@@ -78,9 +78,10 @@ and the build is rejected until the owner creates that secret. Commits, the push
 migration all need the owner's explicit approval.
 
 Task 7's production step is unchanged in shape — create `CRON_SECRET`, apply 0031–0034 to
-production `main`, push/deploy, seed once, prove on the live origin — but the seeding risk is now
-quantified: the catalog fills to ~409 rows per refresh from four channels, and it will work as
-`echo_service` only if 0034 ships with the rest.
+production `main`, push/deploy, seed once, prove on the live origin — and it is written out as an
+ordered runbook in `docs/deployment/hosted-setup.md`, Step 9. The seeding risk is now quantified:
+the catalog fills to roughly 400 rows per refresh from four channels for about 16 quota units, and it
+only works as `echo_service` if 0034 ships with the rest.
 
 One thing the task list missed: Tasks 4–5 shipped the warming-up message but never wired the
 host-only Retry the spec requires, so nothing could call `catalog-sync`. That landed separately
