@@ -17,6 +17,7 @@ import HostPlayer from '../features/playback/HostPlayer';
 import PlayerDock from '../features/playback/PlayerDock';
 import Sidebar, { type SidebarNav } from '../features/rooms/Sidebar';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
+import { loadHostToken } from '../features/rooms/tokenStore';
 import { rememberSession, clearLastRoom } from '../features/rooms/sessionStore';
 import { rememberPlayed, rememberSongs } from '../features/library/libraryStore';
 import { groupRoomCode } from '../lib/format';
@@ -55,6 +56,11 @@ export default function HostRoomPage() {
   const exitSentRef = useRef(false);
   const exitTimerRef = useRef<number | null>(null);
   const wasLiveRef = useRef(false);
+  const roomClosedRef = useRef(false);
+  const canPauseRoom = useCallback(
+    (): boolean => !roomClosedRef.current && loadHostToken(roomId) !== null,
+    [roomId],
+  );
   const lastAutoPlayKey = useRef<string | null>(null);
   const queueInitialized = useRef(false);
 
@@ -78,6 +84,13 @@ export default function HostRoomPage() {
         return;
       }
       exitSentRef.current = true;
+      // Both exit pauses mean the same thing: this device is stopping the only
+      // player. Neither is worth sending once the room has ended or this tab no
+      // longer holds a host pass — those answer 409 and 403 as console noise for a
+      // refusal that is correct.
+      if (!canPauseRoom()) {
+        return;
+      }
       // Leaving this route destroys the only player. Pause even if the last
       // poll looked paused: a guest may have started playback since then.
       void sendPlaybackCommand(api, roomId, 'pause', options).catch(() => undefined);
@@ -91,7 +104,7 @@ export default function HostRoomPage() {
         pauseOnExit();
       }, 0);
     };
-  }, [api, roomId]);
+  }, [api, canPauseRoom, roomId]);
 
   const notify = useCallback<HostNotify>((message, detail, tone = 'success') => {
     setToast({ id: Date.now(), message, detail, tone });
@@ -101,11 +114,14 @@ export default function HostRoomPage() {
   const live = data !== null && data.status === 'live' && room !== undefined;
 
   useEffect(() => {
-    if (wasLiveRef.current && !live) {
+    // An ended room has no playback left to pause, and a tab without a host pass
+    // cannot pause one, so only a room that stopped being live for some other
+    // reason while this device still commands it is worth a final pause command.
+    if (wasLiveRef.current && !live && data?.status !== 'ended' && canPauseRoom()) {
       void sendPlaybackCommand(api, roomId, 'pause').catch(() => undefined);
     }
     wasLiveRef.current = live;
-  }, [api, live, roomId]);
+  }, [api, canPauseRoom, data?.status, live, roomId]);
 
   const queue = useMemo(() => {
     if (!live) return [];
@@ -269,6 +285,7 @@ export default function HostRoomPage() {
   const endRoom = useCallback(async (): Promise<void> => {
     try {
       await sendHostCommand(api, roomId, 'end');
+      roomClosedRef.current = true;
       clearLastRoom();
       navigate('/');
     } catch (caught) {

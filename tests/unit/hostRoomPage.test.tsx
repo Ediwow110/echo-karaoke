@@ -10,6 +10,7 @@ import HostStagePage from '../../src/app/HostStagePage';
 import HostPartyPage from '../../src/app/HostPartyPage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
+import { clearRoomTokens, saveGuestToken } from '../../src/features/rooms/tokenStore';
 import '@testing-library/jest-dom/vitest';
 
 const playerClock = vi.hoisted(() => ({
@@ -298,6 +299,41 @@ describe('host room workspace', () => {
       (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'pause',
     );
     expect(pauseCall?.options?.keepalive).toBe(true);
+  });
+
+  it('does not pause a room this device just ended', async () => {
+    // Ending a room clears playback server-side. The exit cleanup still sent a
+    // pause afterwards, and the ended room refused it: a 409 in the console every
+    // time a host left their own finished room.
+    const { api, calls } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    fireEvent.click(await screen.findByRole('button', { name: /leave & end room/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^end the room$/i }));
+    expect(await screen.findByText('Back at the start')).toBeInTheDocument();
+    await new Promise((resolve) => { window.setTimeout(resolve, 20); });
+
+    expect(calls.some(
+      (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'pause',
+    )).toBe(false);
+  });
+
+  it('does not pause a room this device can no longer command', async () => {
+    // The demoted half of a transfer. This tab keeps playing until it unmounts, and
+    // the command helper falls back to whatever pass it holds — so the exit pause
+    // went out as a *guest* pause and came back 403, because guests cannot pause.
+    const { api, calls } = makeApi();
+    renderHost(api);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+    clearRoomTokens(roomId);
+    saveGuestToken(roomId, 'fresh-guest-pass');
+    window.dispatchEvent(new Event('pagehide'));
+    await new Promise((resolve) => { window.setTimeout(resolve, 20); });
+
+    expect(calls.some(
+      (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'pause',
+    )).toBe(false);
   });
 
   it('automatically plays a song added to a stopped queue', async () => {
