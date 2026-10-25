@@ -109,11 +109,11 @@ five-channel one. `catalog-sync` now returns `unresolved: []` and, when non-empt
 filters by that same id, a drift gate (`tests/unit/catalogChannelContract.test.ts`) now pins the two
 lists together; it was written after the two halves had already drifted apart once.
 
-Still owed from this class: a channel whose *playlist pages* fail mid-walk stops that channel
-quietly after any rows already taken. The cursor-trust half is now closed — a stored uploads
-playlist that YouTube no longer serves is re-resolved from the handle once per run and the cursor is
-replaced (`c5d2bf4`) — as is the outage half, reported as `unreachable` and kept distinct from
-`unresolved` so a YouTube outage never sends a host editing a handle that is correct (`ea6f25c`).
+The silent-omission class is now closed across all four shapes it took in the sync: a handle that
+names no channel (`unresolved`), a lookup YouTube refused (`unreachable`), a stored playlist the
+channel no longer serves (re-resolved and the cursor replaced, `c5d2bf4`), and a channel cut off
+mid-walk (also `unreachable`, `d5b62b2`). Each was red-proved before fixing and mutation-proved
+after, and each isolation named exactly one test.
 
 One more instance of the same disguise was closed in `6a0e938`: the keyless songbook fallback caught
 **every** database error and answered "no results", which is precisely how the missing grants would
