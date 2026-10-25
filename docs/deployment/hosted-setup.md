@@ -532,6 +532,15 @@ grants in 0034 are needed even though nothing calls them yet.
    healthy. Treat those two as the ship's signal: after a successful deploy they must clear, and if
    they still fail the new build is not the one being served. Expect nothing else to differ.
 
+   Before blaming the app for a song that will not play, know that the top of the list has been
+   checked for embeddability: `karaoke_catalog_page` sorts by `published_at desc`, so the first songs
+   a tester meets are the newest uploads. Probed 2026-10-26 with the quota-free oEmbed endpoint
+   against the 15 newest items in `@musisikaraoke`'s uploads playlist — 15 of 15 embeddable, none
+   refused, and one `playlistItems` unit spent straight from the key's daily allowance rather than
+   the songbook's internal 40-unit budget. An oEmbed refusal normally means the uploader switched
+   embedding off, which is content, not a broken ship; the client already reports it as a player
+   error instead of a silent freeze. Only the largest channel's newest 15 were checked.
+
    Expect `401` from the cron — reachable, and rejecting an unauthenticated caller. Then open a
    room as host, press **Refresh the songbook**, and confirm the note reports songs added with no
    "could not find" clause; the first run fills roughly 400 rows from four channels for about 16
