@@ -493,6 +493,10 @@ and authenticated roles.
   under, so the search assertions behave identically. Both `master` and `origin/master` are already
   ancestors of the feature branch, so the push is a fast-forward and cannot produce a merge
   conflict.
+- **The sync's eight-second budget needs no `maxDuration` config.** Vercel Functions default to
+  300 seconds on every plan under Fluid Compute, which is enabled by default, so the refresh path
+  and its drain sit far inside the platform limit. Checked against Vercel's duration limits on
+  2026-10-25 — do not add a `maxDuration` to "fix" a timeout that cannot occur.
 - **The first refresh is bounded**: four channels, at most three pages each, roughly 400 rows and
   about 16 quota units, against a 40-unit daily cap. Browsing the songbook costs nothing.
 - **Every environment variable the Function reads is present in Production except
