@@ -109,6 +109,7 @@
   --animate-queue-in: queue-in var(--duration-base) var(--ease-console) backwards;
   --animate-presence-pulse: presence-pulse 2s ease-in-out infinite;
   --animate-toast-in: toast-in var(--duration-base) var(--ease-console) backwards;
+  --animate-toast-out: toast-out var(--duration-fast) var(--ease-console) forwards;
   --animate-equalizer: equalizer 900ms ease-in-out infinite alternate;
   --animate-page-in: page-in 380ms var(--ease-console) both;
   --animate-list-in: list-in 320ms var(--ease-console) both;
@@ -146,6 +147,11 @@
 @keyframes toast-in {
   from { opacity: 0; transform: translateY(10px) scale(0.98); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+@keyframes toast-out {
+  from { opacity: 1; transform: translateY(0) scale(1); }
+  to { opacity: 0; transform: translateY(6px) scale(0.98); }
 }
 
 @keyframes equalizer {

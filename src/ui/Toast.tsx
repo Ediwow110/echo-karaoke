@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { CheckCircleIcon } from '@phosphor-icons/react/dist/csr/CheckCircle';
 import { InfoIcon } from '@phosphor-icons/react/dist/csr/Info';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
@@ -14,6 +14,13 @@ export type ToastProps = {
   durationMs?: number;
   className?: string;
 };
+
+const EXIT_MS = 140;
+
+function prefersReducedMotion(): boolean {
+  return typeof window.matchMedia === 'function'
+    && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+}
 
 const icons = {
   success: CheckCircleIcon,
@@ -34,10 +41,31 @@ export default function Toast({
   const dismissRef = useRef(onDismiss);
   dismissRef.current = onDismiss;
 
+  const [leaving, setLeaving] = useState(false);
+  const leavingRef = useRef(false);
+  const exitTimerRef = useRef<number | undefined>(undefined);
+
+  // Unmounting the moment dismiss fires cuts the toast off mid-read; hold it
+  // for one short exit, then tell the parent to remove it.
+  const beginDismiss = useCallback(() => {
+    if (leavingRef.current) return;
+    leavingRef.current = true;
+    setLeaving(true);
+    if (prefersReducedMotion()) {
+      dismissRef.current();
+      return;
+    }
+    exitTimerRef.current = window.setTimeout(() => dismissRef.current(), EXIT_MS);
+  }, []);
+
   useEffect(() => {
-    const timer = window.setTimeout(() => dismissRef.current(), durationMs);
+    const timer = window.setTimeout(beginDismiss, durationMs);
     return () => window.clearTimeout(timer);
-  }, [durationMs, message]);
+  }, [beginDismiss, durationMs, message]);
+
+  useEffect(() => () => {
+    if (exitTimerRef.current !== undefined) window.clearTimeout(exitTimerRef.current);
+  }, []);
 
   const Icon = icons[tone];
 
@@ -46,7 +74,8 @@ export default function Toast({
       role={tone === 'error' ? 'alert' : 'status'}
       aria-live={tone === 'error' ? 'assertive' : 'polite'}
       className={[
-        'pointer-events-auto flex w-full max-w-[26rem] items-center gap-3 rounded-panel border px-4 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.45)] animate-toast-in',
+        'pointer-events-auto flex w-full max-w-[26rem] items-center gap-3 rounded-panel border px-4 py-3 shadow-[0_16px_48px_rgba(0,0,0,0.45)]',
+        leaving ? 'animate-toast-out' : 'animate-toast-in',
         tone === 'error'
           ? 'border-danger/35 bg-danger-soft text-ink'
           : tone === 'success'
@@ -62,9 +91,9 @@ export default function Toast({
       </div>
       <button
         type="button"
-        onClick={onDismiss}
+        onClick={beginDismiss}
         aria-label="Dismiss message"
-        className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+        className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-3 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
       >
         <XIcon size={14} weight="bold" aria-hidden="true" />
       </button>

@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render } from '@testing-library/react';
+import { act, cleanup, fireEvent, render } from '@testing-library/react';
 import Toast from '../../src/ui/Toast';
 import '@testing-library/jest-dom/vitest';
 
@@ -25,5 +25,44 @@ describe('toast lifetime', () => {
 
     expect(second).toHaveBeenCalledTimes(1);
     expect(first).not.toHaveBeenCalled();
+  });
+
+  it('plays one short exit before telling the parent to remove it', () => {
+    vi.useFakeTimers();
+    const onDismiss = vi.fn();
+
+    const view = render(<Toast message="Saved" tone="success" onDismiss={onDismiss} />);
+    fireEvent.click(view.getByRole('button', { name: /dismiss message/i }));
+
+    expect(onDismiss).not.toHaveBeenCalled();
+    expect(view.container.firstElementChild).toHaveClass('animate-toast-out');
+
+    act(() => {
+      vi.advanceTimersByTime(200);
+    });
+    expect(onDismiss).toHaveBeenCalledTimes(1);
+  });
+
+  it('skips the exit when the user asked for reduced motion', () => {
+    const original = window.matchMedia;
+    window.matchMedia = vi.fn().mockReturnValue({
+      matches: true,
+      media: '(prefers-reduced-motion: reduce)',
+      onchange: null,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+      addListener: () => undefined,
+      removeListener: () => undefined,
+      dispatchEvent: () => false,
+    }) as unknown as typeof window.matchMedia;
+
+    try {
+      const onDismiss = vi.fn();
+      const view = render(<Toast message="Saved" onDismiss={onDismiss} />);
+      fireEvent.click(view.getByRole('button', { name: /dismiss message/i }));
+      expect(onDismiss).toHaveBeenCalledTimes(1);
+    } finally {
+      window.matchMedia = original;
+    }
   });
 });
