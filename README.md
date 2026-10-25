@@ -91,9 +91,9 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 407 unit and component tests (jsdom)
+    npm test                 # 411 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 325 pgTAP assertions
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 328 pgTAP assertions
     npm run test:integration # 8 router/auth/operation tests against a Neon branch
     npm run test:e2e:ui      # 16 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows against vercel dev on port 3000

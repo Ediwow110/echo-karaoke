@@ -35,10 +35,26 @@ beyond this plan; it hardened the surrounding features:
 - The app is branded **kara-echo** (`appName`, `index.html`, `README.md`, `public/llms.txt`) and
   `Referrer-Policy` moved to `strict-origin-when-cross-origin`.
 
-Evidence on the current tree: `tsc` clean, unit 401/401, pgTAP 323/323 on the local container,
-build passes, mocked e2e 15/15. The full 0001→0033 chain was also pushed to a disposable Neon
-branch off production `main`, where pgTAP reported 323/323; that branch was deleted and
-production `main` was confirmed unchanged afterwards.
+Evidence on the committed tree: `tsc` clean, unit 411/411, pgTAP 328/328, build passes, mocked e2e
+16/16, and every commit in the series typechecks alone. The full 0001→0034 chain was replayed on
+disposable Neon branches off production `main`, where pgTAP reported 328/328 and the integration
+suite 8/8 connecting as `echo_service`; those branches were deleted and production `main` was
+confirmed unchanged each time.
+
+**Two further defects on the seed path, found by reading the build's own deferred notes (2026-10-25):**
+
+- `94b1a0c` — `karaoke_catalog_upsert` cast `publishedAt` straight to `timestamptz`, so one
+  malformed provider string raised inside the statement and cost **all fifty rows of that page**,
+  answering a 500 to a host who had done nothing wrong. A `stable` parse helper now yields NULL for
+  anything unparseable; three pgTAP assertions plant one bad row beside a good one.
+- `fd86173` — the daily-budget call swallowed its own error and returned `null`, which the sync read
+  as a refusal, so a database failure told the host **"paused for today"** — a false cause they
+  would believe until the Pacific-day reset. It now propagates to the operation boundary, which
+  already logs and answers 500. Re-verified on a fresh Neon branch: the chain applies, pgTAP
+  328/328, integration 8/8 as `echo_service`.
+
+Still open in the sync, neither on the first-seed path: two hosts refreshing at once race the
+cursor, and `exhausted_at` is written but never read.
 
 **Live proof, and the bug it found (2026-10-25).** The loop was run end to end against a
 disposable Neon branch off production `main`, with the real YouTube key, connecting as the
