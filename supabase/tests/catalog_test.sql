@@ -91,5 +91,22 @@ select is(has_function_privilege('service_role',
   'public.karaoke_catalog_page(text, text, integer, integer)', 'execute'),
   true, 'service_role can page the catalog');
 
+-- One malformed date from the provider must not cost the whole page. YouTube is
+-- external, and a cast failure inside the statement would roll back every row in it.
+select is(
+  (public.karaoke_catalog_upsert('UC_musisi',
+    ('[{"videoId":"bad00000001","title":"Future upload","channelTitle":"Musisi Karaoke","publishedAt":"tomorrow-ish"},'
+    || '{"videoId":"bad00000002","title":"Good neighbour","channelTitle":"Musisi Karaoke","publishedAt":"2025-03-04T05:06:07Z"}]')::jsonb)),
+  2,
+  'an unparsable publishedAt drops that field, not the row or its neighbours');
+select is(
+  (select published_at from public.karaoke_catalog where video_id = 'bad00000001'),
+  null,
+  'the unparsable date is stored as absent rather than guessed');
+select isnt(
+  (select published_at from public.karaoke_catalog where video_id = 'bad00000002'),
+  null,
+  'a valid date in the same page still lands');
+
 select * from finish();
 rollback;

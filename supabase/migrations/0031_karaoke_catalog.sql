@@ -68,6 +68,26 @@ as $$
   );
 $$;
 
+-- Provider dates are external text. A bare cast aborts the whole statement, so
+-- one malformed value would cost every row in the page and fail the refresh.
+create or replace function public.karaoke_catalog_ts(p_value text)
+returns timestamptz
+language plpgsql
+stable
+set search_path = ''
+as $$
+begin
+  if p_value is null or btrim(p_value) = '' then
+    return null;
+  end if;
+  return p_value::timestamptz;
+exception when others then
+  return null;
+end;
+$$;
+
+revoke all on function public.karaoke_catalog_ts(text) from public, anon, authenticated;
+
 create or replace function public.karaoke_catalog_upsert(p_channel_id text, p_items jsonb)
 returns integer
 language plpgsql
@@ -91,7 +111,7 @@ begin
          coalesce(nullif(item ->> 'channelTitle', ''), 'YouTube'),
          p_channel_id,
          nullif(item ->> 'thumbnailUrl', ''),
-         nullif(item ->> 'publishedAt', '')::timestamptz,
+         public.karaoke_catalog_ts(item ->> 'publishedAt'),
          now()
   from jsonb_array_elements(p_items) item
   where item ->> 'videoId' ~ '^[A-Za-z0-9_-]{11}$'
