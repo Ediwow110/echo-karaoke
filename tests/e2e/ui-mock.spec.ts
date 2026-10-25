@@ -305,6 +305,12 @@ test('guest songbook keeps 44px controls and reflows at 200% text', async ({ pag
   await chips.nth(1).click();
   await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true');
   expect(await clipped(page)).toEqual([]);
+
+  // "All" is the only way back to an unfiltered songbook, and its reset was
+  // previously unproven: a chip that stayed pressed would filter silently.
+  await chips.first().click();
+  await expect(chips.first()).toHaveAttribute('aria-pressed', 'true');
+  await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'false');
 });
 
 test('popular karaoke strip slides with previous and next controls', async ({ page }) => {

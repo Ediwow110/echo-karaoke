@@ -514,7 +514,7 @@ branch for the app-level proof only, or expect those four assertions to complain
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
 - [x] `npm test` reports 407 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 15 passing tests on the current tree.
+- [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [x] `npm run verify:deploy` passes with the production environment.
 - [ ] `vercel deploy --prod` builds with the guard enabled.
 - [ ] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.

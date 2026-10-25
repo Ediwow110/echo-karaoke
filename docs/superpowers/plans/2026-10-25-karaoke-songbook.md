@@ -129,7 +129,10 @@ distinction at all.
   fifth channel had no live handle and the owner removed it on 2026-10-25), plus one extra unit for
   any channel whose stored playlist had to be re-resolved, and **40 units/day** (`consume_daily_rate_limit('global','karaoke-catalog-day',40,…)`), no-ops if every channel synced within 6 hours, and aborts its loop after **8 seconds**.
 - Every new SQL function: `security definer`, `set search_path = ''`, schema-qualified names, `revoke all … from public, anon, authenticated`, `grant execute … to service_role` **and to `echo_service`** — the app connects as `echo_service` since the 2026-10-25 credential rotation, and granting only `service_role` makes the feature 500 in production while every owner-run test stays green (see Status).
-- Guest phone controls stay ≥44px and must not overflow at 200% text.
+- Guest phone controls stay ≥44px and must not overflow at 200% text. Proven by committed gates, not
+  ad-hoc scripts: `tests/e2e/ui-mock.spec.ts` measures guest search and the guest songbook (filter,
+  chips, per-row Add) before and after 200% text, and asserts rows rendered first so an empty shell
+  cannot pass — shrinking the chips to `min-h-8` fails it and names all four.
 - The guest remote keeps exactly two bottom tabs (Search, Queue); the songbook is a screen with its own back link.
 - Commits require the owner's explicit approval; batch the commit steps below when they give it. A push deploys production, so push only with approval.
 - Do not change `youtube-search`, `youtube-suggest`, `youtube-popular` behaviour.
