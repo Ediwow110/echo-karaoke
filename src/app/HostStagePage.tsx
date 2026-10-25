@@ -121,7 +121,7 @@ export default function HostStagePage() {
       <header className="sticky top-0 z-30 border-b border-line bg-graphite/95 backdrop-blur animate-console-in">
         <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6">
           <div className="flex min-w-0 items-center gap-3">
-            <Logo size="md" />
+            <Logo size="md" wordmarkClassName="hidden sm:inline" />
             <span className="hidden h-5 w-px bg-line sm:block" aria-hidden="true" />
             <Link
               to={'/room/' + roomId + '/host'}
