@@ -430,8 +430,11 @@ test is what caught it.
 
 ## Step 9: Shipping the songbook
 
-Production `main` is at migration 0030, so the catalog does not exist there yet. Run these in
-order; step 1 is the only one that is not a command, and nothing after it is safe to skip.
+Production `main` was at migration 0030 when this runbook was written. **Step 2 was executed on
+2026-10-26** — 0031–0034 are applied (`{"latest":"0034","tables":2,"functions":7}`, and `echo_service`
+executes `karaoke_catalog_page`), so read step 2 as already done and do not run it again. What remains
+is step 1 (the secret), step 3 (the push) and step 4 (verify the origin, probe the cron, seed, prove
+playback). Run what is left in order; nothing after it is safe to skip.
 
 If step 1 is not yet available, **do not push** — the build command refuses a production build
 without `CRON_SECRET`, so a push fails rather than shipping. Applying step 2 alone is a separate

@@ -15,8 +15,11 @@
 Tasks 1–6 are committed on `feature/songbook`, and the branch now carries the second batch below on
 top of `8780c90`. It is **not pushed**; read the live gap with `git rev-list --count
 origin/master..HEAD`. Pushing also carries the two local-only `master` commits (`9dc5396`,
-`54b8478`) that were never shipped. Production Neon `main` is verified to be at 0030 with none of
-the catalog or auto-advance functions, so **0031–0033 are still not applied**.
+`54b8478`) that were never shipped. Production Neon `main` **now carries 0031–0034**, applied on
+2026-10-26 and verified against the database (`{"latest":"0034","tables":2,"functions":7}`, with the
+runtime role `echo_service` able to execute `karaoke_catalog_page` — the grant 0034 exists to add).
+The migration half of Task 7 is therefore finished and must not be re-run; the deploy, seed and live
+playback proof still are not.
 
 A second batch sat **uncommitted** in the working tree after Task 6 (55 modified files, 14
 untracked, +1787/-231) and is now committed locally on this branch, starting at `4e4ac1b`. It is
@@ -109,7 +112,9 @@ report `available: false`, which passed on a fresh CI branch only because its ca
 the songbook fallback in place the honest contract is both cases, so the test now seeds one catalog
 row and asserts the cold answer *and* the `source: "songbook"` answer.
 
-Task 7 is **not started** and has a prerequisite beyond the migration: `catalogRetentionCron`
+Task 7 is **half executed**: the production migration ran on 2026-10-26, `main` is at 0034 with the
+runtime grants in place, and what is left is the deploy half. Its prerequisite is that
+`catalogRetentionCron`
 refuses to run without `CRON_SECRET` (≥32 chars) and `npm run verify:deploy` demands it in
 Production, but the Vercel Production environment **does not have it** — so the cron answers 503
 and the build is rejected until the owner creates that secret. Commits, the push and the production
@@ -1451,7 +1456,7 @@ npx vercel env add CRON_SECRET production --force --sensitive < secret.txt
 deploy of this tree succeeds — not just the cron. A new environment value never reaches a running
 deployment, so it must exist before Step 3, not after.
 
-- [ ] **Step 2: Apply migrations 0031–0034 to Neon `main`**
+- [x] **Step 2: Apply migrations 0031–0034 to Neon `main`** — **done 2026-10-26**
 
 All four, in one `db push`, the same way 0025–0030 were applied:
 
@@ -1464,6 +1469,13 @@ npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
 afterwards that `supabase_migrations.schema_migrations` reports 0034 and that
 `has_function_privilege('echo_service', 'public.karaoke_catalog_page(text,text,integer,integer)', 'execute')`
 is true. Never run `supabase test db` against `main`: the fixtures write rows.
+
+Measured as executed: a `--dry-run` first listed exactly the four files (the remote was still 0030),
+the push returned exit 0, and the check afterwards read `{"latest":"0034","tables":2,"functions":7}`
+as the owner. Rather than ask `has_function_privilege`, the proof used the stronger form — a client
+connecting with the app's own `DATABASE_URL` reported `current_user = echo_service` and
+`select * from public.karaoke_catalog_page('', '', 0, 5)` returned a row. The songbook's database half
+is live on production; only the app half is missing, and it is missing because of Step 1.
 
 - [ ] **Step 3: Deploy**
 
