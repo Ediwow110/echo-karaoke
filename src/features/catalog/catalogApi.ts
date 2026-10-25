@@ -53,8 +53,14 @@ export type CatalogSyncResult = {
   message?: string;
 };
 
+// The function is allowed to work for the sync's own 8-second budget and then
+// drain the page it is on, so the default 10s abort would report a refresh that
+// actually succeeded as "the room service could not be reached" — and invite a
+// second press. Pinned above that budget by tests/unit/catalogSyncTimeout.test.ts.
+export const CATALOG_SYNC_TIMEOUT_MS = 20_000;
+
 export async function runCatalogSync(api: EdgeApi, roomId: string): Promise<CatalogSyncResult> {
   return api.invoke<CatalogSyncResult>('catalog-sync', { roomId }, {
     hostToken: loadHostToken(roomId) ?? undefined,
-  });
+  }, { timeoutMs: CATALOG_SYNC_TIMEOUT_MS });
 }

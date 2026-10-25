@@ -24,7 +24,7 @@ const MAX_PAGES_PER_CHANNEL = 3;
 const PAGE_SIZE = 50;
 const DAILY_UNIT_CAP = 40;
 const THROTTLE_MS = 6 * 60 * 60 * 1000;
-const TIME_BUDGET_MS = 8000;
+export const TIME_BUDGET_MS = 8000;
 
 function decodeEntities(value: string): string {
   return value

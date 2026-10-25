@@ -64,6 +64,8 @@ function parseError(status: number, payload: unknown): RoomApiError {
 
 export type EdgeInvokeOptions = {
   keepalive?: boolean;
+  /** Override the 10s abort for calls the function is allowed to take longer on. */
+  timeoutMs?: number;
 };
 
 export type EdgeApi = {
@@ -99,7 +101,7 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
           method: 'POST',
           headers,
           body: JSON.stringify(body),
-          signal: AbortSignal.timeout(10_000),
+          signal: AbortSignal.timeout(options.timeoutMs ?? 10_000),
           ...(options.keepalive === true ? { keepalive: true } : {}),
         });
       } catch {
