@@ -47,6 +47,7 @@ export function mapPlaylistItems(payload: unknown): CatalogRow[] {
   if (!Array.isArray(items)) return [];
   const rows: CatalogRow[] = [];
   for (const raw of items) {
+    if (raw === null || typeof raw !== 'object') continue;
     const item = raw as {
       snippet?: { title?: unknown; channelTitle?: unknown; publishedAt?: unknown; thumbnails?: Record<string, { url?: unknown }> };
       contentDetails?: { videoId?: unknown };
@@ -56,12 +57,13 @@ export function mapPlaylistItems(payload: unknown): CatalogRow[] {
     const title = paragraph(item.snippet?.title, 500);
     if (title === null) continue;
     const thumbs = item.snippet?.thumbnails ?? {};
-    const thumb = thumbs.medium?.url ?? thumbs.high?.url ?? thumbs.default?.url;
+    const thumb = [thumbs.medium?.url, thumbs.high?.url, thumbs.default?.url]
+      .find((value): value is string => typeof value === 'string') ?? null;
     rows.push({
       videoId,
       title,
       channelTitle: paragraph(item.snippet?.channelTitle, 120),
-      thumbnailUrl: typeof thumb === 'string' ? thumb : null,
+      thumbnailUrl: thumb,
       publishedAt: typeof item.snippet?.publishedAt === 'string' ? item.snippet.publishedAt : null,
     });
   }
@@ -165,7 +167,11 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     if (playlistId === null) {
       const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
       if ((spent as { allowed?: boolean } | null)?.allowed !== true) break;
-      const response = await fetch(channelUrl(handle, apiKey), { signal: AbortSignal.timeout(5000) });
+      const remaining = TIME_BUDGET_MS - (Date.now() - started);
+      if (remaining <= 0) break;
+      const response = await fetch(channelUrl(handle, apiKey), {
+        signal: AbortSignal.timeout(Math.min(5000, Math.max(250, remaining))),
+      });
       if (!response.ok) continue;
       const payload = await response.json();
       const items = (payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
@@ -182,7 +188,11 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
       if ((spent as { allowed?: boolean } | null)?.allowed !== true) {
         return jsonResponse({ available: true, added, skipped, message: 'Songbook refresh paused for today' });
       }
-      const response = await fetch(playlistUrl(playlistId, token, apiKey), { signal: AbortSignal.timeout(5000) });
+      const remaining = TIME_BUDGET_MS - (Date.now() - started);
+      if (remaining <= 0) break;
+      const response = await fetch(playlistUrl(playlistId, token, apiKey), {
+        signal: AbortSignal.timeout(Math.min(5000, Math.max(250, remaining))),
+      });
       if (!response.ok) break;
       const payload = await response.json();
       const rows = mapPlaylistItems(payload);
