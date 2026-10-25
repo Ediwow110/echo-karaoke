@@ -261,6 +261,20 @@ describe('catalog access guards', () => {
 });
 
 describe('catalog sync orchestration', () => {
+  it('retires expired provider metadata only after confirming host access and before fetching YouTube', async () => {
+    useDatabase(baseHandlers({
+      karaoke_catalog_retire_stale: () => ({ expiredSongs: 2, expiredCursors: 1 }),
+    }));
+    const fetchCalls = stubFetch({ rows: [row(1)] });
+    const response = await catalogSync(syncRequest(), CALLER);
+
+    expect(response.status).toBe(200);
+    expect(fetchCalls.urls.length).toBeGreaterThan(0);
+    expect(db.timeline.indexOf('host_access_check'))
+      .toBeLessThan(db.timeline.indexOf('karaoke_catalog_retire_stale'));
+    expect(db.timeline.indexOf('karaoke_catalog_retire_stale'))
+      .toBeLessThan(db.timeline.indexOf('fetch'));
+  });
   it('rejects a request without the host token before any quota spend', async () => {
     useDatabase(baseHandlers());
     const fetchCalls = stubFetch();

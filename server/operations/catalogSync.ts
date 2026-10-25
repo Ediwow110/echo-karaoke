@@ -172,6 +172,11 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     return jsonResponse({ available: false, added: 0, message: 'YouTube is not configured' });
   }
 
+  // Purge aged provider metadata before the next fetch. This RPC is installed
+  // by forward-only migration 0033 and must be deployed before this server code.
+  const retire = operationCall('karaoke_catalog_retire_stale', []);
+  await serviceDatabase().query(retire.text, retire.params);
+
   const started = Date.now();
   const cursors = await loadCursors();
   const byChannel = new Map(cursors.map((row) => [row.channelId, row]));

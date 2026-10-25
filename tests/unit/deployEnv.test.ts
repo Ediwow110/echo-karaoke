@@ -9,6 +9,16 @@ const valid = {
 };
 
 describe('deployment environment guard', () => {
+  it('requires a strong cron secret for a production deployment, not preview', () => {
+    const production = { ...valid, VERCEL_ENV: 'production' };
+    expect(checkDeployEnv(production)).toContain(
+      'CRON_SECRET must contain at least 32 characters in Production.',
+    );
+    expect(checkDeployEnv({ ...production, CRON_SECRET: 'short' })).toContain(
+      'CRON_SECRET must contain at least 32 characters in Production.',
+    );
+    expect(checkDeployEnv({ ...production, CRON_SECRET: 'c'.repeat(40) })).toEqual([]);
+  });
   it('accepts a list of explicit deployed origins', () => {
     expect(checkDeployEnv(valid)).toEqual([]);
   });

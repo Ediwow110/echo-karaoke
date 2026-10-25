@@ -7,6 +7,7 @@ type VercelConfig = {
   outputDirectory?: string;
   regions?: string[];
   rewrites?: { source: string; destination: string }[];
+  crons?: { path: string; schedule: string }[];
   headers?: { source: string; headers: Header[] }[];
 };
 
@@ -16,6 +17,12 @@ const header = (key: string): string =>
   globalHeaders.find((entry) => entry.key === key)?.value ?? '';
 
 describe('Vercel deployment configuration', () => {
+  it('schedules daily catalog metadata retirement through the protected API router', () => {
+    expect(config.crons).toContainEqual({
+      path: '/api/cron/catalog-retention',
+      schedule: '0 2 * * *',
+    });
+  });
   it('runs the deploy guard and builds the static output', () => {
     expect(config.buildCommand).toContain('npm run verify:deploy');
     expect(config.buildCommand).toContain('npm run build');
@@ -78,7 +85,7 @@ describe('Vercel deployment configuration', () => {
 
   it('sets baseline security headers and asset caching', () => {
     expect(header('X-Content-Type-Options')).toBe('nosniff');
-    expect(header('Referrer-Policy')).toBe('no-referrer');
+    expect(header('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
     expect(header('X-Frame-Options')).toBe('DENY');
     expect(header('Permissions-Policy')).toContain('camera=(self)');
     expect(header('Strict-Transport-Security')).toContain('max-age=');

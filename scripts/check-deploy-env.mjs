@@ -23,6 +23,10 @@ function checkBackend(env, errors) {
   if (secret.length < 32) {
     errors.push('BETTER_AUTH_SECRET must contain at least 32 characters.');
   }
+  if (env.VERCEL_ENV === 'production'
+    && String(env.CRON_SECRET ?? '').trim().length < 32) {
+    errors.push('CRON_SECRET must contain at least 32 characters in Production.');
+  }
   const isPreview = env.VERCEL_ENV === 'preview';
   const required = isPreview
     ? ['PREVIEW_DATABASE_URL', 'PREVIEW_AUTH_DATABASE_URL']
