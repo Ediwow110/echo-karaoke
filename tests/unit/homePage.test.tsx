@@ -34,6 +34,7 @@ function renderHome(api: EdgeApi = { invoke: (async () => ({})) as unknown as Ed
           <Route path="/" element={<HomePage />} />
           <Route path="/room/:roomId/host" element={<p>Host room</p>} />
           <Route path="/room/:roomId" element={<p>Guest room</p>} />
+          <Route path="/join" element={<p>Join by code</p>} />
         </Routes>
       </MemoryRouter>
     </RoomApiProvider>,
@@ -41,6 +42,32 @@ function renderHome(api: EdgeApi = { invoke: (async () => ({})) as unknown as Ed
 }
 
 describe('create room workspace', () => {
+  it('starts the name field empty even when an earlier visit left a name behind', () => {
+    // On a TV or a shared laptop the landing screen should not announce whoever
+    // last used it. The remembered name still labels the host chip; the field you
+    // type into begins blank, with the placeholder showing what to write.
+    localStorage.setItem('karaoke.profile.name', 'Qoder');
+    stubWide(true);
+    renderHome();
+
+    const field = screen.getByLabelText('Your name');
+    expect(field).toHaveValue('');
+    expect(field).toHaveAttribute('placeholder', 'Alex');
+  });
+
+  it('offers joining by code as an action beside the create button, not as fine print', async () => {
+    stubWide(true);
+    renderHome();
+
+    expect(screen.queryByRole('link', { name: /have a room code/i })).toBeNull();
+    const join = screen.getByRole('button', { name: /have a room code\? join a room/i });
+    const create = screen.getByRole('button', { name: 'Create room' });
+    expect(create.compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+
+    fireEvent.click(join);
+    expect(await screen.findByText('Join by code')).toBeInTheDocument();
+  });
+
   const created = {
     roomId: '550e8400-e29b-41d4-a716-446655440000',
     roomCode: 'ABCDEFGHJKMNPQRS',

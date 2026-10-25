@@ -94,7 +94,10 @@ const steps = [
 ];
 
 function hostNameDefault(): string {
-  return getStoredProfileName();
+  // The remembered name still labels the host chip and the sidebar, but the
+  // field starts empty: on a TV or shared laptop the landing screen should not
+  // announce whoever last used it, and a placeholder invites a fresh name.
+  return '';
 }
 
 export default function HomePage() {
@@ -348,6 +351,16 @@ export default function HomePage() {
               >
                 Create room
               </Button>
+              <Button
+                variant="quiet"
+                size="sm"
+                full
+                className="mt-2"
+                icon={<KeyIcon size={15} weight="duotone" />}
+                onClick={() => { navigate('/join'); }}
+              >
+                Have a room code? Join a room
+              </Button>
               <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
                 The host screen plays video and audio. Add the first song after the room opens.
               </p>
@@ -502,6 +515,16 @@ export default function HomePage() {
             >
               Create room
             </Button>
+            <Button
+              variant="quiet"
+              size="sm"
+              full
+              className="mt-2"
+              icon={<KeyIcon size={15} weight="duotone" />}
+              onClick={() => { navigate('/join'); }}
+            >
+              Have a room code? Join a room
+            </Button>
             <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
               Next: search for your first song, start YouTube playback and share your room QR. The host screen owns the music.
             </p>
@@ -555,13 +578,10 @@ export default function HomePage() {
           </aside>
         </div>
 
-        <div className="mt-5 flex flex-wrap items-center justify-between gap-3 text-[0.6875rem] text-ink-2">
-          <p className="flex items-center gap-2">
-            <MicrophoneStageIcon size={15} className="text-signal" aria-hidden="true" />
-            More room settings are available after creation. Change guest permissions whenever you need.
-          </p>
-          <Link to="/join" className="font-semibold text-signal hover:underline">Have a room code? Join a room</Link>
-        </div>
+        <p className="mt-5 flex flex-wrap items-center gap-2 text-[0.6875rem] text-ink-2">
+          <MicrophoneStageIcon size={15} className="text-signal" aria-hidden="true" />
+          More room settings are available after creation. Change guest permissions whenever you need.
+        </p>
       </main>
     </AppShell>
   );
