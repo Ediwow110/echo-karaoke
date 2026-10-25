@@ -1,11 +1,14 @@
 export class HttpError extends Error {
   code: string;
   status: number;
+  /** The driver's SQLSTATE, kept so a caller can distinguish one failure from all others. */
+  sqlState?: string;
 
-  constructor(code: string, status: number, message: string) {
+  constructor(code: string, status: number, message: string, sqlState?: string) {
     super(message);
     this.code = code;
     this.status = status;
+    this.sqlState = sqlState;
   }
 }
 
@@ -27,18 +30,21 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
   SONG_PLAYING: { status: 409, message: 'Skip the current song before removing it' },
 };
 
-export function mapDatabaseError(error: { message?: string } | null): HttpError {
+export function mapDatabaseError(
+  error: { message?: string } | null,
+  sqlState?: string,
+): HttpError {
   const raw = error?.message ?? '';
   if (raw.includes('queue_songs_active_video_key')) {
-    return new HttpError('DUPLICATE_SONG', 409, ERROR_MAP.DUPLICATE_SONG.message);
+    return new HttpError('DUPLICATE_SONG', 409, ERROR_MAP.DUPLICATE_SONG.message, sqlState);
   }
   for (const code of Object.keys(ERROR_MAP).sort((a, b) => b.length - a.length)) {
     if (raw.includes(code)) {
       const mapped = ERROR_MAP[code];
-      return new HttpError(code, mapped.status, mapped.message);
+      return new HttpError(code, mapped.status, mapped.message, sqlState);
     }
   }
-  return new HttpError('INTERNAL_ERROR', 500, 'The request could not be completed');
+  return new HttpError('INTERNAL_ERROR', 500, 'The request could not be completed', sqlState);
 }
 
 export function jsonResponse(body: unknown, status = 200): Response {

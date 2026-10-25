@@ -163,7 +163,7 @@ async function queryAllowNull(name: string, params: unknown[]): Promise<unknown>
     const rows = await serviceDatabase().query(call.text, call.params);
     return (rows[0] as { result?: unknown } | undefined)?.result ?? null;
   } catch (error) {
-    throw mapDatabaseError(error as { message?: string });
+    throw mapDatabaseError(error as { message?: string }, (error as { code?: string }).code);
   }
 }
 
@@ -203,13 +203,18 @@ export function mapFreshCatalogResults(value: unknown, now = Date.now()): Search
   }).slice(0, MAX_RESULTS);
 }
 
+const UNDEFINED_FUNCTION = '42883';
+
 async function freshCatalogFallback(query: string): Promise<SearchResult[]> {
   try {
     const rows = await queryAllowNull('karaoke_catalog_page', [query, '', 0, MAX_RESULTS]);
     return mapFreshCatalogResults(rows);
-  } catch {
-    // During staged migration rollout the catalog RPC may not exist yet.
-    return [];
+  } catch (error) {
+    // Only "not migrated yet" is a staged-rollout state. Anything else — above
+    // all a denied grant (42501) — must surface, because answering "the
+    // songbook has nothing" is how a broken deployment hides from its users.
+    if ((error as { sqlState?: string }).sqlState === UNDEFINED_FUNCTION) return [];
+    throw error;
   }
 }
 
