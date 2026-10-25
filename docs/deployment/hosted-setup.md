@@ -655,9 +655,9 @@ and authenticated roles.
   tolerates only SQLSTATE 42883 (not yet migrated), so a denied grant reaches the host as
   a 500 instead of an empty list.
 - **All four CI jobs were simulated on a fresh branch off `main`** (2026-10-25): the full
-  0001→0034 chain applies, `npx supabase test db` reports 328/328, and `npm run test:integration`
+  0001→0035 chain applies, `npx supabase test db` reports 345/345, and `npm run test:integration`
   reports 8/8 connecting as `echo_service` **without** a YouTube key — the same conditions CI runs
-  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 431 unit tests, the build and
+  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 447 unit tests, the build and
   16 mocked UI flows pass. The push should be green; if it is not, the difference is in CI's
   environment, not in this tree.
 
@@ -672,11 +672,37 @@ are the only songs in the table — is closed: that file now clears the table fi
 inherits the seeded rows from `main`, and the `database` job on `master` went red for exactly that
 reason: four failures, all of them the fixtures meeting real data they never expected.
 
+## Transfer host (migration 0035, shipped 2026-10-26)
+
+A host can hand the room to any guest whose remote is still connected, from **Room settings →
+crown icon**. Control genuinely moves: the outgoing host's pass stops working at that instant and
+they are demoted to a guest with a pass of their own, rather than being dropped out of a room they
+are still watching.
+
+Proven against production with two separate browser profiles, not just in tests. The host clicked
+**Hand it over**; their tab landed on the guest remote showing "Hosted by Rafa" with no host pass
+left in storage; the receiving guest's remote grew a "You are the host now" panel, and opening the
+host view from it worked — nav, invite QR, search and queue all live. Production then read
+`Qoder/guest`, `Rafa/host`, `HOST_COUNT 1`, and a `transfer_host` room event at the moment of the
+click.
+
+**Why it is two calls.** The host pass is stored only as a digest, so the database cannot hand it
+back, and the replacement may only ever be returned to the device that minted it. `transfer-host`
+revokes and flips roles; `claim-host` mints the new pass on the incoming host's own device using
+the guest credential they already hold. The gap between them is a second or two with no usable host
+pass, which is deliberate: an unusable window beats a window where two devices can both skip.
+
+**One rough edge, understood rather than hidden.** The demoted host's tab logs a `403` from
+`playback-command`: the player's unmount cleanup tries to pause the room with the pass it no longer
+holds. The refusal is the correct outcome — a guest should not be pausing the room — but it is a
+console error, and silencing it means skipping the unmount pause when the tab was demoted rather
+than closed.
+
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 328 passing assertions on a fresh branch.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 345 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 431 passing tests on the current tree.
+- [x] `npm test` reports 447 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
