@@ -15,7 +15,6 @@ export type CatalogRow = {
 export const CATALOG_CHANNELS = [
   '@musisikaraoke',
   '@singking',
-  '@karaoketv',
   '@vinylktv',
   '@titojaymusicofficial',
 ];

@@ -95,18 +95,18 @@ were never resolved before this tree shipped nothing. Resolved now, one `channel
 | `@singking` | resolves — uploads `UUiKvZMc7lApbIc9XCorhFfw` |
 | `@vinylktv` | resolves — uploads `UUL8roECkxt33HMrH9hl01ww` |
 | `@titojaymusic` | **did not exist.** Replaced by `@titojaymusicofficial`, uploads `UUyqXe9LxGxB8pRsbRMpIqSA` |
-| `@karaoketv` | **does not exist and has no obvious successor** — `channels.list` returns zero items and `youtube.com/@karaoketv` is a 404 (control: a nonsense handle 404s too, `@musisikaraoke` 200s) |
+| `@karaoketv` | **did not exist** — `channels.list` returned zero items and `youtube.com/@karaoketv` is a 404 (control: a nonsense handle 404s too, `@musisikaraoke` 200s). **Removed by the owner on 2026-10-25**: the spec's "KaraokeTV" matched two different live channels (`@CARAokeTVOfficial`, `@KARAOKEZONETV`) and none of them was obviously intended, so the songbook ships on four verified channels rather than on a guess about whose videos a room sings from |
 
 The spec named "KaraokeTV", and two live channels could be meant: `@CARAokeTVOfficial` ("CARAoke
 TV") or `@KARAOKEZONETV` ("KARAOKE ZONE TV"). **This is the owner's choice, not a guess to make** —
 it decides whose videos a room's songbook is built from. Until it is answered, `@karaoketv` is kept
 in the list so the gap stays visible.
 
-The silent-omission defect this exposed is fixed: a handle that names no channel used to `continue`
-and the run still answered `{ available: true, added, skipped }`, so a host could never tell a
-five-channel songbook from a four-channel one. `catalog-sync` now returns `unresolved: []` and, when
-non-empty, says "Songbook refresh could not find: …" — proven by mutation (removing the push fails
-exactly one test). Because the sync stores its cursor under the handle and `CATALOG_CHANNEL_LABELS`
+The silent-omission defect this exposed is fixed and stays fixed by the gate below, even though the
+list is now clean: a handle that names no channel used to `continue` and the run still answered
+`{ available: true, added, skipped }`, so a host could never tell a four-channel songbook from a
+five-channel one. `catalog-sync` now returns `unresolved: []` and, when non-empty, says
+"Songbook refresh could not find: …" — proven by mutation (removing the push fails exactly one test). Because the sync stores its cursor under the handle and `CATALOG_CHANNEL_LABELS`
 filters by that same id, a drift gate (`tests/unit/catalogChannelContract.test.ts`) now pins the two
 lists together; it was written after the two halves had already drifted apart once.
 
@@ -117,7 +117,8 @@ still `continue`s unreported, and a cursor whose channel later disappears is not
 
 - Playback is always the YouTube embed; never store or serve video. Catalog rows hold ids and display metadata only.
 - Browsing, filtering and paging must cost **zero** YouTube quota.
-- Sync is **host-token only**, capped at **15 units per run** (5 channels × 3 pages) and **40 units/day** (`consume_daily_rate_limit('global','karaoke-catalog-day',40,…)`), no-ops if every channel synced within 6 hours, and aborts its loop after **8 seconds**.
+- Sync is **host-token only**, capped at **12 units per run** (four channels × 3 pages — the spec's
+  fifth channel had no live handle and the owner removed it on 2026-10-25) and **40 units/day** (`consume_daily_rate_limit('global','karaoke-catalog-day',40,…)`), no-ops if every channel synced within 6 hours, and aborts its loop after **8 seconds**.
 - Every new SQL function: `security definer`, `set search_path = ''`, schema-qualified names, `revoke all … from public, anon, authenticated`, `grant execute … to service_role` **and to `echo_service`** — the app connects as `echo_service` since the 2026-10-25 credential rotation, and granting only `service_role` makes the feature 500 in production while every owner-run test stays green (see Status).
 - Guest phone controls stay ≥44px and must not overflow at 200% text.
 - The guest remote keeps exactly two bottom tabs (Search, Queue); the songbook is a screen with its own back link.

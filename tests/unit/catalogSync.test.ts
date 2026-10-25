@@ -360,41 +360,42 @@ describe('catalog sync orchestration', () => {
     const response = await catalogSync(syncRequest(), CALLER);
     const body = await response.json() as { available: boolean; added: number; skipped: number };
 
-    expect(body).toMatchObject({ available: true, added: 2, skipped: 4 });
+    expect(body).toMatchObject({
+      available: true,
+      added: 2,
+      // Derived, not hardcoded: this used to pin the channel count, so removing
+      // a channel broke an unrelated assertion.
+      skipped: CATALOG_CHANNELS.length - 1,
+    });
   });
 
   it('names a channel it could not resolve instead of reporting a clean run', async () => {
-    // @karaoketv keeps no uploads playlist, so this run must resolve it — and
-    // find nothing. A stale handle has to surface, not shrink the catalog quietly.
+    // Two channels need resolving this run: one real, one whose handle names
+    // nothing. A stale handle has to surface, not quietly shrink the catalog.
     useDatabase(baseHandlers({
-      // Two channels need resolving this run: one real, one stale. The rest
-      // stay inside the 6-hour throttle.
-      karaoke_catalog_cursors: () => cursors('@karaoketv', new Date().toISOString())
+      karaoke_catalog_cursors: () => cursors('@vinylktv', new Date().toISOString())
         .map((row) => {
           const cursor = row as {
             channelId: string;
             uploadsPlaylistId: string | null;
             lastSyncedAt: string | null;
           };
-          if (cursor.channelId === '@karaoketv') {
-            return { ...cursor, uploadsPlaylistId: null, lastSyncedAt: null };
-          }
-          if (cursor.channelId === '@singking') {
+          if (cursor.channelId === '@vinylktv' || cursor.channelId === '@singking') {
             return { ...cursor, uploadsPlaylistId: null, lastSyncedAt: null };
           }
           return row;
         }),
     }));
-    stubFetch({ rows: [row(1)], unresolved: ['@karaoketv'] });
+    stubFetch({ rows: [row(1)], unresolved: ['@vinylktv'] });
 
     const response = await catalogSync(syncRequest(), CALLER);
     const body = await response.json() as { added: number; message?: string; unresolved: string[] };
 
-    // The other channels still filled the catalog, so the run is not a failure...
+    // The other channel still filled the catalog, so the run is not a failure...
     expect(body.added).toBeGreaterThan(0);
     // ...but a handle that returned no channel must never disappear silently.
-    expect(body.unresolved).toEqual(['@karaoketv']);
-    expect(body.message).toContain('@karaoketv');
+    expect(body.unresolved).toEqual(['@vinylktv']);
+    expect(body.message).toContain('@vinylktv');
   });
 
   it('leaves unresolved empty when every handle resolves', async () => {

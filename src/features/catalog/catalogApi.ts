@@ -15,7 +15,6 @@ export type CatalogPage = { total: number; items: CatalogSong[] };
 export const CATALOG_CHANNEL_LABELS: { id: string; label: string }[] = [
   { id: '@musisikaraoke', label: 'Musisi Karaoke' },
   { id: '@singking', label: 'Sing King' },
-  { id: '@karaoketv', label: 'KaraokeTV' },
   { id: '@vinylktv', label: 'Vinyl KTV' },
   { id: '@titojaymusicofficial', label: 'Tito Jay' },
 ];
