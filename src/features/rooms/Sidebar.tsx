@@ -70,6 +70,17 @@ function hrefFor(item: NavItem, activeRoom: ActiveRoom | null | undefined): stri
   return item.href;
 }
 
+// Before a room exists the nav carries the one action that works, plus the page a
+// visitor already arrived on. The room-only destinations used to sit greyed out in
+// between, which read as a broken sidebar rather than a room that hasn't started.
+function visibleItems(activeNav: SidebarNav, activeRoom: ActiveRoom | null | undefined): NavItem[] {
+  if (activeRoom !== null && activeRoom !== undefined) {
+    return items;
+  }
+  return items.filter((item) => item.requiresRoom !== true
+    && (item.key === 'create' || item.key === activeNav));
+}
+
 export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
   const location = useLocation();
   const typed = hostName?.trim() ?? '';
@@ -82,8 +93,7 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
       </Link>
 
       <nav aria-label="Primary" className="mt-9 mb-5 flex flex-col gap-1">
-        {items.map((item) => {
-          const disabled = item.requiresRoom === true && (activeRoom === null || activeRoom === undefined);
+        {visibleItems(activeNav, activeRoom).map((item) => {
           const href = hrefFor(item, activeRoom);
           const active = activeNav === item.key
             || (item.key === 'discover' && location.pathname.endsWith('/host'))
@@ -95,19 +105,6 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
             || (item.key === 'recent' && (location.pathname.endsWith('/host/recent') || location.pathname === '/recent'))
             || (item.key === 'library' && location.pathname === '/library');
           const Icon = item.icon;
-          if (disabled) {
-            return (
-              <span
-                key={item.key}
-                aria-disabled="true"
-                title="Create a room first"
-                className="flex min-h-10 cursor-not-allowed items-center gap-3 rounded-badge px-3 text-[0.75rem] text-ink-3 opacity-45"
-              >
-                <Icon size={17} weight="regular" aria-hidden="true" />
-                {item.label}
-              </span>
-            );
-          }
           return (
             <Link
               key={item.key}
