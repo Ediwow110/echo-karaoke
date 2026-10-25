@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import type { EdgeApi } from '../../lib/edgeApi';
@@ -6,6 +6,9 @@ import { queueCatalogSong, readCatalogPage, type CatalogSong } from './catalogAp
 import { SongArtwork } from '../../ui';
 
 const PAGE_SIZE = 30;
+// The database clamps paging at this offset, so a request past it replays the
+// same rows forever. Stop offering Load more before that happens.
+const MAX_OFFSET = 5000;
 
 export type SongbookListProps = {
   api: EdgeApi;
@@ -24,23 +27,39 @@ export default function SongbookList({ api, roomId, onAdded }: SongbookListProps
   const [items, setItems] = useState<CatalogSong[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
+  const [more, setMore] = useState(false);
   const [busy, setBusy] = useState(false);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
 
+  // Search responses can arrive out of order. Every read owns a sequence number
+  // and may only write (and clear `busy`) while it is still the newest one.
+  const seq = useRef(0);
+
   const load = useCallback(async (nextOffset: number, reset: boolean): Promise<void> => {
+    const id = ++seq.current;
     setBusy(true);
     try {
       const page = await readCatalogPage(api, roomId, { query, channel, offset: nextOffset, limit: PAGE_SIZE });
+      if (seq.current !== id) return;
       setTotal(page.total);
       setOffset(nextOffset);
-      setItems((current) => (reset ? page.items : [...current, ...page.items]));
+      setItems((current) => {
+        if (reset) return page.items;
+        const known = new Set(current.map((song) => song.videoId));
+        return [...current, ...page.items.filter((song) => !known.has(song.videoId))];
+      });
+      setMore(page.items.length >= PAGE_SIZE && nextOffset + PAGE_SIZE <= MAX_OFFSET);
+      setHasLoaded(true);
       setError(null);
     } catch (caught) {
+      if (seq.current !== id) return;
       setError(caught instanceof Error ? caught.message : 'The songbook could not load.');
     } finally {
-      setBusy(false);
+      // A superseded read must not re-enable Load more while the newer one runs.
+      if (seq.current === id) setBusy(false);
     }
   }, [api, channel, query, roomId]);
 
@@ -62,6 +81,8 @@ export default function SongbookList({ api, roomId, onAdded }: SongbookListProps
     }
   }
 
+  const loadingFirstPage = hasLoaded === false && error === null;
+
   return (
     <div className="flex flex-col gap-4">
       <div className="flex flex-wrap items-center gap-3">
@@ -75,17 +96,26 @@ export default function SongbookList({ api, roomId, onAdded }: SongbookListProps
             className="min-h-11 w-full rounded-media border border-line bg-surface pl-9 pr-3 text-[0.8125rem] text-ink placeholder:text-ink-3 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
           />
         </label>
-        <p className="text-[0.6875rem] text-ink-2">{total} songs</p>
+        <p role="status" className="text-[0.6875rem] text-ink-2">{hasLoaded ? total + ' songs' : ''}</p>
       </div>
 
       {error === null ? null : <p role="alert" className="text-[0.75rem] text-danger">{error}</p>}
 
-      {items.length === 0 && busy === false ? (
+      {loadingFirstPage ? (
+        <div className="py-6 text-center">
+          <p className="text-[0.8125rem] text-ink-2" aria-hidden="true">Loading the songbook…</p>
+          <span role="status" aria-label="Loading the songbook…" className="sr-only">Loading the songbook…</span>
+        </div>
+      ) : hasLoaded === false ? null : items.length === 0 && busy === false ? (
         <p className="rounded-panel border border-line bg-surface px-4 py-6 text-center text-[0.8125rem] text-ink-2">
-          The songbook is warming up. {total === 0 ? 'Ask the host to refresh it.' : 'No song matches that search.'}
+          {total === 0
+            ? 'The songbook is warming up. Ask the host to refresh it.'
+            : 'No song matches that search.'}
         </p>
       ) : (
-        <ul className="grid gap-2 sm:grid-cols-2" aria-label="Songbook songs">
+        // Refetches keep the rows already on screen and mark them busy instead
+        // of flashing an empty list.
+        <ul className="grid gap-2 sm:grid-cols-2" aria-label="Songbook songs" aria-busy={busy}>
           {items.map((song) => {
             const isAdded = added.includes(song.videoId);
             return (
@@ -112,7 +142,7 @@ export default function SongbookList({ api, roomId, onAdded }: SongbookListProps
         </ul>
       )}
 
-      {items.length < total ? (
+      {hasLoaded && more && items.length < total ? (
         <button
           type="button"
           onClick={() => void load(offset + PAGE_SIZE, false)}

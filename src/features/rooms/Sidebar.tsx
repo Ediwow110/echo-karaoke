@@ -50,7 +50,7 @@ type NavItem = {
 const items: NavItem[] = [
   { key: 'discover', label: 'Discover', href: '/', icon: CompassIcon, requiresRoom: true },
   { key: 'library', label: 'Song library', href: '/library', icon: MusicNotesIcon },
-  { key: 'songbook', label: 'Songbook', href: '/songbook', icon: MusicNotesIcon },
+  { key: 'songbook', label: 'Songbook', href: '/songbook', icon: MusicNotesIcon, requiresRoom: true },
   { key: 'queue', label: 'Room queue', href: '/queue', icon: QueueIcon, requiresRoom: true },
   { key: 'favorites', label: 'Favorites', href: '/favorites', icon: HeartIcon },
   { key: 'recent', label: 'Recently sung', href: '/recent', icon: ClockCounterClockwiseIcon },
