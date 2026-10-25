@@ -98,10 +98,8 @@ were never resolved before this tree shipped nothing. Resolved now, one `channel
 | `@titojaymusic` | **did not exist.** Replaced by `@titojaymusicofficial`, uploads `UUyqXe9LxGxB8pRsbRMpIqSA` |
 | `@karaoketv` | **did not exist** — `channels.list` returned zero items and `youtube.com/@karaoketv` is a 404 (control: a nonsense handle 404s too, `@musisikaraoke` 200s). **Removed by the owner on 2026-10-25**: the spec's "KaraokeTV" matched two different live channels (`@CARAokeTVOfficial`, `@KARAOKEZONETV`) and none of them was obviously intended, so the songbook ships on four verified channels rather than on a guess about whose videos a room sings from |
 
-The spec named "KaraokeTV", and two live channels could be meant: `@CARAokeTVOfficial` ("CARAoke
-TV") or `@KARAOKEZONETV` ("KARAOKE ZONE TV"). **This is the owner's choice, not a guess to make** —
-it decides whose videos a room's songbook is built from. Until it is answered, `@karaoketv` is kept
-in the list so the gap stays visible.
+Resolved: the owner chose removal over a guess on 2026-10-25 (`299907a`), because whose videos a
+room sings from is not a call to make from two plausible candidates.
 
 The silent-omission defect this exposed is fixed and stays fixed by the gate below, even though the
 list is now clean: a handle that names no channel used to `continue` and the run still answered
@@ -1395,34 +1393,61 @@ git commit -m "test: prove the songbook opens from the strip and queues a song"
 
 ### Task 7: Ship, seed, verify
 
-**Files:** none (operational)
+**Files:** none (operational). Execute `docs/deployment/hosted-setup.md` Step 9 — it is the
+runbook; these steps are the same order with the plan's reasoning attached.
 
-- [ ] **Step 1: Apply migration 0031 to production**
-
-Apply `supabase/migrations/0031_karaoke_catalog.sql` to Neon `main` the same way 0025–0030 were applied (guarded script that reads the owner URL from `server/.env.neon`, refuses any host that is not `ep-long-leaf-*`, one transaction, inserts the tracker row).
-
-- [ ] **Step 2: Deploy**
-
-Push with the owner's approval (GitHub → Vercel deploy), then run `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app`.
-
-- [ ] **Step 3: Seed the catalog once**
-
-From the host screen, open the songbook and press Retry (host-only `catalog-sync`). Confirm the response reports a non-zero `added` and that the page fills, or call it directly:
+- [ ] **Step 1: Create `CRON_SECRET` in Vercel Production** (at least 32 characters)
 
 ```bash
-curl -s -X POST https://echo-karaoke-mocha.vercel.app/api/catalog-sync \
-  -H "authorization: Bearer $TOKEN" -H "content-type: application/json" \
-  -H "x-room-host-token: $HOST_TOKEN" -H "origin: https://echo-karaoke-mocha.vercel.app" \
-  -d '{"roomId":"<room>"}'
+npx vercel env add CRON_SECRET production --force --sensitive < secret.txt
 ```
 
-- [ ] **Step 4: Prove the loop**
+`npm run verify:deploy` is the Vercel build command, so without this variable **no** production
+deploy of this tree succeeds — not just the cron. A new environment value never reaches a running
+deployment, so it must exist before Step 3, not after.
 
-Add a song from the songbook on the host screen, confirm it lands in the queue and starts playing on the host, and confirm the guest phone shows it.
+- [ ] **Step 2: Apply migrations 0031–0034 to Neon `main`**
 
-- [ ] **Step 5: Record the outcome**
+All four, in one `db push`, the same way 0025–0030 were applied:
 
-Note in `docs/superpowers/specs/2026-10-25-karaoke-songbook-design.md` how many rows the first sync produced and which channels resolved, so a later session knows the real depth.
+```bash
+npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
+```
+
+0034 is not optional. The app connects as `echo_service`; without its grants the songbook answers
+500 with SQLSTATE 42501 on every call while pgTAP — which runs as the owner — stays green. Confirm
+afterwards that `supabase_migrations.schema_migrations` reports 0034 and that
+`has_function_privilege('echo_service', 'public.karaoke_catalog_page(text,text,integer,integer)', 'execute')`
+is true. Never run `supabase test db` against `main`: the fixtures write rows.
+
+- [ ] **Step 3: Deploy**
+
+Push `master` with the owner's approval (GitHub → Vercel), then
+`npm run verify:preview -- https://echo-karaoke-mocha.vercel.app`. Note the push also ships the two
+previously unshipped `master` commits (`9dc5396`, `54b8478`). Expect CI green: all four jobs were
+simulated on a fresh branch off `main`.
+
+- [ ] **Step 4: Seed the catalog once**
+
+Open the songbook from the karaoke strip and press **Refresh the songbook** (the host-only
+`catalog-sync`; the button label is this, not the plan's original "Retry"). Expect roughly 400 rows
+from four channels for about 16 quota units, `unresolved: []`, and a note stating how many songs were
+added. Against a healthy deployment `advanced`/`skipped` on a second press within six hours proves
+the throttle without spending quota again.
+
+- [ ] **Step 5: Prove the loop**
+
+Add a song from the songbook on the host screen, confirm it lands in the queue and starts playing on
+the host, and confirm the guest phone shows it. Then let one song end and confirm exactly one advance
+occurs — the claim migration 0032 exists to make. This sequence was already proven against a
+disposable Neon branch; what remains is proving it on the live origin, in a browser, with a guest
+phone in the room.
+
+- [ ] **Step 6: Record the outcome**
+
+Write the production row count and any unresolved channel into the Status section above, so a later
+session knows the real depth without spending quota to rediscover it. The branch proof recorded
+409 rows; production will differ only by which channels had filled their three pages.
 
 ---
 
