@@ -477,6 +477,19 @@ order; step 1 is the only one that is not a command, and nothing after it is saf
    "could not find" clause; the first run fills roughly 400 rows from four channels for about 16
    quota units, and browses afterward cost nothing.
 
+   Before the push, both songbook routes answer **`404` `That operation is not available`** on the
+   live origin (measured 2026-10-25). After a correct ship they answer **`401`**, because the
+   session check runs before dispatch. A `500` instead means the code deployed but the migrations
+   or 0034's grants did not — so this one request separates "not shipped", "shipped correctly" and
+   "shipped without the database", which is otherwise easy to misread as a runtime bug:
+
+   ```bash
+   curl -s -o /dev/null -w '%{http_code}\n' -X POST \
+     https://echo-karaoke-mocha.vercel.app/api/catalog-page \
+     -H 'content-type: application/json' -H 'origin: https://echo-karaoke-mocha.vercel.app' \
+     -d '{"roomId":"00000000-0000-0000-0000-000000000000"}'
+   ```
+
 **Rolling back** is cheap because every catalog object is additive: redeploy the previous commit to
 drop the feature from the app and leave the tables and grants in place. Do not drop `karaoke_catalog`
 to undo a deploy — 0033's RLS and grant hygiene is what keeps the metadata unreachable by the anon

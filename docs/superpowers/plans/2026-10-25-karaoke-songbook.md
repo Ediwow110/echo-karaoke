@@ -61,8 +61,16 @@ confirmed unchanged each time.
   any test, because this operation had no server-side spec at all — `tests/unit/catalogBrowse.test.ts`
   is new with it, and the clamp is mutation-proven (reverting it fails exactly one test).
 
-Still open in the sync, neither on the first-seed path: two hosts refreshing at once race the
-cursor, and `exhausted_at` is written but never read.
+Still open, and deliberately not fixed here: **two refreshes started at once double-spend the
+global budget.** Both runs read the cursors before either writes, so both walk all four channels;
+at ~16 units each against the 40-unit daily cap, two hosts (or two tabs) pressing refresh within
+seconds of each other can leave a third with "paused for today" for the rest of the Pacific day.
+No rows are corrupted and no quota is wasted on YouTube's side beyond the duplicate fetches — the
+6-hour throttle only starts working once a run has finished. A correct fix needs a lease, not a
+transaction lock: `pg_try_advisory_xact_lock` would release between the sync's separate statements,
+and a session-scoped lock is unsafe behind a pooled connection. That is a new table and release
+path on a feature that is otherwise verified, so it is left as a follow-up rather than built into
+the ship. `exhausted_at` is likewise written and never read.
 
 The guest-side permission seam is now guarded (`f44c01d`): `GuestRoomPage` passes
 `locked={locked}` into the songbook screen and nothing had verified it arrives, so dropping the
