@@ -76,6 +76,7 @@ async function mockApi(
   commands: Array<{ action?: string }> = [],
   failHost: () => boolean = () => false,
   popularResults: unknown[] | null = null,
+  catalogQueries: string[] = [],
 ): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -94,6 +95,8 @@ async function mockApi(
         : { available: true, results: popularResults };
     }
     else if (path.endsWith('/api/catalog-page')) {
+      const query = (route.request().postDataJSON() as { query?: string }).query ?? '';
+      catalogQueries.push(query);
       const items = Array.from({ length: 30 }, (_, index) => ({
         videoId: 'video' + String(index).padStart(6, '0'),
         title: index === 0 ? 'Halo - Beyonce (Karaoke)' : 'Song ' + index + ' (Karaoke)',
@@ -101,7 +104,8 @@ async function mockApi(
         thumbnailUrl: null,
         publishedAt: '2025-01-02T00:00:00Z',
       }));
-      body = { total: 31, items: (route.request().postDataJSON() as { query?: string }).query === 'halo' ? items.slice(0, 1) : items };
+      const filtered = query === 'halo' ? items.slice(0, 1) : items;
+      body = { total: filtered.length, items: filtered };
     }
     else if (path.endsWith('/api/queue-command')) {
       const command = route.request().postDataJSON() as { action?: string; videoId?: string };
@@ -242,8 +246,9 @@ test('host opens the songbook from the karaoke strip and queues a song', async (
     thumbnailUrl: null,
     durationSeconds: null,
   }));
-  const commands: Array<{ action?: string }> = [];
-  await mockApi(page, true, commands, () => false, popular);
+  const commands: Array<{ action?: string; videoId?: string; roomId?: string }> = [];
+  const catalogQueries: string[] = [];
+  await mockApi(page, true, commands, () => false, popular, catalogQueries);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
 
@@ -251,11 +256,19 @@ test('host opens the songbook from the karaoke strip and queues a song', async (
   await expect(page).toHaveURL(new RegExp('/host/songbook$'));
   await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
 
+  const rows = page.locator('ul[aria-label="Songbook songs"] li');
+  await expect(rows).toHaveCount(30);
+
   await page.getByLabel('Search the songbook').fill('halo');
+  await expect(rows).toHaveCount(1);
   await expect(page.getByText('Halo - Beyonce (Karaoke)')).toBeVisible();
+  expect(catalogQueries.at(-1)).toBe('halo');
 
   await page.getByRole('button', { name: 'Add Halo - Beyonce (Karaoke)' }).click();
   await expect.poll(() => commands.filter((command) => command.action === 'add').length).toBe(1);
+  const adds = commands.filter((command) => command.action === 'add');
+  expect(adds).toHaveLength(1);
+  expect(adds[0]).toMatchObject({ action: 'add', videoId: 'video000000', roomId: ROOM });
 });
 
 test('guest queue does not promise auto-advance while the host is offline', async ({ page }) => {
