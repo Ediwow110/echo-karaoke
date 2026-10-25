@@ -75,6 +75,18 @@ and a session-scoped lock is unsafe behind a pooled connection. That is a new ta
 path on a feature that is otherwise verified, so it is left as a follow-up rather than built into
 the ship. `exhausted_at` is likewise written and never read.
 
+**Fixed on 2026-10-26, with its own boundary recorded: a half-walked channel was locked out for six
+hours.** `karaoke_catalog_cursor_save` stamps `last_synced_at` on every page, and the throttle read
+only that stamp, so a walk cut short by the eight-second budget or a failed page looked identical to a
+finished one — the next press reported the channel skipped and the rest of its pages stayed out of the
+songbook for six hours, visible only as a number that reads as good news. The throttle now requires no
+pending page token, which is what "brought up to date" actually means. One residual window is accepted
+rather than widened into more conditions: the stale-cursor reconnect saves a null token before its
+first page lands, so a run cut inside that narrow window still reads as complete. Closing it means
+comparing `exhausted_at` too, which would also change how often a renamed channel re-walks, and that
+trade is not worth taking on the eve of the ship. Red before the fix, mutation-proof after: deleting
+the new clause fails only the new test.
+
 The guest-side permission seam is now guarded (`f44c01d`): `GuestRoomPage` passes
 `locked={locked}` into the songbook screen and nothing had verified it arrives, so dropping the
 prop would have left a locked guest with a working Add button. The test is proven by deleting the
