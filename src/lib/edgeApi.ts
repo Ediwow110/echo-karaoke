@@ -14,7 +14,9 @@ export type EdgeFunctionName =
   | 'playback-command'
   | 'playback-report'
   | 'vote-command'
-  | 'touch-member';
+  | 'touch-member'
+  | 'transfer-host'
+  | 'claim-host';
 
 export type RoomTokens = {
   guestToken?: string;

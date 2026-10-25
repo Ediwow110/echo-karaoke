@@ -8,6 +8,7 @@ import { useRoomApi } from './RoomApiProvider';
 import {
   removeRoomMember,
   sendHostCommand,
+  transferRoomTo,
   type HostAction,
 } from '../features/rooms/roomApi';
 import { removeSong as removeQueueSong, reorderSong as reorderQueueSong } from '../features/queue/queueApi';
@@ -244,6 +245,29 @@ export default function HostRoomPage() {
     }
   }, [api, notify, refresh, roomId]);
 
+  const transferRoom = useCallback(async (memberId: string): Promise<void> => {
+    try {
+      const transferred = await transferRoomTo(api, roomId, memberId);
+      // The stored session said "you host this room". Leaving it that way would
+      // send this browser back to a host screen it no longer has a pass for.
+      rememberSession({
+        roomId,
+        code,
+        roomName,
+        hostName: transferred.newHost.displayName,
+        role: 'guest',
+      });
+      navigate('/room/' + roomId);
+      notify(
+        'The room is ' + transferred.newHost.displayName + '’s now.',
+        'You are a guest: you can still add and vote, but playback is theirs.',
+        'info',
+      );
+    } catch (caught) {
+      notify('The room could not be transferred.', caught instanceof Error ? caught.message : undefined, 'error');
+    }
+  }, [api, code, navigate, notify, roomId, roomName]);
+
   const endRoom = useCallback(async (): Promise<void> => {
     try {
       await sendHostCommand(api, roomId, 'end');
@@ -442,6 +466,7 @@ export default function HostRoomPage() {
     removeSong,
     reorderSong,
     removeMember,
+    transferRoom,
     endRoom,
   };
 

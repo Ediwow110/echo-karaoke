@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { CrownIcon } from '@phosphor-icons/react/dist/csr/Crown';
 import { DoorOpenIcon } from '@phosphor-icons/react/dist/csr/DoorOpen';
 import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
 import { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck';
@@ -21,6 +22,7 @@ export default function HostSettingsPage() {
     room,
     connection,
     runHost,
+    transferRoom,
     endRoom,
     removeMember,
   } = useHostRoom();
@@ -29,7 +31,22 @@ export default function HostSettingsPage() {
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [confirmTransfer, setConfirmTransfer] = useState<{ memberId: string; displayName: string } | null>(null);
+  const [transferring, setTransferring] = useState(false);
   const offline = connection === 'offline';
+
+  async function finishTransfer(): Promise<void> {
+    if (confirmTransfer === null || transferring) return;
+    setTransferring(true);
+    try {
+      // transferRoom reports its own failures and navigates away on success, so
+      // the dialog only closes when the handover actually went through.
+      await transferRoom(confirmTransfer.memberId);
+      setConfirmTransfer(null);
+    } finally {
+      setTransferring(false);
+    }
+  }
 
   async function removeGuest(memberId: string): Promise<void> {
     if (removingId !== null) return;
@@ -166,6 +183,18 @@ export default function HostSettingsPage() {
                   <span className={['size-1.5 rounded-full', member.online ? 'bg-live' : 'bg-ink-3'].join(' ')} aria-label={member.online ? 'Online' : 'Away'} />
                   <button
                     type="button"
+                    onClick={() => setConfirmTransfer({ memberId: member.memberId, displayName: member.displayName })}
+                    disabled={offline || !member.online || transferring || removingId !== null}
+                    aria-label={'Hand the room to ' + member.displayName}
+                    title={member.online
+                      ? 'Hand this room to ' + member.displayName
+                      : member.displayName + '’s remote is not connected, so they cannot take the room'}
+                    className="grid size-11 shrink-0 place-items-center rounded-full text-ink-3 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 hover:text-gold focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-35"
+                  >
+                    <CrownIcon size={18} aria-hidden="true" />
+                  </button>
+                  <button
+                    type="button"
                     onClick={() => void removeGuest(member.memberId)}
                     disabled={offline || removingId !== null}
                     aria-label={'Remove ' + member.displayName + ' from the room'}
@@ -256,6 +285,16 @@ export default function HostSettingsPage() {
         </aside>
       </div>
 
+      <ConfirmDialog
+        open={confirmTransfer !== null}
+        title={'Hand the room to ' + (confirmTransfer?.displayName ?? '') + '?'}
+        description="You become a guest. Their screen becomes the room: video, audio, skipping and the queue order all move to them. You can still add songs and vote."
+        confirmLabel="Hand it over"
+        cancelLabel="Keep hosting"
+        busy={transferring}
+        onConfirm={() => { void finishTransfer(); }}
+        onCancel={() => setConfirmTransfer(null)}
+      />
       <ConfirmDialog
         open={confirmEnd}
         title="End the room?"

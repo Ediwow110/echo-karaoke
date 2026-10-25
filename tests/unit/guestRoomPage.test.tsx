@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createElement } from 'react';
 import GuestRoomPage from '../../src/app/GuestRoomPage';
@@ -93,6 +93,32 @@ function renderGuest(api: EdgeApi, path = '/room/' + roomId) {
 }
 
 describe('guest phone remote', () => {
+  it('claims a transferred room exactly once and keeps the pass it minted', async () => {
+    // A second claim rotates the room's host secret, which would invalidate the
+    // pass this browser is already holding — so the promoted guest must claim
+    // once, and a later reload with a stored pass must not claim again.
+    const calls: string[] = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        calls.push(name);
+        if (name === 'claim-host') {
+          return { roomId, memberId: 'm2', hostToken: 'c'.repeat(40) };
+        }
+        return { ...liveRoom(), viewer: { memberId: 'm2', displayName: 'Sam', role: 'host' } };
+      }) as unknown as EdgeApi['invoke'],
+    };
+
+    renderGuest(api);
+    expect(await screen.findByText(/you are the host now/i)).toBeInTheDocument();
+    await waitFor(() => expect(calls.filter((n) => n === 'claim-host')).toHaveLength(1));
+    expect(localStorage.getItem('karaoke.host.' + roomId)).toContain('cccc');
+
+    cleanup();
+    renderGuest(api);
+    await screen.findByText(/the room queue/i);
+    expect(calls.filter((n) => n === 'claim-host')).toHaveLength(1);
+  });
+
   it('announces the loading state before room data arrives', async () => {
     const pendingApi: EdgeApi = {
       invoke: (async (name: string) => {

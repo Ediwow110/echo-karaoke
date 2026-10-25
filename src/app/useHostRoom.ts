@@ -26,6 +26,7 @@ export type HostRoomContext = {
   removeSong: (songId: string) => Promise<void>;
   reorderSong: (songId: string, direction: 'up' | 'down') => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
+  transferRoom: (memberId: string) => Promise<void>;
   endRoom: () => Promise<void>;
 };
 

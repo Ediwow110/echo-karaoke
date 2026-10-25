@@ -1,6 +1,7 @@
 import { requireAnonymousCaller } from '../auth/identity.js';
 import { catalogPage } from './catalogBrowse.js';
 import { catalogSync } from './catalogSync.js';
+import { claimHost, transferHost } from './transferHost.js';
 import { createRoom } from './createRoom.js';
 import { handleThrown, HttpError, jsonResponse, logFailure } from './errors.js';
 import { queueCommand } from './queue.js';
@@ -34,6 +35,8 @@ const OPERATIONS = new Set([
   'youtube-popular',
   'catalog-page',
   'catalog-sync',
+  'transfer-host',
+  'claim-host',
 ]);
 
 function isAuthFailure(error: unknown): boolean {
@@ -87,6 +90,10 @@ export async function handleOperation(request: Request): Promise<Response> {
         return await catalogPage(request, caller);
       case 'catalog-sync':
         return await catalogSync(request, caller);
+      case 'transfer-host':
+        return await transferHost(request, caller);
+      case 'claim-host':
+        return await claimHost(request, caller);
       default:
         throw new HttpError('NOT_IMPLEMENTED', 501, 'That operation is not available');
     }

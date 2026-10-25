@@ -1,7 +1,7 @@
 import type { EdgeApi } from '../../lib/edgeApi';
 import { normalizeDisplayName } from './displayName';
 import { isValidRoomCode, normalizeRoomCode } from './roomCode';
-import { loadGuestToken, loadHostToken, saveGuestToken, saveHostToken } from './tokenStore';
+import { clearRoomTokens, loadGuestToken, loadHostToken, saveGuestToken, saveHostToken } from './tokenStore';
 
 export type CreatedRoom = {
   roomId: string;
@@ -216,4 +216,71 @@ export async function removeRoomMember(
     throw new Error('This browser has no host pass for the room.');
   }
   await api.invoke('host-remove-member', { roomId, memberId }, { hostToken });
+}
+
+export type TransferredRoom = {
+  roomId: string;
+  guestToken: string;
+  newHost: { memberId: string; displayName: string };
+};
+
+/**
+ * Hand the room to a guest. The response is verified rather than cast because it
+ * carries a credential that is about to be stored, and a silently missing field
+ * would leave this browser demoted with no way back into the room.
+ */
+function verifyTransfer(value: unknown, roomId: string): TransferredRoom {
+  const invalid = (): never => {
+    throw new Error('The room could not be transferred. Nothing has changed.');
+  };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return invalid();
+  const room = value as Record<string, unknown>;
+  const target = room.newHost as Record<string, unknown> | undefined;
+  if (typeof room.roomId !== 'string' || !ROOM_UUID.test(room.roomId) || room.roomId !== roomId
+    || typeof room.guestToken !== 'string' || room.guestToken.length < 32
+    || room.role !== 'guest'
+    || target === undefined || typeof target.memberId !== 'string' || !ROOM_UUID.test(target.memberId)
+    || typeof target.displayName !== 'string' || target.displayName.trim().length === 0) {
+    return invalid();
+  }
+  return {
+    roomId: room.roomId,
+    guestToken: room.guestToken,
+    newHost: { memberId: target.memberId, displayName: target.displayName },
+  };
+}
+
+export async function transferRoomTo(
+  api: EdgeApi,
+  roomId: string,
+  memberId: string,
+): Promise<TransferredRoom> {
+  const hostToken = loadHostToken(roomId);
+  if (hostToken === null) {
+    throw new Error('This browser has no host pass for the room.');
+  }
+  const transferred = verifyTransfer(
+    await api.invoke<unknown>('transfer-host', { roomId, memberId }, { hostToken }),
+    roomId,
+  );
+  // The outgoing host never received a guest pass, because they created the room.
+  // Storing this one is what keeps them in the room as a guest instead of dropping
+  // them out of a room they are still watching.
+  clearRoomTokens(roomId);
+  saveGuestToken(transferred.roomId, transferred.guestToken);
+  return transferred;
+}
+
+export async function claimHostPass(api: EdgeApi, roomId: string): Promise<boolean> {
+  const guestToken = loadGuestToken(roomId);
+  if (guestToken === null) {
+    return false;
+  }
+  const response = await api.invoke<unknown>('claim-host', { roomId }, { guestToken });
+  const claim = response as { hostToken?: unknown } | null;
+  if (claim === null || typeof claim.hostToken !== 'string' || claim.hostToken.length < 32) {
+    throw new Error('The host pass could not be claimed. Try again in a moment.');
+  }
+  saveHostToken(roomId, claim.hostToken);
+  return true;
 }

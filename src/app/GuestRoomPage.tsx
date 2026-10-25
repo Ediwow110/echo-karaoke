@@ -14,11 +14,12 @@ import { useRoomData } from '../features/rooms/useRoomData';
 import GuestSongbook from './GuestSongbook';
 import { useRoomApi } from './RoomApiProvider';
 import { sendPlaybackCommand } from '../features/playback/playbackApi';
+import { claimHostPass } from '../features/rooms/roomApi';
 import NowPlayingCard from '../features/queue/NowPlayingCard';
 import { UpNextList } from '../features/queue/QueueRows';
 import SongSearchPanel from '../features/queue/SongSearchPanel';
 import PopularSongs from '../features/queue/PopularSongs';
-import { clearGuestToken } from '../features/rooms/tokenStore';
+import { clearGuestToken, loadHostToken } from '../features/rooms/tokenStore';
 import { touchSession } from '../features/rooms/sessionStore';
 import { rememberPlayed, rememberSongs } from '../features/library/libraryStore';
 import { QUEUE_ELEMENT_ID } from '../features/queue/queueAnchor';
@@ -49,6 +50,8 @@ export default function GuestRoomPage() {
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [playbackBusy, setPlaybackBusy] = useState(false);
   const [retrying, setRetrying] = useState(false);
+  const [tookOver, setTookOver] = useState(false);
+  const hostPassClaimed = useRef<string | null>(null);
   const seenSongs = useRef(new Set<string>());
   const playedSong = useRef<string | null>(null);
   const touchedRoom = useRef<string | null>(null);
@@ -98,6 +101,30 @@ export default function GuestRoomPage() {
     touchedRoom.current = roomId + roomName + hostName;
     touchSession(roomId, { roomName, hostName });
   }, [data, hostName, roomId, roomName, viewer]);
+
+  useEffect(() => {
+    if (viewer?.role !== 'host') {
+      return;
+    }
+    // The room was handed to this guest. Their host pass is minted here, on
+    // their own device, because the database only stores digests and the
+    // outgoing host must never hold the secret that replaces theirs. Claiming
+    // twice would rotate away the pass this browser already has, so the marker
+    // is set before the request goes out and cleared only if it fails.
+    if (hostPassClaimed.current === roomId || loadHostToken(roomId) !== null) {
+      return;
+    }
+    hostPassClaimed.current = roomId;
+    void claimHostPass(api, roomId)
+      .then((claimed) => {
+        if (claimed) {
+          setTookOver(true);
+        }
+      })
+      .catch(() => {
+        hostPassClaimed.current = null;
+      });
+  }, [api, roomId, viewer?.role]);
 
   useEffect(() => {
     if (restoredAt === null) {
@@ -389,6 +416,24 @@ export default function GuestRoomPage() {
             </div>
             <span className="text-[0.625rem] text-ink-2">{queueSummary(queue)}</span>
           </div>
+
+          {tookOver ? (
+            <div role="status" className="mt-4 rounded-panel border border-gold/40 bg-surface p-4">
+              <p className="eyebrow text-gold">You are the host now</p>
+              <p className="mt-1 text-[0.8125rem] leading-[1.6] text-ink-2">
+                This room was just handed to you. Video, audio and the queue run from your screen now.
+              </p>
+              <Button
+                variant="primary"
+                size="sm"
+                full
+                className="mt-3"
+                onClick={() => navigate('/room/' + roomId + '/host')}
+              >
+                Open the host view
+              </Button>
+            </div>
+          ) : null}
 
           <div className="mt-4">
             <NowPlayingCard

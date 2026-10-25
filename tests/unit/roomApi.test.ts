@@ -1,13 +1,22 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { EdgeApi } from '../../src/lib/edgeApi';
 import {
+  claimHostPass,
   createRoom,
   joinRoom,
   readRoomAsGuest,
   readRoomAsHost,
   sendHostCommand,
+  transferRoomTo,
 } from '../../src/features/rooms/roomApi';
-import { clearGuestToken, clearRoomTokens, loadGuestToken, loadHostToken } from '../../src/features/rooms/tokenStore';
+import {
+  clearGuestToken,
+  clearRoomTokens,
+  loadGuestToken,
+  loadHostToken,
+  saveGuestToken,
+  saveHostToken,
+} from '../../src/features/rooms/tokenStore';
 
 type Invocation = { name: string; body: unknown; tokens: unknown };
 
@@ -21,6 +30,72 @@ function fakeApi(result: unknown = {}): { api: EdgeApi; calls: Invocation[] } {
   };
   return { api, calls };
 }
+
+describe('handing over a room', () => {
+  const roomId = '550e8400-e29b-41d4-a716-446655440000';
+  const memberId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
+
+  beforeEach(() => {
+    localStorage.clear();
+    clearRoomTokens(roomId);
+  });
+
+  it('stores the outgoing host’s new guest pass and drops the host pass', async () => {
+    const { api, calls } = fakeApi({
+      roomId,
+      role: 'guest',
+      guestToken: 'g'.repeat(40),
+      newHost: { memberId, displayName: 'Rafa' },
+    });
+    saveHostToken(roomId, 'h'.repeat(40));
+
+    const transferred = await transferRoomTo(api, roomId, memberId);
+
+    expect(calls[0].name).toBe('transfer-host');
+    expect(loadHostToken(roomId)).toBeNull();
+    expect(loadGuestToken(roomId)).toBe(transferred.guestToken);
+  });
+
+  it('keeps the host pass when the transfer answer is unusable', async () => {
+    // Verification runs before anything is cleared on purpose: a malformed
+    // response must not leave the host demoted with no credentials at all.
+    const { api } = fakeApi({
+      roomId,
+      role: 'guest',
+      guestToken: 'short',
+      newHost: { memberId, displayName: 'Rafa' },
+    });
+    saveHostToken(roomId, 'h'.repeat(40));
+
+    await expect(transferRoomTo(api, roomId, memberId)).rejects.toThrow(/could not be transferred/);
+    expect(loadHostToken(roomId)).not.toBeNull();
+    expect(loadGuestToken(roomId)).toBeNull();
+  });
+
+  it('claims the host pass with the guest credential the member already holds', async () => {
+    const { api, calls } = fakeApi({ roomId, memberId, hostToken: 'c'.repeat(40) });
+    saveGuestToken(roomId, 'g'.repeat(40));
+
+    expect(await claimHostPass(api, roomId)).toBe(true);
+    expect(calls[0].tokens).toEqual({ guestToken: 'g'.repeat(40) });
+    expect(loadHostToken(roomId)).toBe('c'.repeat(40));
+  });
+
+  it('will not claim without a guest pass to prove who is asking', async () => {
+    const { api, calls } = fakeApi({ roomId, memberId, hostToken: 'c'.repeat(40) });
+
+    expect(await claimHostPass(api, roomId)).toBe(false);
+    expect(calls).toEqual([]);
+  });
+
+  it('refuses to store a claim that returned no host pass', async () => {
+    const { api } = fakeApi({ roomId, memberId });
+    saveGuestToken(roomId, 'g'.repeat(40));
+
+    await expect(claimHostPass(api, roomId)).rejects.toThrow(/could not be claimed/);
+    expect(loadHostToken(roomId)).toBeNull();
+  });
+});
 
 describe('room api', () => {
   beforeEach(() => {
