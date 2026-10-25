@@ -4,6 +4,17 @@ import { readJsonObject } from './tokens.js';
 import { requireRoomId, type Caller } from './room.js';
 import { requireRoomAccess } from './catalogAccess.js';
 
+// Mirrors the clamps inside karaoke_catalog_page. Number.isInteger accepts 1e15,
+// but Postgres rejects it as an integer out of range, so a wildly paging client
+// got a 500 instead of a page.
+const MAX_OFFSET = 5000;
+const MAX_LIMIT = 50;
+
+function boundedInteger(value: unknown, fallback: number, min: number, max: number): number {
+  if (typeof value !== 'number' || !Number.isSafeInteger(value)) return fallback;
+  return Math.min(max, Math.max(min, value));
+}
+
 export async function catalogPage(request: Request, caller: Caller): Promise<Response> {
   const body = await readJsonObject(request);
   const roomId = requireRoomId(body.roomId);
@@ -11,8 +22,8 @@ export async function catalogPage(request: Request, caller: Caller): Promise<Res
 
   const query = typeof body.query === 'string' ? body.query.slice(0, 80) : '';
   const channel = typeof body.channel === 'string' ? body.channel.slice(0, 80) : '';
-  const offset = Number.isInteger(body.offset) ? (body.offset as number) : 0;
-  const limit = Number.isInteger(body.limit) ? (body.limit as number) : 30;
+  const offset = boundedInteger(body.offset, 0, 0, MAX_OFFSET);
+  const limit = boundedInteger(body.limit, 30, 1, MAX_LIMIT);
 
   try {
     const call = operationCall('karaoke_catalog_page', [query, channel, offset, limit]);
@@ -23,6 +34,9 @@ export async function catalogPage(request: Request, caller: Caller): Promise<Res
     }
     return jsonResponse(result);
   } catch (error) {
+    // Raising above was remapped by the handler below, so the specific reason
+    // never reached the client or the log.
+    if (error instanceof HttpError) throw error;
     throw mapDatabaseError(error as { message?: string });
   }
 }
