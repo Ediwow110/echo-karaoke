@@ -455,7 +455,10 @@ grants in 0034 are needed even though nothing calls them yet.
    ```
 
    Generating it in the shell keeps the value out of chat and shell history, and `--sensitive`
-   stores it as a Vercel Secret, listed as `Hidden` afterwards.
+   stores it as a Vercel Secret, listed as `Hidden` afterwards. Rehearsed 2026-10-26 with a
+   throwaway name on this project: the piped form adds without any interactive prompt, and
+   `npx vercel env rm <NAME> production --yes` removes it just as cleanly, so neither half needs the
+   dashboard. The probe variable is gone — Production lists the same eight names it did before.
 
    Without it `npm run verify:deploy` refuses the build (proved: it is the only remaining
    complaint once the other variables are set) and the daily retention run answers 503. A new
@@ -498,7 +501,8 @@ grants in 0034 are needed even though nothing calls them yet.
    ```
 
    Before the push, `verify:preview` fails **exactly two** checks on production (measured
-   2026-10-25): `referrer-policy does not contain strict-origin-when-cross-origin` and `The
+   2026-10-25, re-measured 2026-10-26 with the same two lines and nothing else): `referrer-policy
+   does not contain strict-origin-when-cross-origin` and `The
    kara-echo title is missing from the HTML`. Both are the branch's own values asserting themselves
    against the older deployment — every other check (headers, CSP, SPA fallback, asset caching,
    credential-free HTML, JWKS, JSON on an unknown `/api` route) passes, so the live origin is
