@@ -558,6 +558,18 @@ and authenticated roles.
   2026-10-25 — do not add a `maxDuration` to "fix" a timeout that cannot occur.
 - **The first refresh is bounded**: four channels, at most three pages each, roughly 400 rows and
   about 16 quota units, against a 40-unit daily cap. Browsing the songbook costs nothing.
+- **Every RPC the operations name is executable by the runtime role on production.** Audited
+  2026-10-26 by reading `pg_proc` as the owner for all 28 names enumerated from `server/operations`
+  (not just the songbook's five): `echo_service` and `service_role` can execute each one, `anon` can
+  execute none, and both catalog tables carry `SELECT/INSERT/UPDATE/DELETE` with row security on. The
+  seed path (`karaoke_catalog_cursors`, `karaoke_catalog_upsert`, `karaoke_catalog_cursor_save`) was
+  the part worth checking, because the integration suite only ever *executes* `karaoke_catalog_page`
+  and `karaoke_catalog_upsert` as that role — `catalog-sync` is rejected for lack of a key before it
+  reaches the database. That gap is now a gate: the suite enumerates the call sites from source and
+  asks the database what `current_user` may execute, so a new RPC without a grant fails CI instead of
+  failing a host's refresh. Proven to have teeth by planting `operationCall('temp_probe_rpc', [])`
+  into an operation file, which failed the run naming that RPC; the privilege half discriminates
+  because `anon` reads false for the same functions `echo_service` reads true on.
 - **Every environment variable the Function reads is present in Production except
   `CRON_SECRET`.** Enumerated from `server/` and `api/` including the dynamic
   `process.env[name]` budget reads: `DATABASE_URL`, `AUTH_DATABASE_URL`,

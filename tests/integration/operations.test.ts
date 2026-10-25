@@ -1,4 +1,5 @@
 import { createServer, type IncomingMessage, type Server } from 'node:http';
+import { readdirSync, readFileSync } from 'node:fs';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 
 const BASE = 'http://127.0.0.1:3000';
@@ -463,5 +464,53 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
 
     const sync = await call('catalog-sync', hostAuth, { roomId: room.roomId });
     expect(sync.status).toBe(403);
+  });
+});
+
+function rpcNamesInOperations(): string[] {
+  const directory = new URL('../../server/operations/', import.meta.url);
+  const found = new Set<string>();
+  for (const file of readdirSync(directory).filter((name) => name.endsWith('.ts'))) {
+    const source = readFileSync(new URL(file, directory), 'utf8');
+    for (const match of source.matchAll(
+      /\b(?:operationCall|queryAllowNull|callOperation|quotaAllows|enforceLimit)\(\s*'([a-z][a-z0-9_]*)'/g,
+    )) {
+      found.add(match[1]);
+    }
+  }
+  return [...found].sort();
+}
+
+describe('runtime-role grants', () => {
+  it.skipIf(!runsHere)('may execute every RPC the operations name', async () => {
+    // pgTAP runs as the owner, and the parity test only compares against
+    // service_role, so a migration that forgets a grant to *both* passes both
+    // suites while the deployed role answers SQLSTATE 42501. Only this suite
+    // connects as the role the Function really uses, so the check enumerates
+    // the call sites from source instead of listing names by hand.
+    const names = rpcNamesInOperations();
+    // 28 at the time of writing; the floor is what keeps a renamed helper from
+    // turning this gate into a test that asserts nothing.
+    expect(names.length, 'the source enumeration found almost no RPCs').toBeGreaterThanOrEqual(24);
+
+    const { serviceDatabase } = await import('../../server/db/client');
+    const checks = await serviceDatabase().query(
+      `select x.name,
+        (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.proname = x.name)::int as present,
+        (select bool_and(has_function_privilege(current_user, p.oid, 'EXECUTE'))
+          from pg_proc p join pg_namespace n on n.oid = p.pronamespace
+          where n.nspname = 'public' and p.proname = x.name) as executable
+       from (select unnest($1::text[]) as name) x
+       order by x.name`,
+      [names],
+    ) as unknown as Array<{ name: string; present: number; executable: boolean | null }>;
+
+    const unusable = checks.filter((row) => row.present === 0 || row.executable !== true);
+    expect(
+      unusable.map((row) => `${row.name}: present=${row.present} executable=${row.executable}`),
+      `${checks.length} RPCs are named in server/operations; every one must exist in public and be`
+      + ' executable by the role the Function connects as.',
+    ).toEqual([]);
   });
 });
