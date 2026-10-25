@@ -50,9 +50,34 @@ explicit approval.
 
 One thing the task list missed: Tasks 4–5 shipped the warming-up message but never wired the
 host-only Retry the spec requires, so nothing could call `catalog-sync`. That landed separately
-in `0062146`. The five channel handles in `CATALOG_CHANNELS` have **never been resolved against
-a real YouTube key** — the first real sync is the proof they exist and of how deep each uploads
-playlist actually goes.
+in `0062146`.
+
+**Channel handles, proven against a real key (2026-10-25).** The five `CATALOG_CHANNELS` entries
+were never resolved before this tree shipped nothing. Resolved now, one `channels.list` unit each:
+
+| Handle | Result |
+|---|---|
+| `@musisikaraoke` | resolves — uploads `UUJw1qyMF4m3ZIBWdhogkcsw` |
+| `@singking` | resolves — uploads `UUiKvZMc7lApbIc9XCorhFfw` |
+| `@vinylktv` | resolves — uploads `UUL8roECkxt33HMrH9hl01ww` |
+| `@titojaymusic` | **did not exist.** Replaced by `@titojaymusicofficial`, uploads `UUyqXe9LxGxB8pRsbRMpIqSA` |
+| `@karaoketv` | **does not exist and has no obvious successor** — `channels.list` returns zero items and `youtube.com/@karaoketv` is a 404 (control: a nonsense handle 404s too, `@musisikaraoke` 200s) |
+
+The spec named "KaraokeTV", and two live channels could be meant: `@CARAokeTVOfficial` ("CARAoke
+TV") or `@KARAOKEZONETV` ("KARAOKE ZONE TV"). **This is the owner's choice, not a guess to make** —
+it decides whose videos a room's songbook is built from. Until it is answered, `@karaoketv` is kept
+in the list so the gap stays visible.
+
+The silent-omission defect this exposed is fixed: a handle that names no channel used to `continue`
+and the run still answered `{ available: true, added, skipped }`, so a host could never tell a
+five-channel songbook from a four-channel one. `catalog-sync` now returns `unresolved: []` and, when
+non-empty, says "Songbook refresh could not find: …" — proven by mutation (removing the push fails
+exactly one test). Because the sync stores its cursor under the handle and `CATALOG_CHANNEL_LABELS`
+filters by that same id, a drift gate (`tests/unit/catalogChannelContract.test.ts`) now pins the two
+lists together; it was written after the two halves had already drifted apart once.
+
+Also still owed from this class: a `channels.list` HTTP error (as opposed to a missing channel)
+still `continue`s unreported, and a cursor whose channel later disappears is not re-checked.
 
 ## Global Constraints
 

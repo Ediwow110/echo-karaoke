@@ -17,7 +17,7 @@ export const CATALOG_CHANNEL_LABELS: { id: string; label: string }[] = [
   { id: '@singking', label: 'Sing King' },
   { id: '@karaoketv', label: 'KaraokeTV' },
   { id: '@vinylktv', label: 'Vinyl KTV' },
-  { id: '@titojaymusic', label: 'Tito Jay' },
+  { id: '@titojaymusicofficial', label: 'Tito Jay' },
 ];
 
 function tokensFor(roomId: string): { hostToken?: string; guestToken?: string } {
@@ -49,6 +49,7 @@ export type CatalogSyncResult = {
   available: boolean;
   added: number;
   skipped: number;
+  unresolved?: string[];
   message?: string;
 };
 

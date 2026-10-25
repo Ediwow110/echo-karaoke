@@ -17,7 +17,7 @@ export const CATALOG_CHANNELS = [
   '@singking',
   '@karaoketv',
   '@vinylktv',
-  '@titojaymusic',
+  '@titojaymusicofficial',
 ];
 
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
@@ -183,6 +183,7 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
   let added = 0;
   let skipped = 0;
   let stoppedEarly = false;
+  const unresolved: string[] = [];
 
   channels: for (const handle of CATALOG_CHANNELS) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
@@ -211,7 +212,12 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
       if (upstream.state === 'http-error') continue;
       const items = (upstream.payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
       const uploads = items[0]?.contentDetails?.relatedPlaylists?.uploads;
-      if (typeof uploads !== 'string') continue;
+      if (typeof uploads !== 'string') {
+        // A handle that names no channel is a configuration fact, not a
+        // transient failure: the catalog would silently stay one channel short.
+        unresolved.push(handle);
+        continue;
+      }
       playlistId = uploads;
       await saveCursor(handle, playlistId, null, false);
     }
@@ -221,7 +227,10 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
       if (Date.now() - started > TIME_BUDGET_MS) break;
       const spent = await queryAllowNull('consume_daily_rate_limit', ['global', 'karaoke-catalog-day', DAILY_UNIT_CAP]);
       if ((spent as { allowed?: boolean } | null)?.allowed !== true) {
-        return jsonResponse({ available: true, added, skipped, message: 'Songbook refresh paused for today' });
+        return jsonResponse({
+          available: true, added, skipped, unresolved,
+          message: 'Songbook refresh paused for today',
+        });
       }
       const remaining = TIME_BUDGET_MS - (Date.now() - started);
       if (remaining <= 0) break;
@@ -245,14 +254,18 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     }
   }
 
-  if (stoppedEarly) {
-    return jsonResponse({
-      available: true,
-      added,
-      skipped,
-      message: 'Songbook refresh stopped early',
-    });
-  }
+  const notes = [
+    stoppedEarly ? 'Songbook refresh stopped early' : null,
+    unresolved.length === 0
+      ? null
+      : 'Songbook refresh could not find: ' + unresolved.join(', '),
+  ].filter((note): note is string => note !== null);
 
-  return jsonResponse({ available: true, added, skipped });
+  return jsonResponse({
+    available: true,
+    added,
+    skipped,
+    unresolved,
+    ...(notes.length === 0 ? {} : { message: notes.join('. ') }),
+  });
 }

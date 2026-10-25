@@ -160,6 +160,7 @@ function upstream(body: unknown): Response {
 type FetchOptions = {
   rows?: unknown[];
   nextPageToken?: boolean;
+  unresolved?: string[];
 };
 
 function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
@@ -172,6 +173,7 @@ function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
     db.timeline.push('fetch');
     if (url.pathname.endsWith('/channels')) {
       const handle = url.searchParams.get('forHandle') ?? '@channel';
+      if (options.unresolved?.includes(handle)) return upstream({ items: [] });
       return upstream({
         items: [{ contentDetails: { relatedPlaylists: { uploads: `UU${handle.slice(1)}` } } }],
       });
@@ -344,6 +346,7 @@ describe('catalog sync orchestration', () => {
       available: true,
       added: 0,
       skipped: 0,
+      unresolved: [],
       message: 'Songbook refresh paused for today',
     });
   });
@@ -358,5 +361,50 @@ describe('catalog sync orchestration', () => {
     const body = await response.json() as { available: boolean; added: number; skipped: number };
 
     expect(body).toMatchObject({ available: true, added: 2, skipped: 4 });
+  });
+
+  it('names a channel it could not resolve instead of reporting a clean run', async () => {
+    // @karaoketv keeps no uploads playlist, so this run must resolve it — and
+    // find nothing. A stale handle has to surface, not shrink the catalog quietly.
+    useDatabase(baseHandlers({
+      // Two channels need resolving this run: one real, one stale. The rest
+      // stay inside the 6-hour throttle.
+      karaoke_catalog_cursors: () => cursors('@karaoketv', new Date().toISOString())
+        .map((row) => {
+          const cursor = row as {
+            channelId: string;
+            uploadsPlaylistId: string | null;
+            lastSyncedAt: string | null;
+          };
+          if (cursor.channelId === '@karaoketv') {
+            return { ...cursor, uploadsPlaylistId: null, lastSyncedAt: null };
+          }
+          if (cursor.channelId === '@singking') {
+            return { ...cursor, uploadsPlaylistId: null, lastSyncedAt: null };
+          }
+          return row;
+        }),
+    }));
+    stubFetch({ rows: [row(1)], unresolved: ['@karaoketv'] });
+
+    const response = await catalogSync(syncRequest(), CALLER);
+    const body = await response.json() as { added: number; message?: string; unresolved: string[] };
+
+    // The other channels still filled the catalog, so the run is not a failure...
+    expect(body.added).toBeGreaterThan(0);
+    // ...but a handle that returned no channel must never disappear silently.
+    expect(body.unresolved).toEqual(['@karaoketv']);
+    expect(body.message).toContain('@karaoketv');
+  });
+
+  it('leaves unresolved empty when every handle resolves', async () => {
+    useDatabase(baseHandlers({
+      karaoke_catalog_cursors: () => cursors('@singking', new Date().toISOString()),
+    }));
+    stubFetch({ rows: [row(1)] });
+
+    const body = await (await catalogSync(syncRequest(), CALLER)).json() as { unresolved: string[] };
+
+    expect(body.unresolved).toEqual([]);
   });
 });
