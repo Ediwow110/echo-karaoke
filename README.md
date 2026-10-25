@@ -89,7 +89,7 @@ The karaoke songbook is a local catalog of embeddable karaoke videos, filled onl
 
 ## Tests
 
-    npm test                 # 405 unit and component tests (jsdom)
+    npm test                 # 407 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # 325 pgTAP assertions
     npm run test:integration # 8 router/auth/operation tests against a Neon branch

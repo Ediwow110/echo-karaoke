@@ -451,10 +451,22 @@ and authenticated roles.
   `tests/unit/catalogRetentionRouter.test.ts` using the real rewrite helper, not a mock.
 - **The first refresh is bounded**: four channels, at most three pages each, roughly 400 rows and
   about 16 quota units, against a 40-unit daily cap. Browsing the songbook costs nothing.
+- **Every environment variable the Function reads is present in Production except
+  `CRON_SECRET`.** Enumerated from `server/` and `api/` including the dynamic
+  `process.env[name]` budget reads: `DATABASE_URL`, `AUTH_DATABASE_URL`,
+  `BETTER_AUTH_SECRET`, `BETTER_AUTH_URL`, `ALLOWED_ORIGINS`, `YOUTUBE_API_KEY` all set;
+  `VERCEL_URL`/`VERCEL_PROJECT_PRODUCTION_URL` are injected by Vercel; the four
+  `YOUTUBE_DAILY_*` and two abuse-limit variables fall back to documented defaults;
+  `PREVIEW_*` apply only to preview. `CRON_SECRET` is the one gap, and it fails loudly
+  (503 on the cron, build refused) rather than silently.
+- **No other read path disguises a broken deployment as empty data.** The keyless
+  songbook fallback used to swallow every database error and answer "no results"; it now
+  tolerates only SQLSTATE 42883 (not yet migrated), so a denied grant reaches the host as
+  a 500 instead of an empty list.
 - **All four CI jobs were simulated on a fresh branch off `main`** (2026-10-25): the full
   0001→0034 chain applies, `npx supabase test db` reports 325/325, and `npm run test:integration`
   reports 8/8 connecting as `echo_service` **without** a YouTube key — the same conditions CI runs
-  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 405 unit tests, the build and
+  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 407 unit tests, the build and
   15 mocked UI flows pass. The push should be green; if it is not, the difference is in CI's
   environment, not in this tree.
 
@@ -470,7 +482,7 @@ branch for the app-level proof only, or expect those four assertions to complain
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 325 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 405 passing tests on the current tree.
+- [x] `npm test` reports 407 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 15 passing tests on the current tree.
 - [x] `npm run verify:deploy` passes with the production environment.
