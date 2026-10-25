@@ -451,6 +451,20 @@ and authenticated roles.
   `tests/unit/catalogRetentionRouter.test.ts` using the real rewrite helper, not a mock.
 - **The first refresh is bounded**: four channels, at most three pages each, roughly 400 rows and
   about 16 quota units, against a 40-unit daily cap. Browsing the songbook costs nothing.
+- **All four CI jobs were simulated on a fresh branch off `main`** (2026-10-25): the full
+  0001→0034 chain applies, `npx supabase test db` reports 325/325, and `npm run test:integration`
+  reports 8/8 connecting as `echo_service` **without** a YouTube key — the same conditions CI runs
+  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 405 unit tests, the build and
+  15 mocked UI flows pass. The push should be green; if it is not, the difference is in CI's
+  environment, not in this tree.
+
+### What the app-level live proof showed (and what it cost)
+
+Running the real flow with the real key on a disposable Neon branch seeded **409 songs** and walked
+filter → chip → queue → play → auto-advance, which is how 0034's missing grants were found. Do not
+re-run that casually: `catalog-sync` spends real quota and the branch's catalog rows make the
+catalog fixtures in `supabase/tests/catalog_test.sql` fail (they assume a clean table), so reuse a
+branch for the app-level proof only, or expect those four assertions to complain.
 
 ## Verification checklist
 
