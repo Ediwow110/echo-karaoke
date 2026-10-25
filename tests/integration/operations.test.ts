@@ -226,16 +226,46 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
     // suites cover the keyed path against a mocked upstream.
     delete process.env.YOUTUBE_API_KEY;
 
-    const search = await call('youtube-search', guestAuth, {
+    const cold = await call('youtube-search', guestAuth, {
       roomId,
-      query: 'abba',
+      query: 'zzzz-no-such-song',
     }, {
       'x-room-guest-token': guestToken,
     });
-    expect(search.status).toBe(200);
-    const searchBody = (await search.json()) as { available?: boolean; results?: unknown[] };
-    expect(searchBody.available).toBe(false);
-    expect(searchBody.results).toEqual([]);
+    expect(cold.status).toBe(200);
+    const coldBody = (await cold.json()) as { available?: boolean; results?: unknown[] };
+    expect(coldBody.available).toBe(false);
+    expect(coldBody.results).toEqual([]);
+
+    // Keyless search then answers from the songbook once the catalog holds a
+    // match. Asserting only the cold case would pass on a fresh CI branch
+    // because its catalog is empty, not because the behaviour is right.
+    const { serviceDatabase } = await import('../../server/db/client');
+    const catalog = serviceDatabase();
+    await catalog.query(
+      'select public.karaoke_catalog_upsert($1, $2::jsonb)',
+      ['@integration', JSON.stringify([{
+        videoId: 'iNTgrAti001',
+        title: 'Dancing Queen (KARAOKE VERSION)',
+        channelTitle: 'Integration Karaoke',
+        thumbnailUrl: null,
+        publishedAt: new Date().toISOString(),
+      }])],
+    );
+
+    const warm = await call('youtube-search', guestAuth, {
+      roomId,
+      query: 'dancing queen',
+    }, {
+      'x-room-guest-token': guestToken,
+    });
+    expect(warm.status).toBe(200);
+    const warmBody = (await warm.json()) as {
+      available?: boolean; source?: string; results?: { videoId: string }[];
+    };
+    expect(warmBody.available).toBe(true);
+    expect(warmBody.source).toBe('songbook');
+    expect(warmBody.results?.[0]?.videoId).toBe('iNTgrAti001');
 
     const popular = await call('youtube-popular', guestAuth, { roomId }, {
       'x-room-guest-token': guestToken,
@@ -416,5 +446,22 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
       'x-room-host-token': secondRoom.hostToken,
     });
     expect(fresh.status).toBe(200);
+  });
+
+  it('reaches the songbook catalog as the runtime role, not just as the owner', async () => {
+    // pgTAP runs as the owner, so it cannot see a missing grant for the role the
+    // function actually connects as. This suite runs as that role.
+    const hostAuth = await signIn();
+    const created = await call('create-room', hostAuth, { displayName: 'Songbook Host' });
+    expect(created.status).toBe(201);
+    const room = (await created.json()) as { roomId: string; hostToken: string };
+
+    const page = await call('catalog-page', hostAuth,
+      { roomId: room.roomId, query: '', channel: '', offset: 0, limit: 5 },
+      { 'x-room-host-token': room.hostToken });
+    expect(page.status, await page.text()).toBe(200);
+
+    const sync = await call('catalog-sync', hostAuth, { roomId: room.roomId });
+    expect(sync.status).toBe(403);
   });
 });
