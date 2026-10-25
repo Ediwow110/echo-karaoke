@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import type { EdgeApi } from '../../lib/edgeApi';
-import { queueCatalogSong, readCatalogPage, type CatalogSong } from './catalogApi';
+import { queueCatalogSong, readCatalogPage, runCatalogSync, type CatalogSong } from './catalogApi';
 import { SongArtwork } from '../../ui';
 
 const PAGE_SIZE = 30;
@@ -19,10 +19,13 @@ export type SongbookListProps = {
   // The guest screen passes the room's guest-control lock. Browsing stays
   // usable; only queueing is gated. The host page never sets this.
   disabled?: boolean;
+  // Only the host page sets this: refreshing the catalog spends YouTube quota,
+  // so the operation refuses a guest pass.
+  canSync?: boolean;
   onAdded?: () => void;
 };
 
-export default function SongbookList({ api, roomId, channels, disabled = false, onAdded }: SongbookListProps) {
+export default function SongbookList({ api, roomId, channels, disabled = false, canSync = false, onAdded }: SongbookListProps) {
   const [query, setQuery] = useState('');
   const [channel, setChannel] = useState('');
   const [items, setItems] = useState<CatalogSong[]>([]);
@@ -34,6 +37,8 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
   const [adding, setAdding] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [syncing, setSyncing] = useState(false);
+  const [syncNote, setSyncNote] = useState<string | null>(null);
 
   // Search responses can arrive out of order. Every read owns a sequence number
   // and may only write (and clear `busy`) while it is still the newest one.
@@ -84,6 +89,26 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
   }
 
   const loadingFirstPage = hasLoaded === false && error === null;
+  // A filtered page that returns nothing is a missed search, not an empty
+  // catalog: the warming-up copy and the refresh control only make sense
+  // unfiltered.
+  const filtering = query.trim().length > 0 || channel.length > 0;
+
+  async function refresh(): Promise<void> {
+    setSyncing(true);
+    setSyncNote(null);
+    try {
+      const result = await runCatalogSync(api, roomId);
+      await load(0, true);
+      setSyncNote(result.message ?? (result.added > 0
+        ? null
+        : 'The channels have nothing new yet. Try again in a few hours.'));
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : 'The songbook could not be refreshed.');
+    } finally {
+      setSyncing(false);
+    }
+  }
 
   return (
     <div className="flex flex-col gap-4">
@@ -134,12 +159,23 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
           <p className="text-[0.8125rem] text-ink-2" aria-hidden="true">Loading the songbook…</p>
           <span role="status" aria-label="Loading the songbook…" className="sr-only">Loading the songbook…</span>
         </div>
-      ) : hasLoaded === false ? null : items.length === 0 && busy === false ? (
-        <p className="rounded-panel border border-line bg-surface px-4 py-6 text-center text-[0.8125rem] text-ink-2">
-          {total === 0
-            ? 'The songbook is warming up. Ask the host to refresh it.'
-            : 'No song matches that search.'}
-        </p>
+      ) : hasLoaded === false ? null : items.length === 0 && (busy === false || syncing) ? (
+        <div className="flex flex-col items-center gap-3">
+          <p className="w-full rounded-panel border border-line bg-surface px-4 py-6 text-center text-[0.8125rem] text-ink-2">
+            {filtering ? 'No song matches that search.' : 'The songbook is warming up. Ask the host to refresh it.'}
+          </p>
+          {syncNote === null ? null : <p role="status" className="text-[0.75rem] text-ink-2">{syncNote}</p>}
+          {canSync && !filtering ? (
+            <button
+              type="button"
+              onClick={() => { void refresh(); }}
+              disabled={syncing || busy}
+              className="min-h-11 rounded-media border border-line bg-surface px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2 disabled:opacity-50"
+            >
+              {syncing ? 'Refreshing…' : 'Refresh the songbook'}
+            </button>
+          ) : null}
+        </div>
       ) : (
         // Refetches keep the rows already on screen and mark them busy instead
         // of flashing an empty list.

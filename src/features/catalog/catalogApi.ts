@@ -44,3 +44,16 @@ export async function readCatalogPage(
 export async function queueCatalogSong(api: EdgeApi, roomId: string, videoId: string): Promise<void> {
   await addSong(api, roomId, videoId);
 }
+
+export type CatalogSyncResult = {
+  available: boolean;
+  added: number;
+  skipped: number;
+  message?: string;
+};
+
+export async function runCatalogSync(api: EdgeApi, roomId: string): Promise<CatalogSyncResult> {
+  return api.invoke<CatalogSyncResult>('catalog-sync', { roomId }, {
+    hostToken: loadHostToken(roomId) ?? undefined,
+  });
+}

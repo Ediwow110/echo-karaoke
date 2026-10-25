@@ -15,7 +15,7 @@ export default function HostSongbookPage() {
         </h2>
         <p className="mt-1 text-[0.8125rem] text-ink-2">With lyrics, ready to queue. Songs play from YouTube.</p>
       </div>
-      <SongbookList api={api} roomId={roomId} channels={CATALOG_CHANNEL_LABELS} onAdded={() => { void refresh(); }} />
+      <SongbookList api={api} roomId={roomId} channels={CATALOG_CHANNEL_LABELS} canSync onAdded={() => { void refresh(); }} />
     </div>
   );
 }

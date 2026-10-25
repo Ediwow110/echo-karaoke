@@ -41,6 +41,32 @@ function makeApi() {
   return { api, calls };
 }
 
+type SyncResult = { available: boolean; added: number; skipped: number; message?: string };
+
+// A catalog the host can fill by refreshing: every read is empty until a sync runs,
+// and any search misses so the empty-catalog and no-match states stay separable.
+function makeEmptyApi(syncResult: SyncResult) {
+  const calls: Array<{ name: string; body: unknown }> = [];
+  let synced = false;
+  const api = {
+    invoke: (async (name: string, body: unknown) => {
+      calls.push({ name, body });
+      if (name === 'catalog-page') {
+        const query = (body as { query?: string }).query ?? '';
+        if (synced && query === '') return catalogPage(0);
+        return { total: 0, items: [] };
+      }
+      if (name === 'catalog-sync') {
+        // The catalog only fills when the sync actually wrote rows.
+        if (syncResult.added > 0) synced = true;
+        return syncResult;
+      }
+      return { ok: true };
+    }) as unknown as EdgeApi['invoke'],
+  };
+  return { api, calls };
+}
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
@@ -184,5 +210,62 @@ describe('songbook list', () => {
 
     expect(await screen.findByText('Halo - Beyonce (Karaoke)')).toBeInTheDocument();
     expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument();
+  });
+
+  it('lets the host refresh a catalog that has not been synced yet', async () => {
+    const { api, calls } = makeEmptyApi({ available: true, added: 412, skipped: 0 });
+    render(<SongbookList api={api} roomId={roomId} canSync />);
+
+    expect(await screen.findByText(/warming up/i)).toBeInTheDocument();
+    // The guest copy asks the host to refresh, so the host must have the control.
+    fireEvent.click(screen.getByRole('button', { name: /refresh the songbook/i }));
+
+    await waitFor(() => {
+      expect(calls.some((call) => call.name === 'catalog-sync')).toBe(true);
+    });
+    // The sync is only useful if the list is read again afterwards.
+    await waitFor(() => {
+      expect(calls.filter((call) => call.name === 'catalog-page').length).toBeGreaterThan(1);
+    });
+    expect(await screen.findByText('Halo - Beyonce (Karaoke)')).toBeInTheDocument();
+    expect(await screen.findByText('61 songs')).toBeInTheDocument();
+  });
+
+  it('shows the host why a refresh added nothing', async () => {
+    const { api } = makeEmptyApi({
+      available: true, added: 0, skipped: 5, message: 'Songbook refresh paused for today',
+    });
+    render(<SongbookList api={api} roomId={roomId} canSync />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /refresh the songbook/i }));
+
+    expect(await screen.findByText('Songbook refresh paused for today')).toBeInTheDocument();
+  });
+
+  it('offers the host no refresh control', async () => {
+    const { api, calls } = makeEmptyApi({ available: true, added: 1, skipped: 0 });
+    render(<SongbookList api={api} roomId={roomId} />);
+
+    expect(await screen.findByText(/warming up/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /refresh the songbook/i })).not.toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/search the songbook/i), { target: { value: 'halo' } });
+    });
+    expect(calls.some((call) => call.name === 'catalog-sync')).toBe(false);
+  });
+
+  it('calls an empty search a missed search, not an unsynced catalog', async () => {
+    const { api } = makeEmptyApi({ available: true, added: 0, skipped: 0 });
+    render(<SongbookList api={api} roomId={roomId} canSync />);
+
+    expect(await screen.findByText(/warming up/i)).toBeInTheDocument();
+
+    await act(async () => {
+      fireEvent.change(screen.getByLabelText(/search the songbook/i), { target: { value: 'nothing' } });
+    });
+
+    expect(await screen.findByText(/no song matches/i)).toBeInTheDocument();
+    expect(screen.queryByText(/warming up/i)).not.toBeInTheDocument();
   });
 });
