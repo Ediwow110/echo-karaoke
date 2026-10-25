@@ -109,8 +109,11 @@ five-channel one. `catalog-sync` now returns `unresolved: []` and, when non-empt
 filters by that same id, a drift gate (`tests/unit/catalogChannelContract.test.ts`) now pins the two
 lists together; it was written after the two halves had already drifted apart once.
 
-Also still owed from this class: a `channels.list` HTTP error (as opposed to a missing channel)
-still `continue`s unreported, and a cursor whose channel later disappears is not re-checked.
+Still owed from this class: a cursor whose channel later disappears is not re-checked (the sync
+trusts a stored uploads playlist id forever), and a channel whose *playlist pages* fail mid-walk
+stops that channel quietly. The `channels.list` HTTP error that used to vanish is now reported as
+`unreachable`, kept distinct from `unresolved` so a YouTube outage never sends a host editing a
+handle that is correct (`ea6f25c`).
 
 One more instance of the same disguise was closed in `6a0e938`: the keyless songbook fallback caught
 **every** database error and answered "no results", which is precisely how the missing grants would
