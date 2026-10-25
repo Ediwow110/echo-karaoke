@@ -496,7 +496,12 @@ order; step 1 is the only one that is not a command, and nothing after it is saf
    Expect `401` from the cron — reachable, and rejecting an unauthenticated caller. Then open a
    room as host, press **Refresh the songbook**, and confirm the note reports songs added with no
    "could not find" clause; the first run fills roughly 400 rows from four channels for about 16
-   quota units, and browses afterward cost nothing.
+   quota units, and browses afterward cost nothing. A dead or quota-exhausted key does not look like
+   a failure there — it looks like a refresh that added nothing — so spend one unit before the
+   sixteen: one `channels.list?forHandle` call with the key `YOUTUBE_API_KEY` carries must answer
+   `200` with exactly one item. Measured 2026-10-26: `@musisikaraoke` returns `Musisi Karaoke` with
+   uploads playlist `UUJw1qyMF4m3ZIBWdhogkcsw`, the same id the plan's probe table records. Do it
+   with the key read from the environment rather than typed, so it stays out of shell history.
 
    Before the push, both songbook routes answer **`404` `That operation is not available`** on the
    live origin (measured 2026-10-25). After a correct ship they answer **`401`**, because the
