@@ -664,10 +664,13 @@ and authenticated roles.
 ### What the app-level live proof showed (and what it cost)
 
 Running the real flow with the real key on a disposable Neon branch seeded **409 songs** and walked
-filter → chip → queue → play → auto-advance, which is how 0034's missing grants were found. Do not
-re-run that casually: `catalog-sync` spends real quota and the branch's catalog rows make the
-catalog fixtures in `supabase/tests/catalog_test.sql` fail (they assume a clean table), so reuse a
-branch for the app-level proof only, or expect those four assertions to complain.
+filter → chip → queue → play → auto-advance, which is how 0034's missing grants were found.
+`catalog-sync` spends real quota, so don't re-run it casually. The old follow-on hazard — a branch
+holding catalog rows broke four assertions in `supabase/tests/catalog_test.sql`, which assume they
+are the only songs in the table — is closed: that file now clears the table first, inside its own
+`begin; … rollback;`. It had to be closed, because once the songbook went live **every** CI branch
+inherits the seeded rows from `main`, and the `database` job on `master` went red for exactly that
+reason: four failures, all of them the fixtures meeting real data they never expected.
 
 ## Verification checklist
 

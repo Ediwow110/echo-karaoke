@@ -3,6 +3,13 @@ create extension if not exists pgtap with schema extensions;
 
 select no_plan();
 
+-- Every assertion below counts the table, reads its head, or relies on there
+-- being exactly 5003 rows, so the suite needs a catalog of its own. Since the
+-- songbook went live, a CI branch is created from main and inherits the real
+-- seeded rows, which broke four of them. This delete is safe because the file
+-- runs inside `begin; … rollback;` — nothing below it is ever committed.
+delete from public.karaoke_catalog;
+
 insert into public.karaoke_catalog (video_id, title, channel_title, channel_id, thumbnail_url, published_at)
 values
   ('aaaaaaaaaaa', 'Halo - Beyonce (Karaoke)', 'Musisi Karaoke', 'UC_musisi', null, '2025-01-02T00:00:00Z'),
