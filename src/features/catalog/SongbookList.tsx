@@ -163,6 +163,12 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
       )}
 
       {error === null ? null : <p role="alert" className="text-[0.75rem] text-danger">{error}</p>}
+      {hasLoaded && total > MAX_OFFSET ? (
+        <p role="status" className="text-[0.6875rem] text-ink-2">
+          Showing the first {MAX_OFFSET.toLocaleString('en-US')} songs of {total.toLocaleString('en-US')}
+          . {'Search or pick a channel to reach the rest.'}
+        </p>
+      ) : null}
       {syncNote === null ? null : <p role="status" className="text-[0.75rem] text-ink-2">{syncNote}</p>}
 
       {loadingFirstPage ? (

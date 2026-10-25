@@ -287,4 +287,24 @@ describe('songbook list', () => {
     expect(await screen.findByText(/no song matches/i)).toBeInTheDocument();
     expect(screen.queryByText(/warming up/i)).not.toBeInTheDocument();
   });
+
+  it('says when the songbook is deeper than the list can reach', async () => {
+    // Paging stops at the database's offset clamp, so with a deeper catalog the
+    // header's total is a number the host can never scroll to. The count and
+    // the reachable set must be told apart, not left to diverge silently.
+    const deepApi = {
+      invoke: (async () => ({ total: 5030, items: catalogPage(0).items })) as unknown as EdgeApi['invoke'],
+    };
+    render(<SongbookList api={deepApi} roomId={roomId} />);
+
+    expect(await screen.findByText(/first 5,000 songs/i)).toHaveTextContent('5,030');
+  });
+
+  it('says nothing about a ceiling when the whole catalog fits', async () => {
+    const { api } = makeApi();
+    render(<SongbookList api={api} roomId={roomId} />);
+
+    await waitFor(() => expect(screen.getByText('61 songs')).toBeInTheDocument());
+    expect(screen.queryByText(/first 5,000 songs/i)).not.toBeInTheDocument();
+  });
 });
