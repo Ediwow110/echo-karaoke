@@ -37,6 +37,7 @@ create or replace function public.karaoke_catalog_page(
 )
 returns jsonb
 language sql
+stable
 security definer
 set search_path = ''
 as $$
@@ -143,6 +144,7 @@ $$;
 create or replace function public.karaoke_catalog_cursors()
 returns jsonb
 language sql
+stable
 security definer
 set search_path = ''
 as $$
