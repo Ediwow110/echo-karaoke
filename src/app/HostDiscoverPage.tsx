@@ -12,7 +12,7 @@ import SongSearchPanel from '../features/queue/SongSearchPanel';
 import PopularSongs from '../features/queue/PopularSongs';
 import InviteCard from '../features/rooms/InviteCard';
 import { queueSummary } from '../lib/format';
-import { Button, Chip } from '../ui';
+import { Button } from '../ui';
 import { scrollToElement } from '../features/queue/queueAnchor';
 
 export default function HostDiscoverPage() {
@@ -67,46 +67,17 @@ export default function HostDiscoverPage() {
 
   return (
     <div className="flex flex-col gap-6">
-      <section className="relative overflow-hidden rounded-panel border border-line bg-graphite-deep animate-console-in" aria-labelledby="discover-title">
-        <img
-          src="/images/discover-spotlight.jpg"
-          alt="A singer performing under a warm stage light"
-          width={1600}
-          height={510}
-          fetchPriority="high"
-          className="stage-drift absolute inset-0 h-full w-full object-cover object-[62%_35%]"
+      <div className="animate-console-in" data-host-hero="room-invite">
+        <InviteCard
+          roomName={roomName}
+          code={code}
+          hostName={hostName}
+          joinUrl={joinUrl}
+          guests={players}
+          shareReady={connection === 'live'}
+          className="p-6 sm:p-8"
         />
-        <div className="stage-smoke absolute inset-0" aria-hidden="true" />
-        <div className="absolute inset-0 bg-[linear-gradient(90deg,rgba(16,13,24,0.96)_0%,rgba(16,13,24,0.82)_42%,rgba(16,13,24,0.18)_100%)]" aria-hidden="true" />
-        <div className="relative flex min-h-[19rem] flex-col justify-between gap-8 p-6 sm:min-h-[21rem] sm:p-8">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <Chip tone="gold">{roomName} room</Chip>
-            <Chip tone="dark">Hosted by {hostName}</Chip>
-          </div>
-          <div className="max-w-[34rem]">
-            <h2 id="discover-title" className="font-display text-[clamp(2.3rem,3.6vw,3rem)] font-bold leading-[1] tracking-[-0.04em] text-ink">
-              Sing live from YouTube.
-            </h2>
-            <p className="mt-4 max-w-[42ch] text-[0.8125rem] leading-[1.65] text-ink-2">
-              Search YouTube karaoke tracks, add them to the room queue, and keep the session moving automatically.
-            </p>
-            <div className="mt-6 flex flex-wrap items-center gap-4">
-              <Button
-                variant="primary"
-                size="md"
-                icon={<MicrophoneStageIcon size={16} weight="duotone" />}
-                busy={starting}
-                onClick={() => void startSession()}
-              >
-                {nowPlaying !== null ? 'Take the stage' : upNext.length > 0 ? 'Start this session' : 'Find the first song'}
-              </Button>
-              <span className="text-[0.6875rem] text-ink-2">
-                {queue.length > 0 ? queueSummary(queue) : 'No songs yet · start with a search'}
-              </span>
-            </div>
-          </div>
-        </div>
-      </section>
+      </div>
 
       <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_21.5rem]">
         <div className="flex min-w-0 flex-col gap-6">
@@ -115,7 +86,7 @@ export default function HostDiscoverPage() {
               <div>
                 <p className="eyebrow text-gold">Add the next chorus</p>
                 <h2 id="search-title" className="mt-1 font-display text-[1.65rem] font-bold tracking-[-0.025em] text-ink">
-                  YouTube karaoke search
+                  kara-echo song search
                 </h2>
               </div>
               <p className="text-[0.6875rem] text-ink-2">Powered by YouTube</p>
@@ -132,6 +103,7 @@ export default function HostDiscoverPage() {
                 popularSlot={(
                   <PopularSongs
                     roomId={roomId}
+                    layout="vertical"
                     queuedVideoIds={queue.map((song) => song.videoId)}
                     moreHref={'/room/' + roomId + '/host/songbook'}
                     onAdded={() => { void refresh(); }}
@@ -141,13 +113,6 @@ export default function HostDiscoverPage() {
             </div>
           </section>
 
-          <InviteCard
-            roomName={roomName}
-            code={code}
-            hostName={hostName}
-            joinUrl={joinUrl}
-            guests={roster.length}
-          />
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4 animate-console-in" style={{ animationDelay: '120ms' }} aria-label="Room queue">

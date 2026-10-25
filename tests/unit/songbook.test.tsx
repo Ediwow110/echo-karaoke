@@ -231,6 +231,25 @@ describe('songbook list', () => {
     expect(await screen.findByText('61 songs')).toBeInTheDocument();
   });
 
+  it('lets the host refresh an already populated songbook without clearing the list', async () => {
+    const { api, calls } = makeApi();
+    render(<SongbookList api={api} roomId={roomId} canSync />);
+    expect(await screen.findByText('Halo - Beyonce (Karaoke)')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /refresh the songbook/i }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.name === 'catalog-sync')).toBe(true);
+    });
+    expect(screen.getByText('Halo - Beyonce (Karaoke)')).toBeInTheDocument();
+  });
+
+  it('does not expose a refresh action to guests even when the catalog is populated', async () => {
+    const { api, calls } = makeApi();
+    render(<SongbookList api={api} roomId={roomId} />);
+    expect(await screen.findByText('Halo - Beyonce (Karaoke)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /refresh the songbook/i })).not.toBeInTheDocument();
+    expect(calls.some((call) => call.name === 'catalog-sync')).toBe(false);
+  });
+
   it('shows the host why a refresh added nothing', async () => {
     const { api } = makeEmptyApi({
       available: true, added: 0, skipped: 5, message: 'Songbook refresh paused for today',

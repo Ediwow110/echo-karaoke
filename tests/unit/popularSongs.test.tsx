@@ -49,6 +49,51 @@ function renderStrip(available: boolean, moreHref?: string) {
 }
 
 describe('popular songs', () => {
+  it('shows a useful unavailable state and songbook link for the vertical host panel', async () => {
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    const { container } = render(
+      createElement(RoomApiProvider, {
+        api: fakeApi(false),
+        children: createElement(MemoryRouter, null,
+          createElement(PopularSongs, {
+            roomId, layout: 'vertical', moreHref: '/room/' + roomId + '/host/songbook',
+          })),
+      }),
+    );
+    expect(await screen.findByText(/popular suggestions are unavailable right now/i)).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /browse the songbook/i }))
+      .toHaveAttribute('href', '/room/' + roomId + '/host/songbook');
+    expect(container.querySelector('[data-layout="vertical"]')).not.toBeNull();
+  });
+
+  it('reports an upstream error on the host without inventing suggestions', async () => {
+    const api: EdgeApi = {
+      invoke: (async () => { throw new Error('upstream failed'); }) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    render(createElement(RoomApiProvider, {
+      api, children: createElement(MemoryRouter, null,
+        createElement(PopularSongs, { roomId, layout: 'vertical' })),
+    }));
+    expect(await screen.findByText(/popular suggestions could not be loaded/i)).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /^queue /i })).not.toBeInTheDocument();
+  });
+
+  it('supports a keyboard-scrollable vertical host suggestion list', async () => {
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    const { container } = render(
+      createElement(RoomApiProvider, {
+        api: fakeApi(true),
+        children: createElement(MemoryRouter, null,
+          createElement(PopularSongs, { roomId, layout: 'vertical' })),
+      }),
+    );
+    await screen.findByRole('button', { name: /queue dancing queen/i });
+    const list = container.querySelector('[data-layout="vertical"]');
+    expect(list).toHaveAttribute('tabindex', '0');
+    expect(list?.className).toContain('overflow-y-auto');
+    expect(screen.queryByRole('button', { name: /next popular karaoke songs/i })).not.toBeInTheDocument();
+  });
   it('offers each suggestion as a queue button', async () => {
     renderStrip(true);
     const button = await screen.findByRole('button', { name: /queue dancing queen/i });

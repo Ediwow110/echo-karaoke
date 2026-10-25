@@ -144,6 +144,39 @@ async function openGuestSearch(page: Page): Promise<void> {
   await page.waitForSelector('ul[aria-label="Songs"] li');
 }
 
+test('host player uses a visible minimum-sized desktop frame and parks it on mobile queue', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/queue', { waitUntil: 'networkidle' });
+  const player = page.locator('[data-host-player]');
+  await expect(player).toBeVisible();
+  const desktop = await player.boundingBox();
+  expect(desktop).not.toBeNull();
+  expect(desktop!.width).toBeGreaterThanOrEqual(200);
+  expect(desktop!.height).toBeGreaterThanOrEqual(200);
+  const videoArea = await player.locator('[data-youtube-frame]').boundingBox();
+  expect(videoArea).not.toBeNull();
+  expect(videoArea!.width).toBeGreaterThanOrEqual(200);
+  expect(videoArea!.height).toBeGreaterThanOrEqual(200);
+  // The handle must be outside the video, not covering its top edge.
+  expect(videoArea!.y).toBeGreaterThanOrEqual(desktop!.y + 40);
+
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(player).toHaveCSS('opacity', '0');
+  await expect(player).toHaveAttribute('aria-hidden', 'true');
+});
+
+test('host can refresh a populated songbook without losing existing songs', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/room/' + ROOM + '/host/songbook', { waitUntil: 'networkidle' });
+  await expect(page.getByText('Halo - Beyonce (Karaoke)')).toBeVisible();
+  const refresh = page.getByRole('button', { name: 'Refresh the songbook' });
+  await expect(refresh).toBeVisible();
+  await refresh.click();
+  await expect(page.getByText('Halo - Beyonce (Karaoke)')).toBeVisible();
+  await expect(refresh).toBeEnabled();
+});
+
 async function undersized(page: Page) {
   return page.evaluate(() => [...document.querySelectorAll('button, input, a[href], [role="button"]')]
     .filter((element) => {
@@ -178,6 +211,43 @@ test('home uses the shorter edge for the device class', async ({ page }) => {
   await page.setViewportSize({ width: 1024, height: 600 });
   await page.goto('/', { waitUntil: 'networkidle' });
   await expect(page.getByRole('heading', { level: 1, name: /join the room/i })).toBeVisible();
+});
+
+test('host creation warns and blocks automatic retries after an uncertain server response', async ({ page }) => {
+  let attempts = 0;
+  await page.route('**/api/**', async (route) => {
+    const path = new URL(route.request().url()).pathname;
+    if (path.endsWith('/api/auth/token')) {
+      await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ token: 'mock-jwt' }) });
+      return;
+    }
+    if (path.endsWith('/api/create-room')) {
+      attempts += 1;
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({
+        error: { code: 'INTERNAL_ERROR', message: 'Server unavailable' },
+      }) });
+      return;
+    }
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
+  });
+  await page.setViewportSize({ width: 1024, height: 800 });
+  await page.goto('/', { waitUntil: 'networkidle' });
+  await page.getByLabel('Your name').fill('Alex');
+  await page.getByRole('button', { name: 'Create room' }).click();
+  await expect(page.getByRole('alert')).toContainText('may have been created');
+  await expect(page.getByRole('button', { name: 'Create room' })).toBeDisabled();
+  await page.getByLabel('Room name').fill('Different room');
+  expect(attempts).toBe(1);
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.getByRole('alert')).toContainText('may have been created');
+  await expect(page.getByRole('button', { name: 'Create room' })).toBeDisabled();
+  expect(attempts).toBe(1);
+  await page.getByRole('button', { name: 'Create another room anyway' }).click();
+  expect(attempts).toBe(1);
+  await page.getByLabel('Your name').fill('Alex');
+  await page.getByRole('button', { name: 'Create room' }).click();
+  await expect(page.getByRole('alert')).toContainText('may have been created');
+  expect(attempts).toBe(2);
 });
 
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
@@ -269,6 +339,69 @@ test('host opens the songbook from the karaoke strip and queues a song', async (
   const adds = commands.filter((command) => command.action === 'add');
   expect(adds).toHaveLength(1);
   expect(adds[0]).toMatchObject({ action: 'add', videoId: 'video000000', roomId: ROOM });
+});
+
+test('host discover shows one live QR invite in the hero and scrollable vertical song suggestions', async ({ page }) => {
+  const popular = Array.from({ length: 8 }, (_, index) => ({
+    videoId: 'karaoke' + String(index).padStart(4, '0'),
+    title: 'Karaoke Pick ' + (index + 1),
+    channelTitle: 'Music Channel',
+    thumbnailUrl: null,
+    durationSeconds: null,
+  }));
+  await mockApi(page, true, [], () => false, popular);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+
+  const hero = page.locator('[data-host-hero="room-invite"]');
+  await expect(hero.getByRole('region', { name: 'Invite your people' })).toBeVisible();
+  await expect(page.getByText('Sing live from YouTube.')).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(1);
+  const list = page.getByRole('list', { name: 'Popular karaoke songs' });
+  await expect(list).toHaveAttribute('data-layout', 'vertical');
+  await expect.poll(async () => list.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
+  await list.focus();
+  await page.keyboard.press('End');
+  await expect.poll(async () => list.evaluate((node) => node.scrollTop)).toBeGreaterThan(0);
+  await expect(page.locator('html')).toHaveAttribute('lang', 'en');
+});
+
+test('host QR payload points to the actual guest join route with its live room code', async ({ page }) => {
+  await mockApi(page);
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+  const hero = page.locator('[data-host-hero="room-invite"]');
+  const actualJoinUrl = new URL('/join/ABCDEFGHJKMNPQRS', page.url()).toString();
+  await expect(hero.locator('img[data-join-url]')).toHaveAttribute('data-join-url', actualJoinUrl);
+  await page.goto(actualJoinUrl, { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'Join the room.' })).toBeVisible();
+  await expect(page.getByLabel('Room code')).toHaveValue('ABCDEFGHJKMNPQRS');
+  await expect(page.getByLabel('Your name')).toBeVisible();
+});
+
+test('host QR hero and vertical suggestions fit phone/tablet widths and 200 percent text', async ({ page }) => {
+  const popular = Array.from({ length: 8 }, (_, index) => ({
+    videoId: 'karaoke' + String(index).padStart(4, '0'),
+    title: 'A long karaoke suggestion title to test narrow screens ' + index,
+    channelTitle: 'A karaoke creator',
+    thumbnailUrl: null,
+    durationSeconds: null,
+  }));
+  await mockApi(page, true, [], () => false, popular);
+  for (const [width, height] of [[390, 844], [768, 1024]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+    const hero = page.locator('[data-host-hero="room-invite"]');
+    await expect(hero.getByRole('region', { name: 'Invite your people' })).toBeVisible();
+    const list = page.getByRole('list', { name: 'Popular karaoke songs' });
+    await expect(list).toHaveAttribute('data-layout', 'vertical');
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+      .toBeLessThanOrEqual(1);
+  }
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  const invite = page.locator('[data-host-hero="room-invite"]');
+  await expect(invite.getByRole('region', { name: 'Invite your people' })).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(1);
 });
 
 test('guest queue does not promise auto-advance while the host is offline', async ({ page }) => {

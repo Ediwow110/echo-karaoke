@@ -18,6 +18,7 @@ type PopularResponse = {
 
 export type PopularSongsProps = {
   roomId: string;
+  layout?: 'horizontal' | 'vertical';
   disabled?: boolean;
   queuedVideoIds?: string[];
   moreHref?: string;
@@ -28,12 +29,13 @@ export type PopularSongsProps = {
  * The live YouTube music chart, so a guest can queue a song without typing.
  * Without an API key on the server the strip stays hidden.
  */
-export default function PopularSongs({ roomId, disabled = false, queuedVideoIds = [], moreHref, onAdded }: PopularSongsProps) {
+export default function PopularSongs({ roomId, layout = 'horizontal', disabled = false, queuedVideoIds = [], moreHref, onAdded }: PopularSongsProps) {
   const api = useRoomApi();
   const [songs, setSongs] = useState<SearchResult[]>([]);
   const [queued, setQueued] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
   const [error, setError] = useState<string | null>(null);
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
   const [canPrevious, setCanPrevious] = useState(false);
   const [canNext, setCanNext] = useState(false);
   const [overflowing, setOverflowing] = useState(false);
@@ -42,22 +44,29 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
 
   useEffect(() => {
     let cancelled = false;
+    setLoadState('loading');
+    setSongs([]);
     const guestToken = loadGuestToken(roomId);
     const hostToken = loadHostToken(roomId);
     const tokens = guestToken !== null ? { guestToken } : hostToken !== null ? { hostToken } : null;
     if (tokens === null) {
+      setLoadState('unavailable');
       return;
     }
 
     void api
       .invoke<PopularResponse>('youtube-popular', { roomId }, tokens)
       .then((response) => {
-        if (!cancelled && response.available === true) {
-          setSongs(response.results ?? []);
+        if (!cancelled) {
+          setSongs(response.available === true ? response.results ?? [] : []);
+          setLoadState(response.available === true ? 'ready' : 'unavailable');
         }
       })
       .catch(() => {
-        // The chart is optional; search and the library still work without it.
+        if (!cancelled) {
+          setSongs([]);
+          setLoadState('error');
+        }
       });
 
     return () => {
@@ -130,7 +139,30 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
   }, []);
 
   if (songs.length === 0) {
-    return null;
+    // The guest's optional horizontal carousel can disappear as before, but
+    // the host's vertical discovery panel must explain its real data state.
+    if (layout === 'horizontal') return null;
+    return (
+      <section data-suggestions data-layout="vertical" aria-label="Popular karaoke">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="eyebrow text-ink-2">Popular karaoke</p>
+          {moreHref === undefined ? null : (
+            <Link to={moreHref} className="inline-flex min-h-11 items-center text-[0.6875rem] font-semibold text-signal hover:underline">
+              Browse the songbook
+            </Link>
+          )}
+        </div>
+        <p role="status" className="mt-3 rounded-media border border-line bg-surface-2 px-4 py-4 text-[0.75rem] leading-[1.6] text-ink-2">
+          {loadState === 'loading'
+            ? 'Loading popular karaoke suggestions…'
+            : loadState === 'error'
+              ? 'Popular suggestions could not be loaded. Search for a song or try the songbook.'
+              : loadState === 'unavailable'
+                ? 'Popular suggestions are unavailable right now. Search for a song or browse the songbook.'
+                : 'No popular songs to suggest right now. Try searching for a song.'}
+        </p>
+      </section>
+    );
   }
 
   return (
@@ -146,26 +178,28 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
         )}
       </div>
       <div className="relative">
-      <ul id={listId} ref={listRef} aria-label="Popular karaoke songs" className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-1">
+      <ul id={listId} ref={listRef} aria-label="Popular karaoke songs" data-layout={layout} tabIndex={layout === 'vertical' ? 0 : undefined} className={layout === 'vertical'
+        ? 'flex max-h-[27rem] flex-col gap-2 overflow-y-auto overscroll-contain rounded-media pr-2 focus-visible:outline-2 focus-visible:outline-signal'
+        : 'no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-1'}>
         {songs.slice(0, 8).map((song) => {
           const isQueued = queuedVideoIds.includes(song.videoId) || added.includes(song.videoId);
           const busy = queued === song.videoId;
           return (
-            <li key={song.videoId} className="w-[9.75rem] shrink-0">
+            <li key={song.videoId} className={layout === 'vertical' ? 'w-full min-w-0' : 'w-[9.75rem] shrink-0'}>
               <button
                 type="button"
                 onClick={() => void queue(song.videoId)}
                 disabled={disabled || isQueued || queued !== null}
                 aria-label={isQueued ? song.title + ' is already queued' : 'Queue ' + song.title}
-                className="group w-full overflow-hidden rounded-panel border border-line bg-surface text-left transition-[border-color,translate,scale] duration-200 hover:-translate-y-0.5 hover:border-line-strong active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-70"
+                className={['group w-full overflow-hidden rounded-panel border border-line bg-surface text-left transition-[border-color,translate,scale] duration-200 hover:border-line-strong active:scale-[0.985] focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal disabled:pointer-events-none disabled:opacity-70', layout === 'vertical' ? 'flex items-center gap-3 p-2' : ''].join(' ')}
               >
-                <span className="relative block aspect-video w-full overflow-hidden bg-surface-3">
+                <span className={layout === 'vertical' ? 'relative block h-[4.5rem] w-32 shrink-0 overflow-hidden rounded-media bg-surface-3' : 'relative block aspect-video w-full overflow-hidden bg-surface-3'}>
                   <SongArtwork src={song.thumbnailUrl} className="h-full w-full" rounded="none" iconSize={20} />
                   <span className="absolute bottom-1.5 right-1.5 grid size-7 place-items-center rounded-full bg-graphite-deep/85 text-ink">
                     {isQueued ? <CheckIcon size={14} weight="bold" aria-hidden="true" /> : <PlusIcon size={14} weight="bold" aria-hidden="true" />}
                   </span>
                 </span>
-                <span className="block p-2.5">
+                <span className={layout === 'vertical' ? 'block min-w-0 flex-1 p-1' : 'block p-2.5'}>
                   <span className="block truncate text-[0.75rem] font-semibold text-ink">{song.title}</span>
                   <span className="mt-0.5 block truncate text-[0.625rem] text-ink-2">{busy ? 'Adding…' : song.channelTitle ?? 'YouTube'}</span>
                 </span>
@@ -174,7 +208,7 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
           );
         })}
       </ul>
-      {overflowing ? (
+      {layout === 'horizontal' && overflowing ? (
         <>
           <button
             type="button"

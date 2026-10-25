@@ -124,6 +124,16 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
           />
         </label>
         <p role="status" className="text-[0.6875rem] text-ink-2">{hasLoaded ? total + ' songs' : ''}</p>
+        {canSync ? (
+          <button
+            type="button"
+            onClick={() => { void refresh(); }}
+            disabled={syncing || busy}
+            className="min-h-11 rounded-media border border-line bg-surface px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2 disabled:opacity-50"
+          >
+            {syncing ? 'Refreshing…' : 'Refresh the songbook'}
+          </button>
+        ) : null}
       </div>
 
       {channels === undefined || channels.length === 0 ? null : (
@@ -153,6 +163,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
       )}
 
       {error === null ? null : <p role="alert" className="text-[0.75rem] text-danger">{error}</p>}
+      {syncNote === null ? null : <p role="status" className="text-[0.75rem] text-ink-2">{syncNote}</p>}
 
       {loadingFirstPage ? (
         <div className="py-6 text-center">
@@ -164,17 +175,6 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
           <p className="w-full rounded-panel border border-line bg-surface px-4 py-6 text-center text-[0.8125rem] text-ink-2">
             {filtering ? 'No song matches that search.' : 'The songbook is warming up. Ask the host to refresh it.'}
           </p>
-          {syncNote === null ? null : <p role="status" className="text-[0.75rem] text-ink-2">{syncNote}</p>}
-          {canSync && !filtering ? (
-            <button
-              type="button"
-              onClick={() => { void refresh(); }}
-              disabled={syncing || busy}
-              className="min-h-11 rounded-media border border-line bg-surface px-4 text-[0.8125rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2 disabled:opacity-50"
-            >
-              {syncing ? 'Refreshing…' : 'Refresh the songbook'}
-            </button>
-          ) : null}
         </div>
       ) : (
         // Refetches keep the rows already on screen and mark them busy instead
