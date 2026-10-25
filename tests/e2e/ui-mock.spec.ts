@@ -93,6 +93,33 @@ async function mockApi(
         ? { available: false, results: [], message: 'off' }
         : { available: true, results: popularResults };
     }
+    else if (path.endsWith('/api/catalog-page')) {
+      const items = Array.from({ length: 30 }, (_, index) => ({
+        videoId: 'video' + String(index).padStart(6, '0'),
+        title: index === 0 ? 'Halo - Beyonce (Karaoke)' : 'Song ' + index + ' (Karaoke)',
+        channelTitle: 'Musisi Karaoke',
+        thumbnailUrl: null,
+        publishedAt: '2025-01-02T00:00:00Z',
+      }));
+      body = { total: 31, items: (route.request().postDataJSON() as { query?: string }).query === 'halo' ? items.slice(0, 1) : items };
+    }
+    else if (path.endsWith('/api/queue-command')) {
+      const command = route.request().postDataJSON() as { action?: string; videoId?: string };
+      commands.push(command);
+      body = {
+        songId: 's3',
+        videoId: command.videoId ?? 'video000000',
+        title: 'Halo - Beyonce (Karaoke)',
+        channelTitle: 'Musisi Karaoke',
+        thumbnailUrl: null,
+        durationSeconds: null,
+        status: 'queued',
+        position: 3,
+        memberId: 'm1',
+        addedBy: 'Ana',
+        voteCount: 0,
+      };
+    }
     else if (path.endsWith('/api/playback-report')) body = room(hostOnline).playback;
     else if (path.endsWith('/api/playback-command')) {
       commands.push(route.request().postDataJSON() as { action?: string });
@@ -205,6 +232,30 @@ test('popular karaoke strip slides with previous and next controls', async ({ pa
   await previous.click();
   await expect.poll(async () => strip.evaluate((element) => element.scrollLeft)).toBe(0);
   await expect(previous).toBeDisabled();
+});
+
+test('host opens the songbook from the karaoke strip and queues a song', async ({ page }) => {
+  const popular = [1, 2, 3].map((index) => ({
+    videoId: 'popular' + index,
+    title: 'Karaoke Song ' + index,
+    channelTitle: 'Karaoke Channel',
+    thumbnailUrl: null,
+    durationSeconds: null,
+  }));
+  const commands: Array<{ action?: string }> = [];
+  await mockApi(page, true, commands, () => false, popular);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+
+  await page.getByRole('link', { name: 'View more' }).click();
+  await expect(page).toHaveURL(new RegExp('/host/songbook$'));
+  await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
+
+  await page.getByLabel('Search the songbook').fill('halo');
+  await expect(page.getByText('Halo - Beyonce (Karaoke)')).toBeVisible();
+
+  await page.getByRole('button', { name: 'Add Halo - Beyonce (Karaoke)' }).click();
+  await expect.poll(() => commands.filter((command) => command.action === 'add').length).toBe(1);
 });
 
 test('guest queue does not promise auto-advance while the host is offline', async ({ page }) => {
