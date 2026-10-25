@@ -1,4 +1,4 @@
-import { useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Link, useNavigate } from 'react-router-dom';
 import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
@@ -12,12 +12,78 @@ import { createRoom, joinRoom } from '../features/rooms/roomApi';
 import { isValidRoomCode, normalizeRoomCode } from '../features/rooms/roomCode';
 import { getStoredProfileName, getHostSessionByCode, rememberSession, saveProfileName } from '../features/rooms/sessionStore';
 import { RoomApiError } from '../lib/edgeApi';
+import { saveGuestToken, saveHostToken } from '../features/rooms/tokenStore';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import AppShell from '../features/rooms/AppShell';
 import { Avatar, Button, Field, Logo, Toggle } from '../ui';
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Try again.';
+}
+
+const UNCERTAIN_CREATE_MESSAGE =
+  'Your room may have been created, but kara-echo could not confirm it. Check any other open host tabs before creating another room. A new attempt might create a duplicate room.';
+const UNCERTAIN_CREATE_KEY = 'karaoke.create-uncertain.v1';
+
+function readCreateUncertainty(): boolean {
+  try {
+    return sessionStorage.getItem(UNCERTAIN_CREATE_KEY) !== null;
+  } catch {
+    // Browsers may deny storage. Retain the in-memory warning for the
+    // current page but do not claim that it survives a reload.
+    return false;
+  }
+}
+
+function persistCreateUncertainty(): void {
+  try {
+    // The marker contains no room identifiers, host names or bearer passes.
+    sessionStorage.setItem(UNCERTAIN_CREATE_KEY, '1');
+  } catch {
+    // Fail closed on the currently mounted screen even if storage is denied.
+  }
+}
+
+function clearCreateUncertainty(): void {
+  try {
+    sessionStorage.removeItem(UNCERTAIN_CREATE_KEY);
+  } catch {
+    // The in-memory flag is still cleared after explicit acknowledgment.
+  }
+}
+
+function isUncertainCreateError(error: unknown): boolean {
+  // Timeouts, transport errors, and server failures do not establish that
+  // database creation was rolled back. Unknown errors also fail closed.
+  return !(error instanceof RoomApiError)
+    || error.code === 'NETWORK_ERROR'
+    || error.status === 0
+    || error.status === 408
+    || error.status >= 500;
+}
+
+function CreateFeedback({ error, uncertain, onAcknowledge }: {
+  error: string | null;
+  uncertain: boolean;
+  onAcknowledge: () => void;
+}) {
+  if (!uncertain && error === null) return null;
+  return (
+    <div className="mt-4 rounded-media border border-danger/30 bg-danger-soft/50 px-3.5 py-3">
+      <p role="alert" className="text-[0.8125rem] leading-[1.6] text-danger">
+        {uncertain ? UNCERTAIN_CREATE_MESSAGE : error}
+      </p>
+      {uncertain ? (
+        <button
+          type="button"
+          onClick={onAcknowledge}
+          className="mt-3 inline-flex min-h-11 items-center rounded-media border border-danger/40 px-3 text-[0.75rem] font-semibold text-danger hover:bg-danger-soft focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+        >
+          Create another room anyway
+        </button>
+      ) : null}
+    </div>
+  );
 }
 
 const steps = [
@@ -46,24 +112,66 @@ export default function HomePage() {
   const [guestName, setGuestName] = useState(hostNameDefault);
   const [hostNameError, setHostNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [createUncertain, setCreateUncertain] = useState(readCreateUncertainty);
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
+  const joinGeneration = useRef(0);
+  const joinSubmitting = useRef(false);
+  const createGeneration = useRef(0);
+  const createSubmitting = useRef(false);
+
+  useEffect(() => {
+    return () => {
+      // Leaving the home screen invalidates responses for an older invite.
+      joinGeneration.current += 1;
+      joinSubmitting.current = false;
+      createGeneration.current += 1;
+      createSubmitting.current = false;
+    };
+  }, []);
+
+  function invalidatePendingJoin(): void {
+    joinGeneration.current += 1;
+    joinSubmitting.current = false;
+    setBusy((current) => current === 'join' ? null : current);
+  }
+
+  function invalidatePendingCreate(): void {
+    createGeneration.current += 1;
+    // Do not unlock an already-sent create request merely because an input
+    // changed. Otherwise another submit can create a second server room.
+    if (!createSubmitting.current) {
+      setBusy((current) => current === 'create' ? null : current);
+    }
+  }
 
   async function handleCreate(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (createSubmitting.current || createUncertain) return;
     setError(null);
     setHostNameError(null);
     if (hostName.trim().length === 0) {
       setHostNameError('Add the name guests will see.');
       return;
     }
+    createSubmitting.current = true;
+    const generation = ++createGeneration.current;
     setBusy('create');
+    // Mark the intent before the network request. If this tab reloads while
+    // SQL is still running, a missing response must not silently unlock a
+    // second room creation.
+    persistCreateUncertainty();
     try {
       const finalName = roomName.trim().length > 0 ? roomName.trim() : hostName.trim() + "'s room";
       const created = await createRoom({ api }, hostName, {
         roomName: finalName,
         guestsCanAdd,
         guestsCanControlPlayback: guestPlayback,
-      });
+      }, { storeTokens: false });
+      if (createGeneration.current !== generation) return;
+      // Only a current, validated success confirms the created room.
+      clearCreateUncertainty();
+      saveGuestToken(created.roomId, created.guestToken);
+      saveHostToken(created.roomId, created.hostToken);
       saveProfileName(created.displayName);
       rememberSession({
         roomId: created.roomId,
@@ -74,22 +182,41 @@ export default function HomePage() {
       });
       navigate('/room/' + created.roomId + '/host');
     } catch (caught) {
-      setError(describeError(caught));
+      if (createGeneration.current !== generation) return;
+      if (isUncertainCreateError(caught)) {
+        persistCreateUncertainty();
+        setCreateUncertain(true);
+        setError(null);
+      } else {
+        clearCreateUncertainty();
+        setError(describeError(caught));
+      }
     } finally {
-      setBusy(null);
+      createSubmitting.current = false;
+      // A stale create may finish after the user switched to joining:
+      // never clear a newer guest-join busy state.
+      if (createGeneration.current === generation) setBusy(null);
+      else setBusy((current) => current === 'create' ? null : current);
     }
   }
 
   async function handleJoin(event: FormEvent<HTMLFormElement>): Promise<void> {
     event.preventDefault();
+    if (joinSubmitting.current) return;
     setError(null);
     if (!isValidRoomCode(joinCode)) {
       setError('That room code is not sixteen characters.');
       return;
     }
+    joinSubmitting.current = true;
+    const generation = ++joinGeneration.current;
     setBusy('join');
     try {
-      const joined = await joinRoom({ api }, joinCode, guestName);
+      // The old guest pass must not be stored after the code, page or mode
+      // changes while a join request is in flight.
+      const joined = await joinRoom({ api }, joinCode, guestName, { storeToken: false });
+      if (joinGeneration.current !== generation) return;
+      saveGuestToken(joined.roomId, joined.guestToken);
       saveProfileName(joined.displayName);
       rememberSession({
         roomId: joined.roomId,
@@ -100,6 +227,7 @@ export default function HomePage() {
       });
       navigate('/room/' + joined.roomId);
     } catch (caught) {
+      if (joinGeneration.current !== generation) return;
       if (caught instanceof RoomApiError && caught.code === 'HOST_ALREADY_IN_ROOM') {
         const hostSession = getHostSessionByCode(joinCode);
         if (hostSession !== null) {
@@ -109,7 +237,10 @@ export default function HomePage() {
       }
       setError(describeError(caught));
     } finally {
-      setBusy(null);
+      if (joinGeneration.current === generation) {
+        joinSubmitting.current = false;
+        setBusy(null);
+      }
     }
   }
 
@@ -137,7 +268,10 @@ export default function HomePage() {
                 id="join-code"
                 label="Room code"
                 value={joinCode}
-                onChange={(event) => setJoinCode(normalizeRoomCode(event.target.value))}
+                onChange={(event) => {
+                  invalidatePendingJoin();
+                  setJoinCode(normalizeRoomCode(event.target.value));
+                }}
                 placeholder="ABCD EFGH JKMN PQRS"
                 autoComplete="off"
                 spellCheck={false}
@@ -149,7 +283,10 @@ export default function HomePage() {
                 id="join-name"
                 label="Your name"
                 value={guestName}
-                onChange={(event) => setGuestName(event.target.value)}
+                onChange={(event) => {
+                  invalidatePendingJoin();
+                  setGuestName(event.target.value);
+                }}
                 placeholder="Jamie"
                 autoComplete="nickname"
                 maxLength={32}
@@ -179,7 +316,10 @@ export default function HomePage() {
                 id="mobile-room-name"
                 label="Room name"
                 value={roomName}
-                onChange={(event) => setRoomName(event.target.value)}
+                onChange={(event) => {
+                  invalidatePendingCreate();
+                  setRoomName(event.target.value);
+                }}
                 placeholder="After Hours"
                 maxLength={48}
                 hint="Guests see this on their phone."
@@ -188,7 +328,10 @@ export default function HomePage() {
                 id="mobile-host-name"
                 label="Your name"
                 value={hostName}
-                onChange={(event) => setHostName(event.target.value)}
+                onChange={(event) => {
+                  invalidatePendingCreate();
+                  setHostName(event.target.value);
+                }}
                 placeholder="Alex"
                 autoComplete="nickname"
                 maxLength={32}
@@ -201,6 +344,7 @@ export default function HomePage() {
                 full
                 icon={<PlusIcon size={16} weight="bold" />}
                 busy={busy === 'create'}
+                disabled={createUncertain}
               >
                 Create room
               </Button>
@@ -211,15 +355,21 @@ export default function HomePage() {
             )}
           </div>
 
-          {error === null ? null : (
-            <p role="alert" className="mt-4 rounded-media border border-danger/30 bg-danger-soft/50 px-3.5 py-2.5 text-[0.8125rem] text-danger">
-              {error}
-            </p>
-          )}
+          <CreateFeedback
+            error={error}
+            uncertain={mode === 'host' && createUncertain}
+            onAcknowledge={() => {
+              clearCreateUncertainty();
+              setCreateUncertain(false);
+              setError(null);
+            }}
+          />
 
           <button
             type="button"
             onClick={() => {
+              invalidatePendingJoin();
+              invalidatePendingCreate();
               setMode(mode === 'join' ? 'host' : 'join');
               setError(null);
             }}
@@ -280,7 +430,10 @@ export default function HomePage() {
                 id="create-room-name"
                 label="Room name"
                 value={roomName}
-                onChange={(event) => setRoomName(event.target.value)}
+                onChange={(event) => {
+                  invalidatePendingCreate();
+                  setRoomName(event.target.value);
+                }}
                 placeholder="After Hours"
                 maxLength={48}
                 hint="This is the name guests see on their phone."
@@ -290,6 +443,7 @@ export default function HomePage() {
                 label="Your name"
                 value={hostName}
                 onChange={(event) => {
+                  invalidatePendingCreate();
                   setHostName(event.target.value);
                   setHostNameError(null);
                 }}
@@ -344,17 +498,22 @@ export default function HomePage() {
               className="mt-5"
               icon={<ArrowRightIcon size={16} weight="bold" />}
               busy={busy === 'create'}
+              disabled={createUncertain}
             >
               Create room
             </Button>
             <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
               Next: search for your first song, start YouTube playback and share your room QR. The host screen owns the music.
             </p>
-            {error === null ? null : (
-              <p role="alert" className="mt-3 rounded-media border border-danger/30 bg-danger-soft/50 px-3.5 py-2.5 text-[0.8125rem] text-danger">
-                {error}
-              </p>
-            )}
+            <CreateFeedback
+              error={error}
+              uncertain={createUncertain}
+              onAcknowledge={() => {
+                clearCreateUncertainty();
+                setCreateUncertain(false);
+                setError(null);
+              }}
+            />
           </form>
 
           <aside className="animate-console-in flex flex-col overflow-hidden rounded-panel border border-line bg-surface" style={{ animationDelay: '180ms' }}>

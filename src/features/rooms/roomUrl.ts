@@ -13,8 +13,14 @@ export function readJoinCodeFromPath(pathname: string): string | null {
     return null;
   }
 
-  const code = normalizeRoomCode(decodeURIComponent(segments[1]));
-  return isValidRoomCode(code) ? code : null;
+  try {
+    const decoded = decodeURIComponent(segments[1]);
+    if (!/^[A-Za-z0-9\s-]+$/.test(decoded)) return null;
+    const code = normalizeRoomCode(decoded);
+    return isValidRoomCode(code) ? code : null;
+  } catch {
+    return null;
+  }
 }
 
 export function readRoomIdFromPath(pathname: string): string | null {
@@ -23,7 +29,12 @@ export function readRoomIdFromPath(pathname: string): string | null {
     return null;
   }
 
-  const roomId = decodeURIComponent(segments[1]);
+  let roomId: string;
+  try {
+    roomId = decodeURIComponent(segments[1]);
+  } catch {
+    return null;
+  }
   if (!ROOM_ID.test(roomId)) {
     return null;
   }

@@ -1,6 +1,6 @@
 import type { EdgeApi } from '../../lib/edgeApi';
 import { normalizeDisplayName } from './displayName';
-import { normalizeRoomCode } from './roomCode';
+import { isValidRoomCode, normalizeRoomCode } from './roomCode';
 import { loadGuestToken, loadHostToken, saveGuestToken, saveHostToken } from './tokenStore';
 
 export type CreatedRoom = {
@@ -24,6 +24,68 @@ export type JoinedRoom = {
   guestToken: string;
 };
 
+const ROOM_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
+
+/** A successful create-room response is not proof that its bearer data is usable. */
+function verifyCreatedRoom(value: unknown): CreatedRoom {
+  const invalid = (): never => {
+    throw new Error('Could not verify the created room. Please check your rooms before trying again.');
+  };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return invalid();
+  const room = value as Record<string, unknown>;
+  if (typeof room.roomId !== 'string' || !ROOM_UUID.test(room.roomId)
+    || typeof room.roomCode !== 'string' || !isValidRoomCode(room.roomCode)
+    || typeof room.roomName !== 'string' || room.roomName.trim().length === 0
+    || typeof room.memberId !== 'string' || !ROOM_UUID.test(room.memberId)
+    || typeof room.displayName !== 'string' || room.displayName.trim().length === 0
+    || room.role !== 'host'
+    || typeof room.guestToken !== 'string' || room.guestToken.length === 0
+    || typeof room.hostToken !== 'string' || room.hostToken.length === 0) return invalid();
+  return {
+    roomId: room.roomId,
+    roomCode: room.roomCode,
+    roomName: room.roomName,
+    memberId: room.memberId,
+    displayName: room.displayName,
+    role: 'host',
+    guestToken: room.guestToken,
+    hostToken: room.hostToken,
+  };
+}
+
+/**
+ * Treat successful HTTP responses as untrusted until the expected guest
+ * identity and requested room code have been verified. Never include a
+ * malformed response (which may contain a bearer pass) in error text.
+ */
+function verifyJoinedRoom(value: unknown, requestedCode: string): JoinedRoom {
+  const invalid = (): never => {
+    throw new Error('Could not verify this room invitation. Please try again.');
+  };
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return invalid();
+  const room = value as Record<string, unknown>;
+  if (typeof room.roomId !== 'string' || !ROOM_UUID.test(room.roomId)
+    || typeof room.roomCode !== 'string'
+    || !isValidRoomCode(normalizeRoomCode(room.roomCode))
+    || normalizeRoomCode(room.roomCode) !== requestedCode
+    || typeof room.roomName !== 'string'
+    || typeof room.memberId !== 'string' || room.memberId.trim().length === 0
+    || typeof room.displayName !== 'string' || room.displayName.trim().length === 0
+    || room.role !== 'guest'
+    || typeof room.guestToken !== 'string' || room.guestToken.length === 0) {
+    return invalid();
+  }
+  return {
+    roomId: room.roomId,
+    roomCode: requestedCode,
+    roomName: room.roomName,
+    memberId: room.memberId,
+    displayName: room.displayName,
+    role: 'guest',
+    guestToken: room.guestToken,
+  };
+}
+
 export type RoomDeps = {
   api: EdgeApi;
   randomGuestNumber?: () => number;
@@ -39,17 +101,21 @@ export async function createRoom(
   deps: RoomDeps,
   displayName: string,
   options: CreateRoomOptions = {},
+  persist: { storeTokens?: boolean } = {},
 ): Promise<CreatedRoom> {
   const normalized = normalizeDisplayName(displayName, deps.randomGuestNumber?.());
-  const created = await deps.api.invoke<CreatedRoom>('create-room', {
+  const response = await deps.api.invoke<unknown>('create-room', {
     displayName: normalized,
     roomName: options.roomName ?? '',
     guestsCanAdd: options.guestsCanAdd ?? true,
     guestsCanControlPlayback: options.guestsCanControlPlayback ?? false,
   });
+  const created = verifyCreatedRoom(response);
 
-  saveGuestToken(created.roomId, created.guestToken);
-  saveHostToken(created.roomId, created.hostToken);
+  if (persist.storeTokens !== false) {
+    saveGuestToken(created.roomId, created.guestToken);
+    saveHostToken(created.roomId, created.hostToken);
+  }
 
   return created;
 }
@@ -58,16 +124,20 @@ export async function joinRoom(
   deps: RoomDeps,
   code: string,
   displayName: string,
+  options: { storeToken?: boolean } = {},
 ): Promise<JoinedRoom> {
   const normalizedCode = normalizeRoomCode(code);
   const normalized = normalizeDisplayName(displayName, deps.randomGuestNumber?.());
 
-  const joined = await deps.api.invoke<JoinedRoom>('join-room', {
+  const response = await deps.api.invoke<unknown>('join-room', {
     code: normalizedCode,
     displayName: normalized,
   });
+  const joined = verifyJoinedRoom(response, normalizedCode);
 
-  saveGuestToken(joined.roomId, joined.guestToken);
+  if (options.storeToken !== false) {
+    saveGuestToken(joined.roomId, joined.guestToken);
+  }
   return joined;
 }
 

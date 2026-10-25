@@ -37,6 +37,53 @@ afterEach(() => {
 });
 
 describe('room data isolation', () => {
+  it('keeps cached room data offline but restores the latest room before an ended response', async () => {
+    const refreshed = {
+      ...roomA,
+      room: { ...roomA.room, code: 'QRSTABCDEFGHJKMN', name: 'Updated room' },
+      roster: [{ memberId: 'm2', role: 'guest', displayName: 'Alex', online: true }],
+    };
+    let reads = 0;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'touch-member') return {};
+        if (name === 'guest-room-read') {
+          reads += 1;
+          if (reads === 2 || reads === 3) {
+            throw new RoomApiError('NETWORK_ERROR', 0, 'Network unavailable');
+          }
+          if (reads === 4) return refreshed;
+          if (reads === 5) return { roomId: 'room-a', status: 'ended' };
+          return roomA;
+        }
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(RoomApiProvider, { api, children });
+    const { result, unmount } = renderHook(() => useRoomData('room-a', 'guest'), { wrapper });
+    try {
+      await waitFor(() => expect(result.current.connection).toBe('live'));
+      expect(result.current.data?.room?.code).toBe(roomA.room.code);
+
+      await act(async () => { await result.current.refresh(); });
+      expect(result.current.connection).toBe('live'); // one transient failure
+      await act(async () => { await result.current.refresh(); });
+      expect(result.current.connection).toBe('offline');
+      expect(result.current.data?.room?.code).toBe(roomA.room.code);
+
+      await act(async () => { await result.current.refresh(); });
+      expect(result.current.connection).toBe('live');
+      expect(result.current.data?.room?.code).toBe(refreshed.room.code);
+      expect(result.current.restoredAt).not.toBeNull();
+
+      await act(async () => { await result.current.refresh(); });
+      expect(result.current.data?.status).toBe('ended');
+      expect(result.current.data?.room).toBeUndefined();
+      expect(result.current.error).toBeNull();
+    } finally {
+      unmount();
+    }
+  });
   it('does not leave room A data visible when room B cannot be read', async () => {
     const api: EdgeApi = {
       invoke: (async (name: string, body: unknown) => {

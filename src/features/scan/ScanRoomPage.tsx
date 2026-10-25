@@ -52,11 +52,22 @@ export default function ScanRoomPage() {
 
       const video = videoRef.current;
       if (video === null) {
+        stream.getTracks().forEach((track) => track.stop());
         return;
       }
       video.srcObject = stream;
-      await Promise.resolve(video.play()).catch(() => undefined);
+      try {
+        await video.play();
+      } catch {
+        // Permission to open the camera does not guarantee the browser will
+        // start the preview. Don't leave tracks running behind a dead scanner.
+        stream.getTracks().forEach((track) => track.stop());
+        video.srcObject = null;
+        if (!cancelled) setCamera('blocked');
+        return;
+      }
       if (cancelled) {
+        stream.getTracks().forEach((track) => track.stop());
         return;
       }
       setCamera('scanning');
@@ -80,7 +91,7 @@ export default function ScanRoomPage() {
               navigate('/join/' + code);
               return;
             }
-            setMessage('That code is not an ECHO room.');
+            setMessage('That code is not a kara-echo room.');
           }
         }
         timer = window.setTimeout(scan, SCAN_INTERVAL_MS);
@@ -114,7 +125,7 @@ export default function ScanRoomPage() {
       <div className="absolute inset-0 bg-[linear-gradient(180deg,rgba(16,13,24,0.85),rgba(16,13,24,0.2)_38%,rgba(16,13,24,0.95))]" aria-hidden="true" />
 
       <header className="relative z-10 flex items-center justify-between px-4 py-4 sm:px-6">
-        <Link to="/" aria-label="ECHO home">
+        <Link to="/" aria-label="kara-echo home">
           <Logo size="sm" />
         </Link>
         <Link

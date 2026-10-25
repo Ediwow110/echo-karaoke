@@ -2,8 +2,9 @@ import { isValidRoomCode, normalizeRoomCode } from '../rooms/roomCode';
 
 /**
  * Reads a room code out of the text a camera just decoded.
- * The host screen encodes a join link, so the code sits in the last path
- * segment. A code that was scanned on its own is read as it is.
+ * The host screen encodes a /join/<code> link. Reject other URL paths
+ * rather than treating any unrelated URL's last segment as a room.
+ * A standalone, optionally grouped room code is also supported.
  */
 export function roomCodeFromScan(text: string): string | null {
   const trimmed = text.trim();
@@ -11,16 +12,20 @@ export function roomCodeFromScan(text: string): string | null {
     return null;
   }
 
-  const withoutQuery = trimmed.split('?')[0] ?? trimmed;
-  const segments = withoutQuery.split('/').filter((segment) => segment.length > 0);
-  const lastSegment = segments.length > 0 ? segments[segments.length - 1] : trimmed;
-
-  for (const candidate of [lastSegment, trimmed]) {
-    const normalized = normalizeRoomCode(candidate);
-    if (isValidRoomCode(normalized)) {
-      return normalized;
-    }
+  if (/^[0-9a-z -]+$/i.test(trimmed)) {
+    const code = normalizeRoomCode(trimmed);
+    return isValidRoomCode(code) ? code : null;
   }
-
-  return null;
+  try {
+    const url = new URL(trimmed, 'https://kara-echo.invalid');
+    if (url.protocol !== 'http:' && url.protocol !== 'https:') return null;
+    const segments = url.pathname.split('/').filter(Boolean);
+    if (segments.length !== 2 || segments[0] !== 'join') return null;
+    const segment = decodeURIComponent(segments[1]);
+    if (!/^[0-9a-z-]+$/i.test(segment)) return null;
+    const code = normalizeRoomCode(segment);
+    return isValidRoomCode(code) ? code : null;
+  } catch {
+    return null;
+  }
 }

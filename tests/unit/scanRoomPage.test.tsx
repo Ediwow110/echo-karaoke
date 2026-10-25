@@ -35,6 +35,18 @@ function renderScan() {
 }
 
 describe('scan room screen', () => {
+  it('releases camera tracks and offers manual joining if video playback cannot start', async () => {
+    const stop = vi.fn();
+    Object.defineProperty(navigator, 'mediaDevices', {
+      configurable: true,
+      value: { getUserMedia: async () => ({ getTracks: () => [{ stop }] }) },
+    });
+    vi.spyOn(HTMLMediaElement.prototype, 'play').mockRejectedValue(new Error('Camera preview blocked'));
+    renderScan();
+    expect(await screen.findByText(/the camera is not available/i)).toBeInTheDocument();
+    expect(stop).toHaveBeenCalledOnce();
+    expect(screen.getByRole('link', { name: /type the code instead/i })).toBeInTheDocument();
+  });
   it('asks the camera for a view and shows a viewfinder', async () => {
     mockCamera('granted');
     renderScan();
