@@ -39,6 +39,13 @@ function renderJoin(code = 'ABCDEFGHJKMNPQRS', roomApi: EdgeApi = api) {
 }
 
 describe('join screen', () => {
+  it('starts the name blank when an earlier visit left a name behind', () => {
+    localStorage.setItem('karaoke.profile.name', 'Qoder');
+    renderJoin();
+    expect(screen.getByLabelText('Your name')).toHaveValue('');
+    expect(screen.queryByText('Qoder')).toBeNull();
+  });
+
   it('ignores the older room response after navigating from invitation A to B', async () => {
     const oldRoomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
     const newRoomId = '550e8400-e29b-41d4-a716-446655440000';

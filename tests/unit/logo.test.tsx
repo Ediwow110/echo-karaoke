@@ -30,12 +30,12 @@ describe('the brand lockup in a narrow header', () => {
   });
 
   it('shrinks every wordmark with the viewport instead of holding one fixed size', () => {
-    for (const size of ['sm', 'md', 'lg'] as const) {
+    for (const size of ['sm', 'md'] as const) {
       const { container, unmount } = render(<Logo size={size} />);
       expect(wordmark(container).className).toMatch(/text-\[clamp\(/);
       unmount();
     }
-    expect(logoSource.match(/wordmark: 'text-\[clamp\(/g)).toHaveLength(3);
+    expect(logoSource.match(/wordmark: 'text-\[clamp\(/g)).toHaveLength(2);
   });
 
   it('keeps the equalizer bars from being squeezed by the text', () => {

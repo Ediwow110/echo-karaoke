@@ -17,7 +17,6 @@ export type LastRoom = {
 
 const SESSIONS_KEY = 'karaoke.sessions';
 const LAST_ROOM_KEY = 'karaoke.last-room';
-const PROFILE_KEY = 'karaoke.profile.name';
 const SESSION_LIMIT = 8;
 
 function readJson<T>(key: string, fallback: T): T {
@@ -115,27 +114,6 @@ export function getHostSessionByCode(code: string): RoomSession | null {
 export function clearLastRoom(): void {
   try {
     localStorage.removeItem(LAST_ROOM_KEY);
-  } catch {
-    // Ignore unavailable storage.
-  }
-}
-
-export function getStoredProfileName(): string {
-  try {
-    return localStorage.getItem(PROFILE_KEY) ?? '';
-  } catch {
-    return '';
-  }
-}
-
-export function saveProfileName(name: string): void {
-  try {
-    const trimmed = name.trim();
-    if (trimmed.length === 0) {
-      localStorage.removeItem(PROFILE_KEY);
-      return;
-    }
-    localStorage.setItem(PROFILE_KEY, trimmed);
   } catch {
     // Ignore unavailable storage.
   }

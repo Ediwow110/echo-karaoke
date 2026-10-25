@@ -3,7 +3,7 @@ import { Link, Navigate } from 'react-router-dom';
 import AppShell from '../features/rooms/AppShell';
 import type { SidebarNav } from '../features/rooms/Sidebar';
 import SongCollectionView, { type CollectionMode } from '../features/library/SongCollectionView';
-import { getLastRoomSession, getStoredProfileName } from '../features/rooms/sessionStore';
+import { getLastRoomSession } from '../features/rooms/sessionStore';
 import { loadGuestToken, loadHostToken } from '../features/rooms/tokenStore';
 
 function useLastRoomInfo() {
@@ -34,7 +34,6 @@ function GlobalCollection({ mode, activeNav }: { mode: CollectionMode; activeNav
     <AppShell
       activeNav={activeNav}
       activeRoom={null}
-      hostName={getStoredProfileName() || 'Host'}
       mobileAction={<Link to="/" className="text-[0.75rem] font-semibold text-signal">Create room</Link>}
     >
       <main className="page-enter mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-6 lg:px-8">

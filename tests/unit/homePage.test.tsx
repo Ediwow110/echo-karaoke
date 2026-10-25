@@ -44,8 +44,8 @@ function renderHome(api: EdgeApi = { invoke: (async () => ({})) as unknown as Ed
 describe('create room workspace', () => {
   it('starts the name field empty even when an earlier visit left a name behind', () => {
     // On a TV or a shared laptop the landing screen should not announce whoever
-    // last used it. The remembered name still labels the host chip; the field you
-    // type into begins blank, with the placeholder showing what to write.
+    // last used it. The field you type into begins blank, with the placeholder
+    // showing what to write, and the name stays out of the chrome too.
     localStorage.setItem('karaoke.profile.name', 'Qoder');
     stubWide(true);
     renderHome();
@@ -53,6 +53,17 @@ describe('create room workspace', () => {
     const field = screen.getByLabelText('Your name');
     expect(field).toHaveValue('');
     expect(field).toHaveAttribute('placeholder', 'Alex');
+    expect(screen.queryByText('Qoder')).toBeNull();
+  });
+
+  it('gives the sidebar the name being typed, never one from storage', () => {
+    localStorage.setItem('karaoke.profile.name', 'Qoder');
+    stubWide(true);
+    renderHome();
+
+    expect(screen.getByText('Host', { exact: true })).toBeInTheDocument();
+    fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Rafa' } });
+    expect(screen.getByText('Rafa')).toBeInTheDocument();
   });
 
   it('offers joining by code as an action beside the create button, not as fine print', async () => {

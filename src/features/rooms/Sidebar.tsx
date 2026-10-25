@@ -7,7 +7,6 @@ import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { Avatar, Logo } from '../../ui';
-import { getStoredProfileName } from './sessionStore';
 
 export type SidebarNav =
   | 'discover'
@@ -73,13 +72,13 @@ function hrefFor(item: NavItem, activeRoom: ActiveRoom | null | undefined): stri
 
 export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
   const location = useLocation();
-  const name = hostName ?? getStoredProfileName() ?? '';
-  const displayName = name.length > 0 ? name : 'Host';
+  const typed = hostName?.trim() ?? '';
+  const displayName = typed.length > 0 ? typed : 'Host';
 
   return (
     <aside aria-label="Room navigation" className="hidden h-dvh w-[232px] shrink-0 flex-col border-r border-line bg-graphite-deep px-4 pb-5 pt-7 lg:sticky lg:top-0 lg:flex">
       <Link to="/" className="px-2" aria-label="kara-echo, create a room">
-        <Logo size="lg" />
+        <Logo size="sm" />
       </Link>
 
       <nav aria-label="Primary" className="mt-9 mb-5 flex flex-col gap-1">

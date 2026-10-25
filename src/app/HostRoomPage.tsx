@@ -17,7 +17,7 @@ import HostPlayer from '../features/playback/HostPlayer';
 import PlayerDock from '../features/playback/PlayerDock';
 import Sidebar, { type SidebarNav } from '../features/rooms/Sidebar';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
-import { getStoredProfileName, rememberSession, clearLastRoom } from '../features/rooms/sessionStore';
+import { rememberSession, clearLastRoom } from '../features/rooms/sessionStore';
 import { rememberPlayed, rememberSongs } from '../features/library/libraryStore';
 import { groupRoomCode } from '../lib/format';
 import { Button, Chip, IconButton, Logo, Toast, type ToastTone } from '../ui';
@@ -119,9 +119,7 @@ export default function HostRoomPage() {
   }, [data, live, queue]);
   const upNext = useMemo(() => queue.filter((song) => song.status !== 'playing'), [queue]);
   const roster = live ? (data.roster ?? []) : [];
-  const hostName = roster.find((member) => member.role === 'host')?.displayName?.trim()
-    || getStoredProfileName()
-    || 'Host';
+  const hostName = roster.find((member) => member.role === 'host')?.displayName?.trim() || 'Host';
   const roomName = room?.name ?? 'Karaoke room';
   const code = room?.code ?? '';
   const joinUrl = code.length > 0 ? buildJoinUrl(window.location.origin, code) : '';

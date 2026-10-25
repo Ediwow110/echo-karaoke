@@ -1,5 +1,5 @@
 export type LogoProps = {
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'sm' | 'md';
   withWordmark?: boolean;
   className?: string;
   /**
@@ -14,7 +14,6 @@ export type LogoProps = {
 const sizes = {
   sm: { wordmark: 'text-[clamp(1.05rem,4.4vw,1.7rem)]', bars: 'h-6 gap-[3px]', bar: 'w-[3px]' },
   md: { wordmark: 'text-[clamp(1.2rem,5vw,2.05rem)]', bars: 'h-8 gap-[4px]', bar: 'w-[3.5px]' },
-  lg: { wordmark: 'text-[clamp(1.4rem,5.6vw,2.4rem)]', bars: 'h-10 gap-[4px]', bar: 'w-[4px]' },
 };
 
 const barHeights = ['50%', '100%', '72%', '38%'];

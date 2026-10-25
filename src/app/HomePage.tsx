@@ -10,7 +10,7 @@ import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHor
 import { useRoomApi } from './RoomApiProvider';
 import { createRoom, joinRoom } from '../features/rooms/roomApi';
 import { isValidRoomCode, normalizeRoomCode } from '../features/rooms/roomCode';
-import { getStoredProfileName, getHostSessionByCode, rememberSession, saveProfileName } from '../features/rooms/sessionStore';
+import { getHostSessionByCode, rememberSession } from '../features/rooms/sessionStore';
 import { RoomApiError } from '../lib/edgeApi';
 import { saveGuestToken, saveHostToken } from '../features/rooms/tokenStore';
 import { useMediaQuery } from '../lib/useMediaQuery';
@@ -94,9 +94,8 @@ const steps = [
 ];
 
 function hostNameDefault(): string {
-  // The remembered name still labels the host chip and the sidebar, but the
-  // field starts empty: on a TV or shared laptop the landing screen should not
-  // announce whoever last used it, and a placeholder invites a fresh name.
+  // On a TV or shared laptop the landing screen should not announce whoever last
+  // used it, so both name fields open empty and a placeholder says what to write.
   return '';
 }
 
@@ -175,7 +174,6 @@ export default function HomePage() {
       clearCreateUncertainty();
       saveGuestToken(created.roomId, created.guestToken);
       saveHostToken(created.roomId, created.hostToken);
-      saveProfileName(created.displayName);
       rememberSession({
         roomId: created.roomId,
         code: created.roomCode,
@@ -220,7 +218,6 @@ export default function HomePage() {
       const joined = await joinRoom({ api }, joinCode, guestName, { storeToken: false });
       if (joinGeneration.current !== generation) return;
       saveGuestToken(joined.roomId, joined.guestToken);
-      saveProfileName(joined.displayName);
       rememberSession({
         roomId: joined.roomId,
         code: joined.roomCode,
@@ -402,7 +399,7 @@ export default function HomePage() {
     <AppShell
       activeNav="create"
       activeRoom={null}
-      hostName={hostName.trim().length > 0 ? hostName.trim() : getStoredProfileName() || 'Host'}
+      hostName={hostName.trim()}
       mobileAction={<Link to="/scan" className="inline-flex min-h-11 items-center text-[0.75rem] font-semibold text-signal">Scan a code</Link>}
     >
       <main className="mx-auto w-full max-w-[1240px] px-4 pb-12 pt-6 sm:px-6 lg:px-8 lg:pt-8">

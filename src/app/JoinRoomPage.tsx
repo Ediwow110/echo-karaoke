@@ -6,7 +6,7 @@ import { QrCodeIcon } from '@phosphor-icons/react/dist/csr/QrCode';
 import { useRoomApi } from './RoomApiProvider';
 import { joinRoom } from '../features/rooms/roomApi';
 import { isValidRoomCode, normalizeRoomCode } from '../features/rooms/roomCode';
-import { getHostSessionByCode, getStoredProfileName, rememberSession, saveProfileName } from '../features/rooms/sessionStore';
+import { getHostSessionByCode, rememberSession } from '../features/rooms/sessionStore';
 import { RoomApiError } from '../lib/edgeApi';
 import { saveGuestToken } from '../features/rooms/tokenStore';
 import { Button, Field, Logo } from '../ui';
@@ -16,7 +16,7 @@ export default function JoinRoomPage() {
   const navigate = useNavigate();
   const params = useParams<{ roomCode?: string }>();
   const [code, setCode] = useState('');
-  const [displayName, setDisplayName] = useState(() => getStoredProfileName());
+  const [displayName, setDisplayName] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const joinGeneration = useRef(0);
@@ -51,7 +51,6 @@ export default function JoinRoomPage() {
       const joined = await joinRoom({ api }, code, displayName, { storeToken: false });
       if (joinGeneration.current !== generation) return;
       saveGuestToken(joined.roomId, joined.guestToken);
-      saveProfileName(joined.displayName);
       rememberSession({
         roomId: joined.roomId,
         code: joined.roomCode,
