@@ -114,6 +114,12 @@ lists together; it was written after the two halves had already drifted apart on
 Also still owed from this class: a `channels.list` HTTP error (as opposed to a missing channel)
 still `continue`s unreported, and a cursor whose channel later disappears is not re-checked.
 
+One more instance of the same disguise was closed in `6a0e938`: the keyless songbook fallback caught
+**every** database error and answered "no results", which is precisely how the missing grants would
+have presented themselves to a browsing guest. It now tolerates only SQLSTATE 42883 (not yet
+migrated) and rethrows the rest, with `HttpError` carrying the SQLSTATE so callers can make that
+distinction at all.
+
 ## Global Constraints
 
 - Playback is always the YouTube embed; never store or serve video. Catalog rows hold ids and display metadata only.
