@@ -5,13 +5,18 @@ and deployment contract.
 
 ## Commands
 
-- `npm run dev`: Vite only. `/api` is not served unless the optional local backend is
-  running.
-- `npx vercel dev`: the full app and the same-origin Function on port 3000.
+- `npm run dev`: Vite only — `/api` is not served. Vite proxies `/api` to
+  `http://127.0.0.1:3001`, but nothing in this repo listens there: `scripts/backend-server.ts`
+  imports `.js` specifiers that plain Node cannot resolve, so it exits with `ERR_MODULE_NOT_FOUND`.
+  It is not wired into any npm script. Do not describe it as "the optional local backend".
+- `npx vercel dev`: the only working full-stack local path, on port 3000.
   **Caution:** `.env.local`'s `DATABASE_URL`, `AUTH_DATABASE_URL`, and
   `NEON_DATABASE_URL` all name production Neon `main`, so this command writes real
-  rooms, queue rows, and catalog cursors to production. Point it at a disposable
-  branch first, or do not run it.
+  rooms, queue rows, and catalog cursors to production. Before running it, apply the
+  migration chain to a disposable Neon branch and override all three URLs to that
+  branch's hosts in the shell environment (verified procedure:
+  `docs/deployment/hosted-setup.md`); never print the resulting connection string,
+  because Neon role passwords are shared project-wide.
 - `npm run build`: `tsc --noEmit` then the production Vite build.
 - `npm test`: unit and component tests in jsdom.
 - `npm run test:e2e:ui`: Playwright UI checks against Vite with mocked `/api` calls.

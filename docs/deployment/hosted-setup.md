@@ -379,6 +379,31 @@ curl -s -o /dev/null -w '%{http_code}\n' https://your-app.example/api/cron/catal
 # 401 — reachable, and rejected without the bearer secret
 ```
 
+Verified in a live process before any deploy: outside Production the same route answers **404**
+even when handed the correct bearer token, and for `POST` as well — so a preview deployment cannot
+run retention or be probed into it.
+
+### Running the full app locally against a branch
+
+`vercel dev` is the only working full-stack local path, and it reads `.env.local`, which names
+production `main`. Repoint it by deriving branch URLs from the same credentials rather than
+editing that file — Neon role passwords are project-wide, so a branch URL is the production URL
+with the host swapped:
+
+1. Create a disposable branch off `main` and note its endpoint host (direct and `-pooler`).
+2. Copy `.env.local`, replace the hostname of each of the three URLs with the branch host
+   (`DATABASE_URL` takes the pooled host; `AUTH_DATABASE_URL` and `NEON_DATABASE_URL` the direct
+   one). Keep the credentials untouched and never echo the result.
+3. Assert before use that no produced URL still names the production host, and that the owner-role
+   URL uses the direct endpoint.
+4. `npx supabase db push --db-url "$NEON_DATABASE_URL" --yes` to bring the branch to 0034, export
+   the three swapped variables in the shell, then `npx vercel dev`.
+5. Delete the branch afterwards. Neon computes do not auto-suspend on this project, so a leftover
+   branch keeps billing.
+
+`npm run test:integration` and `npx supabase test db --db-url` both accept the same swapped values,
+which is how the songbook loop was proven against real YouTube without touching production.
+
 Migrations 0031 (catalog tables and paging), 0032 (`playback_next_if_current`),
 0033 (retention, RLS and the 28-day read filter) and 0034 (the same surface granted
 to `echo_service`) must be applied before this tree serves traffic: the sync and the
