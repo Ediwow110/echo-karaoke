@@ -14,6 +14,7 @@ const HostQueuePage = lazy(() => import('./HostQueuePage'));
 const HostSettingsPage = lazy(() => import('./HostSettingsPage'));
 const HostStagePage = lazy(() => import('./HostStagePage'));
 const HostPartyPage = lazy(() => import('./HostPartyPage'));
+const HostSongbookPage = lazy(() => import('./HostSongbookPage'));
 const ScanRoomPage = lazy(() => import('../features/scan/ScanRoomPage'));
 const HostLibraryPage = lazy(() => import('./HostCollectionPages').then((module) => ({ default: module.HostLibraryPage })));
 const HostFavoritesPage = lazy(() => import('./HostCollectionPages').then((module) => ({ default: module.HostFavoritesPage })));
@@ -110,6 +111,7 @@ export default function App() {
             <Route path="library" element={<HostLibraryPage />} />
             <Route path="favorites" element={<HostFavoritesPage />} />
             <Route path="recent" element={<HostRecentPage />} />
+            <Route path="songbook" element={<HostSongbookPage />} />
             <Route path="stage" element={<HostStagePage />} />
             <Route path="party" element={<HostPartyPage />} />
           </Route>

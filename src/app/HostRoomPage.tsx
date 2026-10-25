@@ -30,6 +30,7 @@ function navFor(pathname: string): SidebarNav {
   if (pathname.endsWith('/host/library')) return 'library';
   if (pathname.endsWith('/host/favorites')) return 'favorites';
   if (pathname.endsWith('/host/recent')) return 'recent';
+  if (pathname.endsWith('/host/songbook')) return 'songbook';
   return 'discover';
 }
 
