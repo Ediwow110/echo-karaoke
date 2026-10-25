@@ -433,6 +433,15 @@ test is what caught it.
 Production `main` is at migration 0030, so the catalog does not exist there yet. Run these in
 order; step 1 is the only one that is not a command, and nothing after it is safe to skip.
 
+If step 1 is not yet available, **do not push** — the build command refuses a production build
+without `CRON_SECRET`, so a push fails rather than shipping. Applying step 2 alone is a separate
+question, and it is safe in the narrow sense: the deployed commit (`badd036`) references no catalog
+object at all (`git grep` for `karaoke_catalog`, `catalog-page`, `catalog-sync`,
+`playback_next_if_current` across its `server`, `src` and `api` trees: zero hits), and the only
+non-catalog object in 0031–0034 is `playback_next_if_current`, which that code never calls. So the
+schema can sit ahead of the app without changing how the running app behaves — which is why the
+grants in 0034 are needed even though nothing calls them yet.
+
 1. **Create `CRON_SECRET`** (at least 32 random characters) in the Vercel Production environment.
    Pipe it so it does not land in shell history or a transcript:
 
