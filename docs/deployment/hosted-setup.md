@@ -364,6 +364,15 @@ runs `karaoke_catalog_retire_stale()`, which deletes catalog songs and channel c
 older than 28 days, so synced YouTube metadata is never served beyond the 30-day
 revalidation window even when the site is idle and no host refreshes.
 
+That job only **removes**. Nothing schedules a refresh: `catalog-sync` runs when a host presses
+**Refresh the songbook**, and the read filter serves only rows whose `synced_at` is inside 28 days.
+So a songbook nobody refreshes empties itself on day 28 — that shrink is the read filter, not this
+cron; the cron only sweeps the expired rows and their cursors out of the table. A full four-channel
+walk costs up to 16 of the 40 daily units — three playlist pages per channel, plus one handle
+lookup each on the first walk before the cursors exist, one unit per call (measured at 409 songs) —
+so pressing the button once a day keeps a standing supply; the six-hour per-channel throttle means
+extra presses report `skipped` rather than spending again.
+
 The route accepts only `GET`, and only when `Authorization` equals `Bearer ` plus
 `CRON_SECRET` compared with `timingSafeEqual`. It returns 404 outside Production, 405
 for other methods, 401 on a mismatched bearer, and 503 if the secret is unset or
