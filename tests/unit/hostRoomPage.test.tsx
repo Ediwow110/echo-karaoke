@@ -7,9 +7,12 @@ import HostDiscoverPage from '../../src/app/HostDiscoverPage';
 import HostQueuePage from '../../src/app/HostQueuePage';
 import HostSettingsPage from '../../src/app/HostSettingsPage';
 import HostStagePage from '../../src/app/HostStagePage';
+import HostPartyPage from '../../src/app/HostPartyPage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
 import '@testing-library/jest-dom/vitest';
+
+const playerClock = vi.hoisted(() => ({ currentTime: 0, duration: 0 }));
 
 vi.mock('../../src/features/playback/youtubeIframe', () => ({
   youtubePlayerFactory: () => ({
@@ -17,8 +20,8 @@ vi.mock('../../src/features/playback/youtubeIframe', () => ({
     play: () => undefined,
     pause: () => undefined,
     seekTo: () => undefined,
-    getCurrentTime: () => 0,
-    getDuration: () => 0,
+    getCurrentTime: () => playerClock.currentTime,
+    getDuration: () => playerClock.duration,
     setVolume: () => undefined,
     getVolume: () => 100,
     getState: () => -1,
@@ -29,6 +32,8 @@ vi.mock('../../src/features/playback/youtubeIframe', () => ({
 const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
 
 beforeEach(() => {
+  playerClock.currentTime = 0;
+  playerClock.duration = 0;
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
     media: '',
@@ -146,6 +151,7 @@ function renderHost(api: EdgeApi, path = '/room/' + roomId + '/host') {
             createElement(Route, { path: 'queue', element: createElement(HostQueuePage) }),
             createElement(Route, { path: 'settings', element: createElement(HostSettingsPage) }),
             createElement(Route, { path: 'stage', element: createElement(HostStagePage) }),
+            createElement(Route, { path: 'party', element: createElement(HostPartyPage) }),
           ),
         ),
       ),
@@ -164,10 +170,17 @@ describe('host room workspace', () => {
     expect(screen.getByRole('link', { name: /party view/i })).toBeInTheDocument();
   });
 
+  it('opens the room at the top instead of inheriting the page scroll', async () => {
+    const { api } = makeApi();
+    renderHost(api);
+
+    expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+    expect(window.scrollTo).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
+  });
+
   it('shows the running order and its songs', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/queue');
-
     expect(await screen.findByRole('heading', { name: /keep the night moving/i })).toBeInTheDocument();
     expect(screen.getByText('Midnight City')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /skip current song/i })).toBeInTheDocument();
@@ -285,10 +298,10 @@ describe('host room workspace', () => {
         (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
       )).toBe(true);
     });
-    expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('After Hours · Party view')).length).toBeGreaterThan(0);
   });
 
-  it('takes a host on the queue page to the stage when a queued song starts', async () => {
+  it('takes a host on the queue page into party view when a queued song starts', async () => {
     const stoppedRoom = {
       ...liveRoom,
       playback: { currentSongId: null, positionSeconds: 0, isPlaying: false, updatedAt: null },
@@ -314,6 +327,70 @@ describe('host room workspace', () => {
         (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
       )).toBe(true);
     });
+    expect((await screen.findAllByText('After Hours · Party view')).length).toBeGreaterThan(0);
+  });
+
+  it('finishes the song five seconds before the video ends', async () => {
+    const actions: string[] = [];
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true, positionSeconds: 217 },
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        if (name === 'playback-command') {
+          actions.push((body as { action?: string }).action ?? '');
+          return { roomId, status: 'live', playback: playingRoom.playback };
+        }
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return playingRoom;
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    playerClock.currentTime = 217;
+    playerClock.duration = 222;
+
+    renderHost(api);
+
+    await waitFor(() => {
+      expect(actions).toContain('next');
+    }, { timeout: 5000 });
+  });
+
+  it('names the singer on the host now-playing card', async () => {
+    const { api } = makeApi();
+    renderHost(api);
+
+    expect((await screen.findAllByText('Added by Ana')).length).toBeGreaterThan(0);
+  });
+
+  it('lets the host drag the floating video', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    const { api } = makeApi();
+    renderHost(api);
+
+    const handle = await screen.findByRole('button', { name: /move the video/i });
+    fireEvent.pointerDown(handle, { pointerId: 1, clientX: 100, clientY: 100 });
+    fireEvent.pointerMove(handle, { pointerId: 1, clientX: 400, clientY: 250 });
+    fireEvent.pointerUp(handle, { pointerId: 1 });
+
+    const layer = document.querySelector('[data-host-player]') as HTMLElement;
+    expect(layer.style.left).toBe('300px');
+    expect(layer.style.top).toBe('150px');
+  });
+
+  it('returns from party view to the stage, not the discovery page', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('button', { name: /leave party view/i }));
+
     expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
   });
 

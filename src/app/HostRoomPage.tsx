@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
 import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
 import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
@@ -52,6 +52,12 @@ export default function HostRoomPage() {
   const wasLiveRef = useRef(false);
   const lastAutoPlayKey = useRef<string | null>(null);
   const queueInitialized = useRef(false);
+
+  // Hosts arrive here from the home page, which may be scrolled; without this
+  // the room opens mid-page with its hero banner cut off.
+  useLayoutEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
+  }, [roomId]);
 
   useEffect(() => {
     // A cleanup that is immediately followed by the next setup is the
@@ -146,11 +152,11 @@ export default function HostRoomPage() {
     }
   }, [api, notify, refresh, roomId]);
 
-  const enterStage = useCallback((): void => {
+  const openPartyView = useCallback((): void => {
     if (location.pathname.endsWith('/host/stage') || location.pathname.endsWith('/host/party')) {
       return;
     }
-    navigate('/room/' + roomId + '/host/stage');
+    navigate('/room/' + roomId + '/host/party');
   }, [location.pathname, navigate, roomId]);
 
   const next = useCallback(async (): Promise<boolean> => {
@@ -294,8 +300,8 @@ export default function HostRoomPage() {
       seenSongs.current.add(song.videoId);
     }
     rememberSongs(fresh);
-    enterStage();
-  }, [enterStage, live, queue]);
+    openPartyView();
+  }, [openPartyView, live, queue]);
 
   useEffect(() => {
     document.title = roomName.length > 0 ? 'ECHO · ' + roomName : 'ECHO | the room sings together';
@@ -320,11 +326,11 @@ export default function HostRoomPage() {
     const key = queue[0].songId;
     if (lastAutoPlayKey.current === key) return;
     lastAutoPlayKey.current = key;
-    // A guest's first request should take the host screen straight to the
-    // stage; the manual "Take the stage" button is only a fallback.
+    // A guest's first request should take the host screen straight into party
+    // view; the manual "Take the stage" button is only a fallback.
     void runPlayback('play');
-    enterStage();
-  }, [enterStage, live, data?.playback, queue, runPlayback]);
+    openPartyView();
+  }, [openPartyView, live, data?.playback, queue, runPlayback]);
 
   if (loading) {
     return (

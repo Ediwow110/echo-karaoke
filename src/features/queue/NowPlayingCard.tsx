@@ -79,6 +79,7 @@ export default function NowPlayingCard({
             {song.channelTitle ?? 'YouTube'}
             {song.durationSeconds === null ? '' : ' · ' + formatTime(song.durationSeconds)}
           </p>
+          <p className="mt-1 truncate text-[0.625rem] text-ink-3">Added by {song.addedBy}</p>
           <div className="mt-3 flex items-center justify-between gap-2">
             <Chip tone="default">
               <MonitorPlayIcon size={11} aria-hidden="true" />

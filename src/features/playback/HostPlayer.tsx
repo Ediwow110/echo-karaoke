@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
@@ -28,6 +28,19 @@ type Props = {
 
 const VOLUME_KEY = 'karaoke.volume';
 const PLAYER_STATE = { unstarted: -1, ended: 0, playing: 1, paused: 2, buffering: 3, cued: 5 } as const;
+// Karaoke videos usually end on an outro card; finishing this early keeps the
+// set moving instead of waiting out the tail.
+const EARLY_END_SECONDS = 5;
+const FLOAT_WIDTH = 280;
+const FLOAT_HEIGHT = 158;
+const FLOAT_MARGIN = 12;
+
+function clampFloat(x: number, y: number): { x: number; y: number } {
+  return {
+    x: Math.min(Math.max(FLOAT_MARGIN, x), Math.max(FLOAT_MARGIN, window.innerWidth - FLOAT_WIDTH - FLOAT_MARGIN)),
+    y: Math.min(Math.max(FLOAT_MARGIN, y), Math.max(FLOAT_MARGIN, window.innerHeight - FLOAT_HEIGHT - FLOAT_MARGIN)),
+  };
+}
 
 function readVolume(): number {
   try {
@@ -62,6 +75,7 @@ export default function HostPlayer({
   const loadedVideoRef = useRef<string | null>(null);
   const autoSkippedRef = useRef<string | null>(null);
   const advancingRef = useRef(false);
+  const earlyFinishRef = useRef<string | null>(null);
   const onNextRef = useRef(onNext);
   const onReportRef = useRef(onReport);
   const playbackRef = useRef(playback);
@@ -70,6 +84,8 @@ export default function HostPlayer({
   const volumeRef = useRef(readVolume());
   const [slot, setSlot] = useState<HTMLElement | null>(null);
   const [rect, setRect] = useState({ top: 0, left: 0, width: 0, height: 0 });
+  const [floatPos, setFloatPos] = useState<{ x: number; y: number } | null>(null);
+  const floatDragRef = useRef<{ dx: number; dy: number } | null>(null);
   const [factoryReady, setFactoryReady] = useState(false);
   const [playerState, setPlayerState] = useState<number>(PLAYER_STATE.unstarted);
   const [needsTap, setNeedsTap] = useState(false);
@@ -122,7 +138,7 @@ export default function HostPlayer({
     return advanced;
   }, []);
 
-  const handleEnded = useCallback(() => {
+  const finishSong = useCallback(() => {
     if (advancingRef.current) {
       return;
     }
@@ -143,7 +159,7 @@ export default function HostPlayer({
     }
     if (playerRef.current === null) {
       playerRef.current = youtubePlayerFactory(hostRef.current, {
-        onEnded: handleEnded,
+        onEnded: finishSong,
         onError: handlePlayerError,
         onReady: () => {
           playerRef.current?.setVolume(volumeRef.current);
@@ -161,7 +177,7 @@ export default function HostPlayer({
         playerRef.current = null;
       }, 0);
     };
-  }, [handleEnded, handlePlayerError]);
+  }, [finishSong, handlePlayerError]);
 
   useEffect(() => {
     const player = playerRef.current;
@@ -300,6 +316,22 @@ export default function HostPlayer({
     }, 1000);
     return () => window.clearInterval(timer);
   }, []);
+
+  useEffect(() => {
+    if (!isPlaying || videoId === null || loadedVideoRef.current !== videoId) {
+      return;
+    }
+    const total = duration > 0 ? duration : nowPlaying?.durationSeconds ?? 0;
+    if (total <= 0 || total - currentTime > EARLY_END_SECONDS) {
+      return;
+    }
+    // One attempt per video: a failed advance must not retry every tick.
+    if (earlyFinishRef.current === videoId) {
+      return;
+    }
+    earlyFinishRef.current = videoId;
+    finishSong();
+  }, [currentTime, duration, finishSong, isPlaying, nowPlaying?.durationSeconds, videoId]);
 
   useEffect(() => {
     if (duration > 0 || nowPlaying?.durationSeconds == null) {
@@ -516,10 +548,50 @@ export default function HostPlayer({
   ]);
 
   const isFloatingFrame = slot === null && videoId !== null && isLg;
+
+  const startFloatDrag = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
+    const box = layerRef.current?.getBoundingClientRect();
+    if (box === undefined) {
+      return;
+    }
+    floatDragRef.current = { dx: event.clientX - box.left, dy: event.clientY - box.top };
+    event.currentTarget.setPointerCapture?.(event.pointerId);
+  }, []);
+
+  const moveFloat = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
+    const drag = floatDragRef.current;
+    if (drag === null) {
+      return;
+    }
+    setFloatPos(clampFloat(event.clientX - drag.dx, event.clientY - drag.dy));
+  }, []);
+
+  const endFloatDrag = useCallback((event: ReactPointerEvent<HTMLElement>): void => {
+    if (floatDragRef.current === null) {
+      return;
+    }
+    floatDragRef.current = null;
+    event.currentTarget.releasePointerCapture?.(event.pointerId);
+  }, []);
+
+  useEffect(() => {
+    const onResize = (): void => setFloatPos((current) => (
+      current === null ? null : clampFloat(current.x, current.y)
+    ));
+    window.addEventListener('resize', onResize);
+    return () => window.removeEventListener('resize', onResize);
+  }, []);
+
   const layerStyle = isFloatingFrame
     // Keep the frame clear of the host header. The dock already carries the
     // transport controls; this is only the picture.
-    ? { bottom: 124, right: 16, width: 280, height: 158, opacity: 1, pointerEvents: 'auto' as const }
+    ? {
+      ...(floatPos === null ? { bottom: 124, right: 16 } : { top: floatPos.y, left: floatPos.x }),
+      width: FLOAT_WIDTH,
+      height: FLOAT_HEIGHT,
+      opacity: 1,
+      pointerEvents: 'auto' as const,
+    }
     : slot === null
       ? { top: 0, left: -10000, width: 320, height: 180, opacity: 0, pointerEvents: 'none' as const }
       : { top: rect.top, left: rect.left, width: rect.width, height: rect.height, opacity: 1, pointerEvents: 'auto' as const };
@@ -555,6 +627,19 @@ export default function HostPlayer({
         style={layerStyle}
         className="fixed z-20 overflow-hidden rounded-media bg-graphite-deep"
       >
+        {isFloatingFrame ? (
+          <button
+            type="button"
+            aria-label="Move the video"
+            onPointerDown={startFloatDrag}
+            onPointerMove={moveFloat}
+            onPointerUp={endFloatDrag}
+            onPointerCancel={endFloatDrag}
+            className="absolute inset-x-0 top-0 z-10 flex h-5 cursor-grab touch-none items-center justify-center bg-graphite-deep/75 active:cursor-grabbing"
+          >
+            <span aria-hidden="true" className="h-0.5 w-8 rounded-full bg-ink-4" />
+          </button>
+        ) : null}
         <div ref={hostRef} className="absolute inset-0" />
         {slot === null || videoId === null ? null : (
           <div className="pointer-events-none absolute inset-0">

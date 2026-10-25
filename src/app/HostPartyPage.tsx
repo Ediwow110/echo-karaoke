@@ -41,12 +41,13 @@ export default function HostPartyPage() {
     player.registerStageSlot(node);
   }, [player.registerStageSlot]);
 
-  const exit = useCallback((): void => {
+  const backToStage = useCallback((): void => {
+    const stageHref = '/room/' + roomId + '/host/stage';
     if (document.fullscreenElement !== null && document.fullscreenElement !== undefined) {
-      void document.exitFullscreen().finally(() => navigate('/room/' + roomId + '/host'));
+      void document.exitFullscreen().finally(() => navigate(stageHref));
       return;
     }
-    navigate('/room/' + roomId + '/host');
+    navigate(stageHref);
   }, [navigate, roomId]);
 
   useEffect(() => {
@@ -56,7 +57,7 @@ export default function HostPartyPage() {
         return;
       }
       if (event.key === 'Escape') {
-        exit();
+        backToStage();
         return;
       }
       if (event.code === 'Space') {
@@ -81,7 +82,7 @@ export default function HostPartyPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [exit, player.seekBy, player.toggleFullscreen, togglePlay]);
+  }, [backToStage, player.seekBy, player.toggleFullscreen, togglePlay]);
 
   async function playPause(): Promise<void> {
     setBusy('play');
@@ -120,7 +121,7 @@ export default function HostPartyPage() {
         </p>
         <div className="flex items-center gap-2">
           {connection === 'offline' ? <Chip tone="gold">Reconnecting</Chip> : null}
-          <Button variant="secondary" size="sm" icon={<ArrowsInIcon size={14} />} onClick={exit}>
+          <Button variant="secondary" size="sm" icon={<ArrowsInIcon size={14} />} onClick={backToStage}>
             Leave party view
           </Button>
         </div>
@@ -145,7 +146,7 @@ export default function HostPartyPage() {
                 </p>
                 <div className="mt-5 flex justify-center gap-2">
                   <Button variant="primary" onClick={() => navigate('/room/' + roomId + '/host')}>Find a song</Button>
-                  <Button variant="secondary" onClick={exit}>Back to discovery</Button>
+                  <Button variant="secondary" onClick={() => navigate('/room/' + roomId + '/host')}>Back to discovery</Button>
                 </div>
               </div>
             </div>
