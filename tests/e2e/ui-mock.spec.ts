@@ -271,6 +271,42 @@ test('guest search keeps 44px controls and reflows at 200% text', async ({ page 
   expect(outline).not.toBe('none');
 });
 
+test('guest songbook keeps 44px controls and reflows at 200% text', async ({ page }) => {
+  // The plan binds guest phone controls to >=44px with no overflow at 200% text,
+  // and this screen adds a filter box, five chips and a row of Add buttons per
+  // song. Assert the rendered rows first: an empty shell passes a sizing sweep.
+  const catalogQueries: string[] = [];
+  await mockApi(page, true, [], () => false, null, catalogQueries);
+  await page.goto('/room/' + ROOM + '/songbook', { waitUntil: 'networkidle' });
+
+  await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
+  const rows = page.locator('ul[aria-label="Songbook songs"] li');
+  await expect(rows.first()).toBeVisible();
+  expect(await rows.count()).toBeGreaterThan(5);
+
+  const chips = page.getByRole('group', { name: 'Filter by channel' }).locator('button');
+  expect(await chips.count()).toBe(5);
+
+  expect(await undersized(page)).toEqual([]);
+  expect(await clipped(page)).toEqual([]);
+
+  await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
+  await page.waitForTimeout(250);
+
+  expect(await undersized(page)).toEqual([]);
+  expect(await clipped(page)).toEqual([]);
+  const overflow = await page.evaluate(
+    () => document.documentElement.scrollWidth - document.documentElement.clientWidth,
+  );
+  expect(overflow).toBeLessThanOrEqual(0);
+
+  // A chip is the one control that can silently drop below 44px by shrinking to
+  // its text, so drive one and keep asserting the screen is still usable.
+  await chips.nth(1).click();
+  await expect(chips.nth(1)).toHaveAttribute('aria-pressed', 'true');
+  expect(await clipped(page)).toEqual([]);
+});
+
 test('popular karaoke strip slides with previous and next controls', async ({ page }) => {
   const karaoke = Array.from({ length: 8 }, (_, index) => ({
     videoId: 'karaoke' + String(index).padStart(4, '0'),
