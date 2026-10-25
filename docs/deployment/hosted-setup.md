@@ -396,8 +396,13 @@ order; step 1 is the only one that is not a command, and nothing after it is saf
    Pipe it so it does not land in shell history or a transcript:
 
    ```bash
+   openssl rand -hex 32 > secret.txt
    npx vercel env add CRON_SECRET production --force --sensitive < secret.txt
+   rm secret.txt
    ```
+
+   Generating it in the shell keeps the value out of chat and shell history, and `--sensitive`
+   stores it as a Vercel Secret, listed as `Hidden` afterwards.
 
    Without it `npm run verify:deploy` refuses the build (proved: it is the only remaining
    complaint once the other variables are set) and the daily retention run answers 503. A new

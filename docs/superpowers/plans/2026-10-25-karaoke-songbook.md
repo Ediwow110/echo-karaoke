@@ -109,11 +109,11 @@ five-channel one. `catalog-sync` now returns `unresolved: []` and, when non-empt
 filters by that same id, a drift gate (`tests/unit/catalogChannelContract.test.ts`) now pins the two
 lists together; it was written after the two halves had already drifted apart once.
 
-Still owed from this class: a cursor whose channel later disappears is not re-checked (the sync
-trusts a stored uploads playlist id forever), and a channel whose *playlist pages* fail mid-walk
-stops that channel quietly. The `channels.list` HTTP error that used to vanish is now reported as
-`unreachable`, kept distinct from `unresolved` so a YouTube outage never sends a host editing a
-handle that is correct (`ea6f25c`).
+Still owed from this class: a channel whose *playlist pages* fail mid-walk stops that channel
+quietly after any rows already taken. The cursor-trust half is now closed — a stored uploads
+playlist that YouTube no longer serves is re-resolved from the handle once per run and the cursor is
+replaced (`c5d2bf4`) — as is the outage half, reported as `unreachable` and kept distinct from
+`unresolved` so a YouTube outage never sends a host editing a handle that is correct (`ea6f25c`).
 
 One more instance of the same disguise was closed in `6a0e938`: the keyless songbook fallback caught
 **every** database error and answered "no results", which is precisely how the missing grants would
@@ -126,7 +126,8 @@ distinction at all.
 - Playback is always the YouTube embed; never store or serve video. Catalog rows hold ids and display metadata only.
 - Browsing, filtering and paging must cost **zero** YouTube quota.
 - Sync is **host-token only**, capped at **12 units per run** (four channels × 3 pages — the spec's
-  fifth channel had no live handle and the owner removed it on 2026-10-25) and **40 units/day** (`consume_daily_rate_limit('global','karaoke-catalog-day',40,…)`), no-ops if every channel synced within 6 hours, and aborts its loop after **8 seconds**.
+  fifth channel had no live handle and the owner removed it on 2026-10-25), plus one extra unit for
+  any channel whose stored playlist had to be re-resolved, and **40 units/day** (`consume_daily_rate_limit('global','karaoke-catalog-day',40,…)`), no-ops if every channel synced within 6 hours, and aborts its loop after **8 seconds**.
 - Every new SQL function: `security definer`, `set search_path = ''`, schema-qualified names, `revoke all … from public, anon, authenticated`, `grant execute … to service_role` **and to `echo_service`** — the app connects as `echo_service` since the 2026-10-25 credential rotation, and granting only `service_role` makes the feature 500 in production while every owner-run test stays green (see Status).
 - Guest phone controls stay ≥44px and must not overflow at 200% text.
 - The guest remote keeps exactly two bottom tabs (Search, Queue); the songbook is a screen with its own back link.
