@@ -212,6 +212,22 @@ describe('songbook list', () => {
     expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument();
   });
 
+  it('does not tell a host to ask the host', async () => {
+    // The guest line is right for a phone remote. On the host screen the refresh
+    // button sits directly above this sentence, so telling the reader to ask the
+    // host was telling them to ask themselves.
+    const host = makeEmptyApi({ available: true, added: 0, skipped: 0 });
+    render(<SongbookList api={host.api} roomId={roomId} canSync />);
+    const hostCopy = await screen.findByText(/warming up/i);
+    expect(hostCopy).toHaveTextContent(/refresh it/i);
+    expect(hostCopy.textContent).not.toMatch(/ask the host/i);
+    cleanup();
+
+    const guest = makeEmptyApi({ available: true, added: 0, skipped: 0 });
+    render(<SongbookList api={guest.api} roomId={roomId} />);
+    expect(await screen.findByText(/warming up/i)).toHaveTextContent(/ask the host/i);
+  });
+
   it('lets the host refresh a catalog that has not been synced yet', async () => {
     const { api, calls } = makeEmptyApi({ available: true, added: 412, skipped: 0 });
     render(<SongbookList api={api} roomId={roomId} canSync />);

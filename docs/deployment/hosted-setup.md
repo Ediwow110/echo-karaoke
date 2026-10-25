@@ -499,6 +499,14 @@ grants in 0034 are needed even though nothing calls them yet.
    hardening batch — which is why the post-deploy checks below include the ordinary host flow, not just
    catalog calls.
 
+   **That warning earned its keep.** Proving the songbook in a real browser found exactly such a
+   regression, invisible to every automated gate: the YouTube IFrame API replaces the element it is
+   handed, `HostPlayer` gave it a div React rendered, and the next client-side navigation that
+   inserted a sibling threw `NotFoundError: insertBefore` and dropped the host screen to the error
+   boundary. Fixed in `c66aa8a` by letting the factory own a throwaway child node, with a test that
+   reproduces the same DOMException against the old code. The lesson worth keeping: a suite that mocks
+   the API can never see a conflict between that API and the reconciler.
+
    Nothing else in this tree can fail the build, and that is measured rather than assumed.
 
    **What this deploy changes for rooms that are already running.** When a video ends in an open host
@@ -649,7 +657,7 @@ and authenticated roles.
 - **All four CI jobs were simulated on a fresh branch off `main`** (2026-10-25): the full
   0001→0034 chain applies, `npx supabase test db` reports 328/328, and `npm run test:integration`
   reports 8/8 connecting as `echo_service` **without** a YouTube key — the same conditions CI runs
-  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 426 unit tests, the build and
+  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 429 unit tests, the build and
   16 mocked UI flows pass. The push should be green; if it is not, the difference is in CI's
   environment, not in this tree.
 
@@ -665,7 +673,7 @@ branch for the app-level proof only, or expect those four assertions to complain
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 328 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 426 passing tests on the current tree.
+- [x] `npm test` reports 429 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**

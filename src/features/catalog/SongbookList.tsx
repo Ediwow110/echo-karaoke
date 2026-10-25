@@ -185,7 +185,11 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
       ) : hasLoaded === false ? null : items.length === 0 && (busy === false || syncing) ? (
         <div className="flex flex-col items-center gap-3">
           <p className="w-full rounded-panel border border-line bg-surface px-4 py-6 text-center text-[0.8125rem] text-ink-2">
-            {filtering ? 'No song matches that search.' : 'The songbook is warming up. Ask the host to refresh it.'}
+            {filtering
+              ? 'No song matches that search.'
+              : canSync
+                ? 'The songbook is warming up. Refresh it to fill it with songs.'
+                : 'The songbook is warming up. Ask the host to refresh it.'}
           </p>
         </div>
       ) : (
