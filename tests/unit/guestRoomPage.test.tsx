@@ -38,7 +38,7 @@ function liveRoom(locked = false) {
   };
 }
 
-function makeApi(locked = false): { api: EdgeApi; calls: string[] } {
+function makeApi(locked = false, catalogItems: unknown[] = []): { api: EdgeApi; calls: string[] } {
   const calls: string[] = [];
   const api: EdgeApi = {
     invoke: (async (name: string) => {
@@ -62,7 +62,7 @@ function makeApi(locked = false): { api: EdgeApi; calls: string[] } {
         return { roomId, status: 'live', playback: liveRoom(locked).playback };
       }
       if (name === 'catalog-page') {
-        return { total: 0, items: [] };
+        return { total: catalogItems.length, items: catalogItems };
       }
       return liveRoom(locked);
     }) as unknown as EdgeApi['invoke'],
@@ -156,6 +156,31 @@ describe('guest phone remote', () => {
 
     expect(await screen.findByText(/never gonna give you up added/i)).toBeInTheDocument();
     expect(calls).toContain('queue-command');
+  });
+
+  it('carries the host lock into the songbook so a locked guest cannot queue a song', async () => {
+    // GuestRoomPage passes locked={locked} to the songbook screen. Nothing
+    // covered that seam: dropping the prop left a locked guest with a fully
+    // working Add button on the one screen that had no test for it.
+    const song = {
+      videoId: 'dQw4w9WgXcQ',
+      title: 'Never Gonna Give You Up',
+      channelTitle: 'Rick Astley',
+      thumbnailUrl: null,
+      publishedAt: '2025-01-02T00:00:00Z',
+    };
+
+    const open = makeApi(true, [song]);
+    renderGuest(open.api, '/room/' + roomId + '/songbook');
+    const addLocked = await screen.findByRole('button', { name: 'Add Never Gonna Give You Up' });
+    expect(addLocked).toBeDisabled();
+    fireEvent.click(addLocked);
+    expect(open.calls).not.toContain('queue-command');
+
+    const unlocked = makeApi(false, [song]);
+    cleanup();
+    renderGuest(unlocked.api, '/room/' + roomId + '/songbook');
+    expect(await screen.findByRole('button', { name: 'Add Never Gonna Give You Up' })).toBeEnabled();
   });
 
   it('opens the songbook inside the remote without adding a third tab', async () => {
