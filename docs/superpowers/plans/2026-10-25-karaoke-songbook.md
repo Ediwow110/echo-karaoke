@@ -35,13 +35,13 @@ beyond this plan; it hardened the surrounding features:
 - The app is branded **kara-echo** (`appName`, `index.html`, `README.md`, `public/llms.txt`) and
   `Referrer-Policy` moved to `strict-origin-when-cross-origin`.
 
-Evidence on the committed tree: `tsc` clean, unit 411/411, pgTAP 328/328, build passes, mocked e2e
+Evidence on the committed tree: `tsc` clean, unit 415/415, pgTAP 328/328, build passes, mocked e2e
 16/16, and every commit in the series typechecks alone. The full 0001→0034 chain was replayed on
 disposable Neon branches off production `main`, where pgTAP reported 328/328 and the integration
 suite 8/8 connecting as `echo_service`; those branches were deleted and production `main` was
 confirmed unchanged each time.
 
-**Two further defects on the seed path, found by reading the build's own deferred notes (2026-10-25):**
+**Further defects on the seed path, found by reading the build's own deferred notes (2026-10-25):**
 
 - `94b1a0c` — `karaoke_catalog_upsert` cast `publishedAt` straight to `timestamptz`, so one
   malformed provider string raised inside the statement and cost **all fifty rows of that page**,
@@ -52,6 +52,14 @@ confirmed unchanged each time.
   would believe until the Pacific-day reset. It now propagates to the operation boundary, which
   already logs and answers 500. Re-verified on a fresh Neon branch: the chain applies, pgTAP
   328/328, integration 8/8 as `echo_service`.
+
+- `2ec1a19` — `catalog-page` validated paging with `Number.isInteger`, which accepts `1e15`;
+  Postgres then rejected it as an integer out of range, so a wildly paging guest got a 500 instead
+  of a page. Bounds now mirror the SQL clamps. The same commit covers a second defect: the
+  "songbook returned no result" throw sat **inside its own `try`**, so `mapDatabaseError` replaced
+  the specific reason with the generic message before anyone could see it. Neither was reachable by
+  any test, because this operation had no server-side spec at all — `tests/unit/catalogBrowse.test.ts`
+  is new with it, and the clamp is mutation-proven (reverting it fails exactly one test).
 
 Still open in the sync, neither on the first-seed path: two hosts refreshing at once race the
 cursor, and `exhausted_at` is written but never read.
