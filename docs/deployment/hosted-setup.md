@@ -698,11 +698,33 @@ holds. The refusal is the correct outcome — a guest should not be pausing the 
 console error, and silencing it means skipping the unmount pause when the tab was demoted rather
 than closed.
 
+## Narrow screens (shipped 2026-10-26)
+
+The owner's screenshot showed `kara-echo` folded across two lines in the stage header at 320px, with
+the back arrow and Party view pushed apart. The wordmark was a fixed `2.05rem` in a flex row, so on a
+phone it had no room and wrapped instead of yielding. `src/ui/Logo.tsx` now clamps each size to the
+viewport, forbids the break, and lets the bars refuse to shrink; the stage header drops the wordmark
+below the small breakpoint, as the host header already did, because there the brand competes with
+actions a person needs to hit.
+
+Measured on the live origin at 320px — stage, party, host discovery, guest, home, settings and the
+songbook (30 rows): no element wider than the viewport outside a clipped container, no text whose
+scroll width exceeded its box, and the brand either absent (stage) or on one line everywhere else. At
+640px, where the stage wordmark returns, the header is one 65px row with 24px of slack. The only
+horizontal scroll anywhere was 10px at a 320px *desktop* window, where `body { min-width: 320px }`
+holds the floor against the classic scrollbar; with the scrollbar removed the document measures
+exactly 320, so a real phone at 320pt does not scroll sideways.
+
+`tests/unit/logo.test.tsx` holds the contract: the wordmark never wraps, all three sizes stay fluid,
+the bars keep `shrink-0`, and header-specific classes land on the text only. Red-proved by restoring
+the pre-fix `Logo.tsx` — four assertions fail, and the fifth (the stage header's own class) does not,
+which is the shape of the bug.
+
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 345 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 447 passing tests on the current tree.
+- [x] `npm test` reports 454 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
