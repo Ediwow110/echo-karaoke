@@ -379,9 +379,13 @@ curl -s -o /dev/null -w '%{http_code}\n' https://your-app.example/api/cron/catal
 # 401 — reachable, and rejected without the bearer secret
 ```
 
-Migrations 0031 (catalog tables and paging), 0032 (`playback_next_if_current`) and
-0033 (retention, RLS and the 28-day read filter) must be applied before this tree
-serves traffic: the sync and the cron both call functions 0033 installs.
+Migrations 0031 (catalog tables and paging), 0032 (`playback_next_if_current`),
+0033 (retention, RLS and the 28-day read filter) and 0034 (the same surface granted
+to `echo_service`) must be applied before this tree serves traffic: the sync and the
+cron both call functions 0033 installs. 0034 is not optional — the function layer
+connects as `echo_service`, so without it every songbook call answers 500 while the
+owner-run database suite still passes. Grant new functions to both roles from now on;
+`supabase/tests/role_grant_parity_test.sql` fails if they drift apart.
 
 ## Verification checklist
 

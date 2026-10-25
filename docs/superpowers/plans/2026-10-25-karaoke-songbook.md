@@ -40,13 +40,47 @@ build passes, mocked e2e 15/15. The full 0001→0033 chain was also pushed to a 
 branch off production `main`, where pgTAP reported 323/323; that branch was deleted and
 production `main` was confirmed unchanged afterwards.
 
-Task 7 is **not started** and now has one more prerequisite: `catalogRetentionCron` refuses to run
-without `CRON_SECRET` (≥32 chars) and `npm run verify:deploy` demands it in Production, but the
-Vercel Production environment **does not have it** — so the cron answers 503 and the build is
-rejected until the owner creates that secret. Order that matters: create `CRON_SECRET`, apply
-0031–0033 to production `main`, push/deploy, seed once from the host screen, prove a songbook pick
-reaches the queue and plays. Commits, the push and the production migration all need the owner's
-explicit approval.
+**Live proof, and the bug it found (2026-10-25).** The loop was run end to end against a
+disposable Neon branch off production `main`, with the real YouTube key, connecting as the
+**runtime role**:
+
+| Step | Result |
+|---|---|
+| `catalog-sync` | **409 songs** written from the four live channels; `unresolved: ["@karaoketv"]` |
+| re-run inside 6h | `added 0, skipped 4` — the throttle, not a silent re-fetch |
+| `catalog-page` | `total 409`, page of 5 — zero quota spent |
+| filter `q=Nanghihinayang` | `total 1`, every title matches |
+| channel chip `@vinylktv` | `total 105`, every row that channel |
+| `queue-command add` | `status queued`, 201 |
+| `playback-command play` | `currentSongId` = the queued song, `isPlaying true` |
+| `next` with `expectedSongId` | first `advanced: true`, replay `advanced: false` — 0032's claim |
+
+The first attempt returned **500 on every catalog call**, and no existing test could see it:
+migrations 0031–0033 grant `execute` to `service_role`, but the app connects as `echo_service`,
+whose surface was copied from `service_role` on 2026-10-25 — *before* those migrations existed.
+pgTAP runs as the owner and grants are checked at call time, so 298 assertions stayed green while
+the feature was unusable. Migration `0034_grant_catalog_to_runtime_role.sql` repairs it (guarded so
+it still applies where `echo_service` does not exist, i.e. the local stack), and two gates now close
+the class: `supabase/tests/role_grant_parity_test.sql` fails if any function or table reachable by
+`service_role` is unreachable by `echo_service` (mutation-proven: revoking one grant turns it red),
+and the integration suite — which *does* connect as the runtime role — now asserts the songbook
+page answers 200.
+
+That suite also exposed a stale assertion worth keeping: keyless `youtube-search` was expected to
+report `available: false`, which passed on a fresh CI branch only because its catalog is empty. With
+the songbook fallback in place the honest contract is both cases, so the test now seeds one catalog
+row and asserts the cold answer *and* the `source: "songbook"` answer.
+
+Task 7 is **not started** and has a prerequisite beyond the migration: `catalogRetentionCron`
+refuses to run without `CRON_SECRET` (≥32 chars) and `npm run verify:deploy` demands it in
+Production, but the Vercel Production environment **does not have it** — so the cron answers 503
+and the build is rejected until the owner creates that secret. Commits, the push and the production
+migration all need the owner's explicit approval.
+
+Task 7's production step is unchanged in shape — create `CRON_SECRET`, apply 0031–0034 to
+production `main`, push/deploy, seed once, prove on the live origin — but the seeding risk is now
+quantified: the catalog fills to ~409 rows per refresh from four channels, and it will work as
+`echo_service` only if 0034 ships with the rest.
 
 One thing the task list missed: Tasks 4–5 shipped the warming-up message but never wired the
 host-only Retry the spec requires, so nothing could call `catalog-sync`. That landed separately
@@ -84,7 +118,7 @@ still `continue`s unreported, and a cursor whose channel later disappears is not
 - Playback is always the YouTube embed; never store or serve video. Catalog rows hold ids and display metadata only.
 - Browsing, filtering and paging must cost **zero** YouTube quota.
 - Sync is **host-token only**, capped at **15 units per run** (5 channels × 3 pages) and **40 units/day** (`consume_daily_rate_limit('global','karaoke-catalog-day',40,…)`), no-ops if every channel synced within 6 hours, and aborts its loop after **8 seconds**.
-- Every new SQL function: `security definer`, `set search_path = ''`, schema-qualified names, `revoke all … from public, anon, authenticated`, `grant execute … to service_role`.
+- Every new SQL function: `security definer`, `set search_path = ''`, schema-qualified names, `revoke all … from public, anon, authenticated`, `grant execute … to service_role` **and to `echo_service`** — the app connects as `echo_service` since the 2026-10-25 credential rotation, and granting only `service_role` makes the feature 500 in production while every owner-run test stays green (see Status).
 - Guest phone controls stay ≥44px and must not overflow at 200% text.
 - The guest remote keeps exactly two bottom tabs (Search, Queue); the songbook is a screen with its own back link.
 - Commits require the owner's explicit approval; batch the commit steps below when they give it. A push deploys production, so push only with approval.
