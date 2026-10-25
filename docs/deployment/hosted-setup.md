@@ -491,7 +491,13 @@ grants in 0034 are needed even though nothing calls them yet.
    owner-run database suite stays green.
 
 3. **Deploy** by pushing `master`. Note this branch also carries the two local-only `master`
-   commits (`9dc5396`, `54b8478`) that were never shipped.
+   commits (`9dc5396`, `54b8478`) that were never shipped. They are not inert: `9dc5396` is a host
+   playback feature — handing the host to the party view and ending a song early — that added 95 lines
+   to `HostPlayer.tsx`, the same component that owns the auto-advance, so watch for a regression there
+   and not only in the songbook. `54b8478` only deletes a retired Supabase-era dev-tunnel script.
+   Read the whole push as three things shipping at once — the songbook, that playback feature, and the
+   hardening batch — which is why the post-deploy checks below include the ordinary host flow, not just
+   catalog calls.
 
    Nothing else in this tree can fail the build, and that is measured rather than assumed.
 
