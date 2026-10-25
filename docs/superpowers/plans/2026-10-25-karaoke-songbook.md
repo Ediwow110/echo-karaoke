@@ -35,7 +35,7 @@ beyond this plan; it hardened the surrounding features:
 - The app is branded **kara-echo** (`appName`, `index.html`, `README.md`, `public/llms.txt`) and
   `Referrer-Policy` moved to `strict-origin-when-cross-origin`.
 
-Evidence on the committed tree: `tsc` clean, unit 416/416, pgTAP 328/328, build passes, mocked e2e
+Evidence on the committed tree: `tsc` clean, unit 418/418, pgTAP 328/328, build passes, mocked e2e
 16/16, and every commit in the series typechecks alone. The full 0001→0034 chain was replayed on
 disposable Neon branches off production `main`, where pgTAP reported 328/328 and the integration
 suite 8/8 connecting as `echo_service`; those branches were deleted and production `main` was
