@@ -1,4 +1,4 @@
-# ECHO
+# kara-echo
 
 A login-free YouTube karaoke room. A host creates a named room, guests scan a real QR code or type the room code, and everyone adds songs to one shared queue while the host screen plays the music.
 
@@ -59,9 +59,11 @@ YouTube search and chart require a data API key. Without it the app explains tha
 Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed, with a per-room daily lookup budget and a larger deployment budget. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0030 before deploying this tree; queue and search now call
+migrations 0025 through 0033 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
-karaoke-strip cache TTL, and host removal now repairs playback state.
+karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
+calls `playback_next_if_current`, and the songbook catalog tables and its retention
+function must exist before the sync and the daily cron run.
 
     npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
     npx supabase test db --db-url "$NEON_DATABASE_URL"
@@ -75,7 +77,7 @@ Two abuse controls are optional. The room cap counts the host and guests present
     ROOM_MEMBER_LIMIT=50
     ANON_SIGNIN_LIMIT_PER_HOUR=120
 
-Before shipping, run `npm run verify:deploy`. It refuses a build when the auth secret, the two database URLs, an origin, or a quota budget is missing or malformed, or when any `VITE_` variable holds a PostgreSQL connection string. `vercel.json` applies the security headers and the CSP at the Vercel edge, pins the function to `sin1`, and sends `/api/*` to the function instead of the app shell.
+Before shipping, run `npm run verify:deploy`. It refuses a build when the auth secret, the two database URLs, an origin, a quota budget, or the Production `CRON_SECRET` is missing or malformed, or when any `VITE_` variable holds a PostgreSQL connection string. `vercel.json` applies the security headers and the CSP at the Vercel edge, pins the function to `sin1`, sends `/api/*` to the function instead of the app shell, and schedules the catalog retention cron.
 
 The hosted setup, step by step, is in `docs/deployment/hosted-setup.md`. It covers the Neon project, the two database credentials, the auth service, the Vercel environment, the CI secrets, and the preview checks.
 
@@ -83,13 +85,15 @@ After deploying, run `npm run verify:preview -- https://your-app.example`. It ch
 
 Rooms are cleaned up when a room is created. That request first deletes every room whose members have not sent a heartbeat for 30 minutes and every ended room older than two days; members, queue items, votes, events, and host secrets cascade. The app sends a slow heartbeat while a tab is hidden, so a background host tab is not treated as empty. Anonymous identities are intentionally retained: they contain no room content after the sweep, and Better Auth owns them. Room creation is capped at 10 rooms per session per hour; this is a per-session speed bump, not a replacement for sign-in rate limits.
 
+The karaoke songbook is a local catalog of embeddable karaoke videos, filled only by a host pressing Refresh. Browsing, filtering and paging read the catalog and cost zero YouTube quota. One refresh costs at most 15 `playlistItems` units (five channels, three pages) against a 40-unit daily budget, no-ops while every channel synced within six hours, and stops after eight seconds with a partial result. Because third-party YouTube metadata must be revalidated or deleted within 30 days, the page function hides anything older than 28 days and `karaoke_catalog_retire_stale()` deletes it. That runs inside each refresh and once more from a Vercel Cron at 02:00 UTC, so an idle site still expires its catalog. Set `CRON_SECRET` to at least 32 characters in the Production environment; Vercel sends it as `Authorization: Bearer <secret>`. The endpoint answers 404 outside Production, 401 on a non-matching bearer, and 503 when the secret is unset or short, and never returns database contents. When search is unconfigured, out of budget, or failing, the search panel falls back to matching catalog entries within that same 28-day window and says so; it never serves aged metadata as a search result.
+
 ## Tests
 
-    npm test                 # 264 unit and component tests (jsdom)
+    npm test                 # 401 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 283 pgTAP assertions
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 323 pgTAP assertions
     npm run test:integration # 7 router/auth/operation tests against a Neon branch
-    npm run test:e2e:ui      # 6 CI-safe Playwright UI flows with a mocked API
+    npm run test:e2e:ui      # 15 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows against vercel dev on port 3000
 
 The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.

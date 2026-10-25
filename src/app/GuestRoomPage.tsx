@@ -129,9 +129,9 @@ export default function GuestRoomPage() {
   }, [queue]);
 
   useEffect(() => {
-    document.title = roomName.length > 0 ? 'ECHO · ' + roomName : 'ECHO | the room sings together';
+    document.title = roomName.length > 0 ? 'kara-echo · ' + roomName : 'kara-echo | the room sings together';
     return () => {
-      document.title = 'ECHO | the room sings together';
+      document.title = 'kara-echo | the room sings together';
     };
   }, [roomName]);
 

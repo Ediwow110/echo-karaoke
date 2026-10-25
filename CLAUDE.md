@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Persistent instructions for agents working in ECHO. See `README.md` for the product
+Persistent instructions for agents working in kara-echo. See `README.md` for the product
 and deployment contract.
 
 ## Commands

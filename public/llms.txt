@@ -1,6 +1,6 @@
-# ECHO
+# kara-echo
 
-ECHO is a login-free YouTube karaoke room. One host screen plays the music while guests use their phones as search and queue remotes.
+kara-echo is a login-free YouTube karaoke room. One host screen plays the music while guests use their phones as search and queue remotes.
 
 ## Entry points
 

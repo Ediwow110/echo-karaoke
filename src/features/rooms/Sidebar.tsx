@@ -104,7 +104,7 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
 
   return (
     <aside aria-label="Room navigation" className="hidden h-dvh w-[232px] shrink-0 flex-col border-r border-line bg-graphite-deep px-4 pb-5 pt-7 lg:sticky lg:top-0 lg:flex">
-      <Link to="/" className="px-2" aria-label="ECHO, create a room">
+      <Link to="/" className="px-2" aria-label="kara-echo, create a room">
         <Logo size="lg" />
       </Link>
 

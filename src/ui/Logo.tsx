@@ -15,7 +15,7 @@ const barHeights = ['50%', '100%', '72%', '38%'];
 export default function Logo({ size = 'md', withWordmark = true, className = '' }: LogoProps) {
   const scale = sizes[size];
   return (
-    <span className={['inline-flex items-center gap-2', className].join(' ')} aria-label="ECHO">
+    <span className={['inline-flex items-center gap-2', className].join(' ')} aria-label="kara-echo">
       <span aria-hidden="true" className={['flex items-center', scale.bars].join(' ')}>
         {barHeights.map((height, index) => (
           <span
@@ -27,7 +27,7 @@ export default function Logo({ size = 'md', withWordmark = true, className = '' 
       </span>
       {withWordmark ? (
         <span className={['font-display font-bold tracking-[-0.035em] text-ink', scale.wordmark].join(' ')}>
-          ECHO
+          kara-echo
         </span>
       ) : null}
     </span>

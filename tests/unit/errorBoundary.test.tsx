@@ -18,6 +18,6 @@ describe('application error boundary', () => {
     vi.spyOn(console, 'error').mockImplementation(() => undefined);
     render(createElement(ErrorBoundary, null, createElement(Broken)));
     expect(screen.getByRole('heading', { name: /this screen stopped/i })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /reload echo/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /reload kara-echo/i })).toBeInTheDocument();
   });
 });

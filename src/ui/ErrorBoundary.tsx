@@ -11,7 +11,7 @@ export default class ErrorBoundary extends Component<Props, State> {
   }
 
   componentDidCatch(error: Error, info: ErrorInfo): void {
-    console.error('ECHO could not render this screen', error.name, info.componentStack);
+    console.error('kara-echo could not render this screen', error.name, info.componentStack);
   }
 
   render() {
@@ -28,7 +28,7 @@ export default class ErrorBoundary extends Component<Props, State> {
               onClick={() => window.location.reload()}
               className="mt-5 inline-flex min-h-11 items-center rounded-media bg-signal-fill px-4 text-[0.8125rem] font-semibold text-signal-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
             >
-              Reload ECHO
+              Reload kara-echo
             </button>
           </div>
         </main>

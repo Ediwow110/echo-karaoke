@@ -10,15 +10,42 @@
 
 **Spec:** `docs/superpowers/specs/2026-10-25-karaoke-songbook-design.md`
 
-## Status (2026-10-25)
+## Status (2026-10-25, second pass)
 
-Tasks 1–6 are complete and committed on `feature/songbook` (13 commits ahead of `master`); the
-branch is **not pushed** and **migration 0031 is not applied to production Neon**, so production
-still has no `karaoke_catalog` tables. Local evidence at `0062146`: unit 304/304, pgTAP 298/298,
-`tsc` clean, build passes, mocked e2e 9/9.
+Tasks 1–6 remain committed on `feature/songbook` (14 ahead of local `master`, 16 ahead of
+`origin/master`, latest `8780c90`). The branch is still **not pushed** and **migrations 0031–0033
+are still not applied to production Neon `main`**, which is verified to be at 0030 with none of the
+catalog or auto-advance functions. Merging also carries the two local-only `master` commits
+(`9dc5396`, `54b8478`) that were never shipped.
 
-Task 7 (apply 0031 to production, push/deploy, seed once, prove the loop) is **not started** —
-it needs the owner's approval because a push deploys production.
+A second, uncommitted batch sits in the working tree (55 modified files, 14 untracked, +1787/-231).
+It is not one of this plan's tasks; it hardened the surrounding features after Task 6:
+
+- `0032_playback_auto_advance_once.sql` + `playbackCommand` — an automatic advance passes
+  `expectedSongId` and the database re-checks it under the room lock, so a replayed advance can
+  never skip the following song.
+- `0033_catalog_retention_and_rls.sql` + `server/operations/catalogRetention.ts` + the
+  `vercel.json` cron — RLS on both catalog tables, a 28-day filter inside `karaoke_catalog_page`,
+  and `karaoke_catalog_retire_stale()` on a daily `0 2 * * *` schedule.
+- `youtube.ts` — search now falls back to fresh catalog entries when the key is absent or the
+  budget is spent, and the upstream call asks for `videoEmbeddable=true&videoSyndicated=true`.
+- `roomApi.ts` / `HomePage.tsx` — create/join responses are validated before their bearer tokens
+  are stored, and an uncertain create warns instead of silently allowing a duplicate room.
+- The app is branded **kara-echo** (`appName`, `index.html`, `README.md`, `public/llms.txt`) and
+  `Referrer-Policy` moved to `strict-origin-when-cross-origin`.
+
+Evidence on the current tree: `tsc` clean, unit 401/401, pgTAP 323/323 on the local container,
+build passes, mocked e2e 15/15. The full 0001→0033 chain was also pushed to a disposable Neon
+branch off production `main`, where pgTAP reported 323/323; that branch was deleted and
+production `main` was confirmed unchanged afterwards.
+
+Task 7 is **not started** and now has one more prerequisite: `catalogRetentionCron` refuses to run
+without `CRON_SECRET` (≥32 chars) and `npm run verify:deploy` demands it in Production, but the
+Vercel Production environment **does not have it** — so the cron answers 503 and the build is
+rejected until the owner creates that secret. Order that matters: create `CRON_SECRET`, apply
+0031–0033 to production `main`, push/deploy, seed once from the host screen, prove a songbook pick
+reaches the queue and plays. Commits, the push and the production migration all need the owner's
+explicit approval.
 
 One thing the task list missed: Tasks 4–5 shipped the warming-up message but never wired the
 host-only Retry the spec requires, so nothing could call `catalog-sync`. That landed separately

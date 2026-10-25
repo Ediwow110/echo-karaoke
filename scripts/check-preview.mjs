@@ -86,7 +86,7 @@ export async function checkPreview(input, options = {}) {
     if (!type.includes('text/html')) errors.push('The home page is not HTML.');
 
     requireHeader(home.headers, 'x-content-type-options', 'nosniff');
-    requireHeader(home.headers, 'referrer-policy', 'no-referrer');
+    requireHeader(home.headers, 'referrer-policy', 'strict-origin-when-cross-origin');
     requireHeader(home.headers, 'x-frame-options', 'DENY');
     requireHeader(home.headers, 'permissions-policy', 'camera=(self)');
     if (target.protocol === 'https:') {
@@ -120,7 +120,7 @@ export async function checkPreview(input, options = {}) {
     }
 
     const html = await home.text();
-    if (!html.includes('<title>ECHO')) errors.push('The ECHO title is missing from the HTML.');
+    if (!html.includes('<title>kara-echo')) errors.push('The kara-echo title is missing from the HTML.');
     if (CONNECTION_STRING.test(html)) errors.push(credentialError('HTML'));
 
     const script = html.match(/<script[^>]+src="([^"]+)"/i)?.[1];

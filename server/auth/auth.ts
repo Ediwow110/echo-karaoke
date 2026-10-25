@@ -20,7 +20,7 @@ const authDatabaseUrl = process.env.VERCEL_ENV === 'preview'
   : process.env.AUTH_DATABASE_URL ?? '';
 
 export const auth = betterAuth({
-  appName: 'ECHO',
+  appName: 'kara-echo',
   baseURL,
   secret: process.env.BETTER_AUTH_SECRET ?? '',
   database: new Pool({

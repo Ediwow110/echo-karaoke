@@ -193,6 +193,7 @@ vercel env add ALLOWED_ORIGINS production
 vercel env add ROOM_MEMBER_LIMIT production
 vercel env add ANON_SIGNIN_LIMIT_PER_HOUR production
 vercel env add YOUTUBE_API_KEY production
+vercel env add CRON_SECRET production
 ```
 
 | Variable | Value |
@@ -204,11 +205,12 @@ vercel env add YOUTUBE_API_KEY production
 | `ALLOWED_ORIGINS` | `https://echo-karaoke-mocha.vercel.app` |
 | `ROOM_MEMBER_LIMIT` | `50` (allowed 2–500); host plus guests |
 | `ANON_SIGNIN_LIMIT_PER_HOUR` | `120` (allowed 1–1000); per hashed network address |
-| `YOUTUBE_API_KEY` | YouTube Data API v3 key for song search and karaoke picks. Without it these features report "not configured"; search also offers a manual-link fallback |
+| `YOUTUBE_API_KEY` | YouTube Data API v3 key for song search and karaoke picks. Without it these features report "not configured"; search falls back to fresh songbook catalog entries |
 | `YOUTUBE_DAILY_SEARCH_BUDGET` | `90` upstream user search calls per day across all rooms |
 | `YOUTUBE_DAILY_POPULAR_BUDGET` | `6` upstream karaoke-strip search calls per day (12-hour cache; must fit the same 100-call bucket as search) |
 | `YOUTUBE_DAILY_METADATA_BUDGET` | `5000` quota-free oEmbed lookups per Pacific day across the deployment |
 | `YOUTUBE_ROOM_METADATA_BUDGET` | `500` quota-free oEmbed lookups per Pacific day per room |
+| `CRON_SECRET` | A random secret of at least 32 characters. Vercel Cron sends it as `Authorization: Bearer …` to `/api/cron/catalog-retention`; required in Production, and `npm run verify:deploy` fails without it |
 | `PREVIEW_DATABASE_URL` | Preview-only service URL pointing at a disposable Neon branch |
 | `PREVIEW_AUTH_DATABASE_URL` | Preview-only auth URL pointing at the same branch |
 
@@ -355,13 +357,39 @@ Both sweeps are best effort. A sweep failure is ignored so that a room can still
 created when the cleanup call fails. There is no required pg_cron job and no
 five-minute guarantee; the interval is opportunistic.
 
+## Step 8: The songbook catalog retention cron
+
+`vercel.json` schedules `0 2 * * *` against `/api/cron/catalog-retention`. That call
+runs `karaoke_catalog_retire_stale()`, which deletes catalog songs and channel cursors
+older than 28 days, so synced YouTube metadata is never served beyond the 30-day
+revalidation window even when the site is idle and no host refreshes.
+
+The route accepts only `GET`, and only when `Authorization` equals `Bearer ` plus
+`CRON_SECRET` compared with `timingSafeEqual`. It returns 404 outside Production, 405
+for other methods, 401 on a mismatched bearer, and 503 if the secret is unset or
+shorter than 32 characters. A database failure returns `{ ok: false }` with no
+connection or query detail. It is matched in `api/router.ts` before Better Auth, so
+cron traffic never creates an anonymous identity, and the operation is not in the
+public registry.
+
+Confirm it after deploying, from the deployed host:
+
+```bash
+curl -s -o /dev/null -w '%{http_code}\n' https://your-app.example/api/cron/catalog-retention
+# 401 — reachable, and rejected without the bearer secret
+```
+
+Migrations 0031 (catalog tables and paging), 0032 (`playback_next_if_current`) and
+0033 (retention, RLS and the 28-day read filter) must be applied before this tree
+serves traffic: the sync and the cron both call functions 0033 installs.
+
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 283 passing assertions on a fresh branch.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 323 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch.
-- [x] `npm test` reports 264 passing tests on the current tree.
+- [x] `npm test` reports 401 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 6 passing tests on the current tree.
+- [x] `npm run test:e2e:ui` reports 15 passing tests on the current tree.
 - [x] `npm run verify:deploy` passes with the production environment.
 - [ ] `vercel deploy --prod` builds with the guard enabled.
 - [ ] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.

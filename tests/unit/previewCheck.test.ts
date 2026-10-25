@@ -4,7 +4,7 @@ import { checkPreview } from '../../scripts/check-preview.mjs';
 type Route = { status: number; headers: Record<string, string>; body: string };
 
 const HOME_HTML = [
-  '<!doctype html><html lang="en"><head><title>ECHO</title>',
+  '<!doctype html><html lang="en"><head><title>kara-echo</title>',
   '<script type="module" crossorigin src="/assets/index-abc123.js"></script>',
   '</head><body><div id="root"></div></body></html>',
 ].join('');
@@ -27,7 +27,7 @@ const DEFAULT_CSP = [
 const HOME_HEADERS = {
   'content-type': 'text/html; charset=utf-8',
   'x-content-type-options': 'nosniff',
-  'referrer-policy': 'no-referrer',
+  'referrer-policy': 'strict-origin-when-cross-origin',
   'x-frame-options': 'DENY',
   'permissions-policy': 'camera=(self), microphone=(), geolocation=()',
   'strict-transport-security': 'max-age=63072000; includeSubDomains',
