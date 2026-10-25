@@ -672,6 +672,37 @@ are the only songs in the table — is closed: that file now clears the table fi
 inherits the seeded rows from `main`, and the `database` job on `master` went red for exactly that
 reason: four failures, all of them the fixtures meeting real data they never expected.
 
+### The guest-to-handoff chain, proven on production (2026-10-26)
+
+The last two unverified behaviors closed in one room ("Handoff Proof", `a8485335`), with the host in
+one browser and the guest in a second, isolated one:
+
+```
+23:27:13 join  guest Meow
+23:28:12 add   guest → When I Was Your Man      POST /api/queue-command 201
+23:28:54 add   guest → Umbrella                 POST /api/queue-command 201
+23:31:46 skip  member_id: null                  ← the automatic advance
+queue_songs: row 1 played, row 2 playing
+```
+
+The guest joined by code, queued two karaoke picks, the host tab auto-opened party view playing the
+guest's song with "Added by Meow", and 213 s later — a 3:36 video ending through the 5-second early-end
+rule — `advance_queue` handed off with nobody pressing next. `member_id: null` on the `skip` is what
+separates an automatic advance from a host skip. The settings screen also offered "Hand the room to
+Meow" with a live roster, so the transfer UI is confirmed reachable against real data.
+
+**Two limits on that proof, stated rather than glossed.** The guest browser's synthetic clicks never
+reached React's handlers, so its join and queue actions were dispatched through the DOM instead; the
+server logged ordinary `200`/`201` traffic, which makes that a harness limitation and not an app
+defect. And that browser could not be resized, so the guest flow ran at desktop width — the checklist
+line about a **390px** guest viewport stays unticked, even though the narrow layouts were measured
+separately the same day.
+
+**A second instance of the teardown rough edge.** Ending the room logged a `409` from
+`playback-command`: the player's unmount cleanup tried to pause a room that had already ended. Same
+shape as the `403` a demoted host's tab logs after transfer-host — a pause attempt with a pass that is
+no longer valid. The refusal is correct; the console noise is the bug, and one guard should cover both.
+
 ## Transfer host (migration 0035, shipped 2026-10-26)
 
 A host can hand the room to any guest whose remote is still connected, from **Room settings →
