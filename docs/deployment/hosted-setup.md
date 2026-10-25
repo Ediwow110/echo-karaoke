@@ -542,6 +542,12 @@ grants in 0034 are needed even though nothing calls them yet.
    uploads playlist `UUJw1qyMF4m3ZIBWdhogkcsw`, the same id the plan's probe table records. Do it
    with the key read from the environment rather than typed, so it stays out of shell history.
 
+   If a press stops before every channel is filled — the eight-second budget can cut a walk in the
+   middle of a playlist — press again rather than waiting. A channel whose stored page token is still
+   pending resumes from that token; the six-hour throttle only holds a channel that was brought fully
+   up to date, because `karaoke_catalog_cursor_save` stamps `last_synced_at` on every page and the
+   finish is told apart by the token, not the timestamp.
+
    Before the push, both songbook routes answer **`404` `That operation is not available`** on the
    live origin (measured 2026-10-25). After a correct ship they answer **`401`**, because the
    session check runs before dispatch. A `500` instead means the code deployed but the migrations
@@ -628,7 +634,7 @@ and authenticated roles.
 - **All four CI jobs were simulated on a fresh branch off `main`** (2026-10-25): the full
   0001→0034 chain applies, `npx supabase test db` reports 328/328, and `npm run test:integration`
   reports 8/8 connecting as `echo_service` **without** a YouTube key — the same conditions CI runs
-  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 425 unit tests, the build and
+  under. `npm audit --audit-level=high` is clean, and locally `tsc`, 426 unit tests, the build and
   16 mocked UI flows pass. The push should be green; if it is not, the difference is in CI's
   environment, not in this tree.
 
@@ -644,7 +650,7 @@ branch for the app-level proof only, or expect those four assertions to complain
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 328 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 425 passing tests on the current tree.
+- [x] `npm test` reports 426 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**

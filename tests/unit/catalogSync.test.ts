@@ -379,6 +379,33 @@ describe('catalog sync orchestration', () => {
     });
   });
 
+  it('resumes a walk the time budget cut short instead of locking it out for six hours', async () => {
+    // karaoke_catalog_cursor_save stamps last_synced_at on EVERY page, so a half
+    // finished channel looks identical to a finished one at the throttle. If the
+    // token is still pending, the next press must pick up where it stopped — the
+    // alternative is a songbook missing whole pages that no host can fill for six
+    // hours, with the UI reporting only a skip count.
+    const now = new Date().toISOString();
+    const partial = CATALOG_CHANNELS.map((handle, index) => ({
+      channelId: handle,
+      uploadsPlaylistId: 'UU' + handle.slice(1),
+      nextPageToken: index === 0 ? 'TOKEN_PAGE_2' : null,
+      exhaustedAt: null,
+      lastSyncedAt: now,
+    }));
+    useDatabase(baseHandlers({ karaoke_catalog_cursors: () => partial }));
+    const fetchRecord = stubFetch({ rows: [row(1)] });
+
+    const response = await catalogSync(syncRequest(), CALLER);
+    const body = await response.json() as { added: number; skipped: number };
+
+    expect(
+      fetchRecord.urls.some((url) => url.searchParams.get('pageToken') === 'TOKEN_PAGE_2'),
+      'the stored page token was never requested',
+    ).toBe(true);
+    expect(body.skipped).toBe(CATALOG_CHANNELS.length - 1);
+  });
+
   it('names a channel it could not resolve instead of reporting a clean run', async () => {
     // Two channels need resolving this run: one real, one whose handle names
     // nothing. A stale handle has to surface, not quietly shrink the catalog.

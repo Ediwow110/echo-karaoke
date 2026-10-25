@@ -226,7 +226,13 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
   channels: for (const handle of CATALOG_CHANNELS) {
     if (Date.now() - started > TIME_BUDGET_MS) break;
     let cursor = byChannel.get(handle);
+    // The six-hour throttle means "this channel is up to date", so it may only
+    // apply to a walk that finished. cursor_save stamps last_synced_at on every
+    // page, and the time budget or a bad page can cut a walk short with a page
+    // token still pending — throttling that would hide the rest of a channel's
+    // songs for six hours behind a skip count.
     if (cursor !== undefined && cursor.lastSyncedAt !== null
+      && cursor.nextPageToken === null
       && Date.now() - Date.parse(cursor.lastSyncedAt) < THROTTLE_MS) {
       skipped += 1;
       continue;
