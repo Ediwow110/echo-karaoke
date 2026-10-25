@@ -720,11 +720,32 @@ the bars keep `shrink-0`, and header-specific classes land on the text only. Red
 the pre-fix `Logo.tsx` — four assertions fail, and the fifth (the stage header's own class) does not,
 which is the shape of the bug.
 
+## Landing identity and the roomless nav (shipped 2026-10-26)
+
+**No name until one is typed.** `karaoke.profile.name` survived the blank field: the landing
+sidebar, the collection pages, the join form, `Sidebar` itself and `HostRoomPage` all read it, so a
+shared TV still opened by announcing whoever last used it. Identity now comes only from what is typed
+in this session, or from the room's own roster once you are inside one, and the storage helper is
+deleted because nothing reads it. The accepted cost is retyping your name each visit, including on the
+join screen.
+
+**The nav before a room.** Four room-only destinations used to sit greyed out beside the live ones,
+which read as a broken sidebar rather than a room that hasn't started. The nav now carries Create room
+alone, plus the page a visitor arrived on so a bookmark to the library never shows a nav hiding where
+you are, and all eight return the moment there is a room to point them at. The placeholder branch is
+gone with it.
+
+**Proven on production after the push, not just in jsdom.** Cold landing: one nav link, zero
+placeholders, brand at 27.2px inside a 40px nav row. With `karaoke.profile.name` still holding `Qoder`
+in that browser, typing "Rafa" moved the sidebar identity and nothing rendered the stored name.
+Creating a room brought all eight links back with zero console errors. `tests/unit/sidebarNav.test.tsx`
+and `sidebarIdentity.test.tsx` hold both rules; two of the nav assertions were red beforehand.
+
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 345 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 454 passing tests on the current tree.
+- [x] `npm test` reports 462 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
