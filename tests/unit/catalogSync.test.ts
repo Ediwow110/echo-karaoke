@@ -163,6 +163,7 @@ type FetchOptions = {
   unresolved?: string[];
   unreachable?: string[];
   failingPlaylists?: string[];
+  failingNextPages?: string[];
 };
 
 function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
@@ -183,6 +184,9 @@ function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
     }
     const playlistId = url.searchParams.get('playlistId') ?? '';
     if (options.failingPlaylists?.includes(playlistId)) return new Response(null, { status: 503 });
+    if (options.failingNextPages?.includes(playlistId) && url.searchParams.has('pageToken')) {
+      return new Response(null, { status: 503 });
+    }
     const body: Record<string, unknown> = { items: options.rows ?? [] };
     if (options.nextPageToken === true) {
       body.nextPageToken = `page-${urls.length}`;
@@ -460,6 +464,24 @@ describe('catalog sync orchestration', () => {
       .filter(([text]) => String(text).includes('karaoke_catalog_cursor_save'))
       .map(([, params]) => params);
     expect(saved).toContainEqual(['@vinylktv', 'UUvinylktv', null, false]);
+  });
+
+  it('says when a channel was cut short mid-walk, so a partial seed is not read as the whole depth', async () => {
+    // The first page landed and the cursor kept its token, so this self-heals on
+    // the next refresh — but "added 205" alone cannot tell a host that a channel
+    // stopped half way, which is exactly what they need at first seed.
+    useDatabase(baseHandlers({
+      karaoke_catalog_cursors: () => cursors('@vinylktv', new Date().toISOString()),
+    }));
+    stubFetch({ rows: [row(1)], nextPageToken: true, failingNextPages: ['UUvinylktv'] });
+
+    const body = await (await catalogSync(syncRequest(), CALLER)).json() as {
+      added: number; message?: string; unreachable: string[];
+    };
+
+    expect(body.added).toBeGreaterThan(0);
+    expect(body.unreachable).toEqual(['@vinylktv']);
+    expect(body.message).toContain('could not reach');
   });
 
   it('leaves unresolved empty when every handle resolves', async () => {

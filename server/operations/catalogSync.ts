@@ -294,6 +294,11 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
           if (lookup.state === 'unresolved') unresolved.push(handle);
           if (lookup.state === 'unreachable') unreachable.push(handle);
         }
+        // A page cut short is transient and the saved token resumes it next run,
+        // but silence here would let a half-filled channel read as a full one.
+        if (!unreachable.includes(handle) && !unresolved.includes(handle)) {
+          unreachable.push(handle);
+        }
         break;
       }
       const rows = mapPlaylistItems(upstream.payload);
