@@ -11,6 +11,7 @@ import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
 import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { useRoomData } from '../features/rooms/useRoomData';
+import GuestSongbook from './GuestSongbook';
 import { useRoomApi } from './RoomApiProvider';
 import { sendPlaybackCommand } from '../features/playback/playbackApi';
 import NowPlayingCard from '../features/queue/NowPlayingCard';
@@ -36,7 +37,13 @@ export default function GuestRoomPage() {
   const roomId = params.roomId ?? '';
   const api = useRoomApi();
   const navigate = useNavigate();
+  const location = useLocation();
   const tab = useGuestTab();
+  // The songbook is a screen inside the remote, not a third remote tab. The
+  // shell keeps running here so the session heartbeat and BottomNav survive.
+  const songbook = location.pathname.endsWith('/songbook');
+  // Neither remote tab owns the songbook, so leave both unselected there.
+  const navTab: GuestTab | null = songbook ? null : tab;
   const { data, error, loading, connection, restoredAt, lastLiveAt, refresh } = useRoomData(roomId, 'guest');
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string } | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -317,7 +324,7 @@ export default function GuestRoomPage() {
             Your room, identity and queue are kept. Once restored you will land back here with no need to join again.
           </p>
         </main>
-        <BottomNav tab={tab} queueCount={queue.length} roomId={roomId} />
+        <BottomNav tab={navTab} queueCount={queue.length} roomId={roomId} />
       </div>
     );
   }
@@ -329,7 +336,11 @@ export default function GuestRoomPage() {
     <div className="mx-auto min-h-dvh w-full max-w-[430px] bg-graphite pb-24 text-ink">
       {header}
 
-      {tab === 'search' ? (
+      {songbook ? (
+        <main key="songbook" className="page-enter px-4 pb-8 pt-6">
+          <GuestSongbook roomId={roomId} onAdded={() => { void refresh(); }} />
+        </main>
+      ) : tab === 'search' ? (
         <main key="search" className="page-enter px-4 pb-8 pt-6">
           <p className="eyebrow text-gold">Song discovery</p>
           <h2 className="mt-1 font-display text-[2rem] font-bold leading-[1.03] tracking-[-0.035em]">Pick your next song.</h2>
@@ -362,6 +373,7 @@ export default function GuestRoomPage() {
                   roomId={roomId}
                   disabled={locked}
                   queuedVideoIds={queue.map((song) => song.videoId)}
+                  moreHref={'/room/' + roomId + '/songbook'}
                   onAdded={() => { void refresh(); }}
                 />
               )}
@@ -512,7 +524,7 @@ export default function GuestRoomPage() {
         </main>
       )}
 
-      <BottomNav tab={tab} queueCount={queue.length} roomId={roomId} />
+      <BottomNav tab={navTab} queueCount={queue.length} roomId={roomId} />
 
       {toast === null ? null : (
         <div className="pointer-events-none fixed inset-x-0 bottom-24 z-[70] flex justify-center px-4">
@@ -542,7 +554,7 @@ function BottomNav({
   queueCount,
   roomId,
 }: {
-  tab: GuestTab;
+  tab: GuestTab | null;
   queueCount: number;
   roomId: string;
 }) {

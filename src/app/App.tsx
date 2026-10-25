@@ -104,6 +104,7 @@ export default function App() {
           <Route path="/scan" element={<ScanRoomPage />} />
           <Route path="/room/:roomId" element={<GuestRoomRoute />} />
           <Route path="/room/:roomId/search" element={<GuestRoomRoute />} />
+          <Route path="/room/:roomId/songbook" element={<GuestRoomRoute />} />
           <Route path="/room/:roomId/host" element={<HostRoomRoute />}>
             <Route index element={<HostDiscoverPage />} />
             <Route path="queue" element={<HostQueuePage />} />

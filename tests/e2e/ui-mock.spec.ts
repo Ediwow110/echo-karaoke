@@ -183,7 +183,7 @@ test('popular karaoke strip slides with previous and next controls', async ({ pa
   await page.getByRole('link', { name: 'Search' }).click();
 
   await expect(page.getByText('Popular karaoke')).toBeVisible();
-  await expect(page.getByText('With lyrics')).toBeVisible();
+  await expect(page.getByRole('link', { name: 'View more' })).toHaveAttribute('href', '/room/' + ROOM + '/songbook');
   const strip = page.getByRole('list', { name: 'Popular karaoke songs' });
   await expect(strip).toBeVisible();
 

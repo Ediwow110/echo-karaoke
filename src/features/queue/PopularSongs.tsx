@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
 import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
@@ -19,6 +20,7 @@ export type PopularSongsProps = {
   roomId: string;
   disabled?: boolean;
   queuedVideoIds?: string[];
+  moreHref?: string;
   onAdded?: (song: QueueSong) => void;
 };
 
@@ -26,7 +28,7 @@ export type PopularSongsProps = {
  * The live YouTube music chart, so a guest can queue a song without typing.
  * Without an API key on the server the strip stays hidden.
  */
-export default function PopularSongs({ roomId, disabled = false, queuedVideoIds = [], onAdded }: PopularSongsProps) {
+export default function PopularSongs({ roomId, disabled = false, queuedVideoIds = [], moreHref, onAdded }: PopularSongsProps) {
   const api = useRoomApi();
   const [songs, setSongs] = useState<SearchResult[]>([]);
   const [queued, setQueued] = useState<string | null>(null);
@@ -133,9 +135,15 @@ export default function PopularSongs({ roomId, disabled = false, queuedVideoIds 
 
   return (
     <div data-suggestions className="flex flex-col gap-3">
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <p className="eyebrow text-ink-2">Popular karaoke</p>
-        <p className="text-[0.625rem] text-ink-3">With lyrics</p>
+        {moreHref === undefined ? (
+          <p className="text-[0.625rem] text-ink-3">With lyrics</p>
+        ) : (
+          <Link to={moreHref} className="inline-flex min-h-11 items-center text-[0.6875rem] font-semibold text-signal hover:underline">
+            View more
+          </Link>
+        )}
       </div>
       <div className="relative">
       <ul id={listId} ref={listRef} aria-label="Popular karaoke songs" className="no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-1">

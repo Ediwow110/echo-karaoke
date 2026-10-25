@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createElement } from 'react';
 import GuestRoomPage from '../../src/app/GuestRoomPage';
@@ -61,6 +61,9 @@ function makeApi(locked = false): { api: EdgeApi; calls: string[] } {
       if (name === 'playback-command') {
         return { roomId, status: 'live', playback: liveRoom(locked).playback };
       }
+      if (name === 'catalog-page') {
+        return { total: 0, items: [] };
+      }
       return liveRoom(locked);
     }) as unknown as EdgeApi['invoke'],
   };
@@ -81,6 +84,7 @@ function renderGuest(api: EdgeApi, path = '/room/' + roomId) {
           createElement(Route, { path: '/', element: createElement('p', null, 'Back at the start') }),
           createElement(Route, { path: '/room/:roomId', element: createElement(GuestRoomPage) }),
           createElement(Route, { path: '/room/:roomId/search', element: createElement(GuestRoomPage) }),
+          createElement(Route, { path: '/room/:roomId/songbook', element: createElement(GuestRoomPage) }),
           createElement(Route, { path: '/join/:roomCode', element: createElement('p', null, 'Join page') }),
         ),
       ),
@@ -152,6 +156,29 @@ describe('guest phone remote', () => {
 
     expect(await screen.findByText(/never gonna give you up added/i)).toBeInTheDocument();
     expect(calls).toContain('queue-command');
+  });
+
+  it('opens the songbook inside the remote without adding a third tab', async () => {
+    const { api, calls } = makeApi();
+    renderGuest(api, '/room/' + roomId + '/songbook');
+
+    expect(await screen.findByRole('heading', { name: 'Karaoke songbook' })).toBeInTheDocument();
+    const main = screen.getByRole('main');
+    expect(within(main).getByRole('link', { name: 'Search' })).toHaveAttribute('href', '/room/' + roomId + '/search');
+    expect(within(main).getByRole('button', { name: 'Musisi Karaoke' })).toBeInTheDocument();
+    expect(await screen.findByText(/warming up/i)).toBeInTheDocument();
+    expect(calls).toContain('guest-room-read');
+    expect(calls).toContain('catalog-page');
+
+    const nav = screen.getByRole('navigation', { name: /remote sections/i });
+    expect(within(nav).getAllByRole('link')).toHaveLength(2);
+    expect(within(nav).getByRole('link', { name: 'Search' }))
+      .toHaveAttribute('href', '/room/' + roomId + '/search');
+    expect(within(nav).getByRole('link', { name: /queue/i }))
+      .toHaveAttribute('href', '/room/' + roomId);
+    for (const link of within(nav).getAllByRole('link')) {
+      expect(link).not.toHaveAttribute('aria-current');
+    }
   });
 
   it('lets a guest leave the room and drops the pass', async () => {

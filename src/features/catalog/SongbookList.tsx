@@ -13,17 +13,15 @@ const MAX_OFFSET = 5000;
 export type SongbookListProps = {
   api: EdgeApi;
   roomId: string;
-  // The channel chips arrive with the guest screen; the host already passes the
-  // labels so the prop shape is settled here.
+  // The guest screen and the host page pass the synced channel labels; a
+  // caller that omits them gets no chips.
   channels?: { id: string; label: string }[];
   onAdded?: () => void;
 };
 
-export default function SongbookList({ api, roomId, onAdded }: SongbookListProps) {
+export default function SongbookList({ api, roomId, channels, onAdded }: SongbookListProps) {
   const [query, setQuery] = useState('');
-  // The channel filter is wired through the request now; Task 5 adds the chips
-  // and the setter that drives it.
-  const [channel] = useState('');
+  const [channel, setChannel] = useState('');
   const [items, setItems] = useState<CatalogSong[]>([]);
   const [total, setTotal] = useState(0);
   const [offset, setOffset] = useState(0);
@@ -99,6 +97,32 @@ export default function SongbookList({ api, roomId, onAdded }: SongbookListProps
         <p role="status" className="text-[0.6875rem] text-ink-2">{hasLoaded ? total + ' songs' : ''}</p>
       </div>
 
+      {channels === undefined || channels.length === 0 ? null : (
+        <div className="flex flex-wrap gap-2">
+          <button
+            type="button"
+            onClick={() => setChannel('')}
+            aria-pressed={channel === ''}
+            className={['min-h-11 min-w-11 rounded-pill border px-3 text-[0.6875rem] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
+              channel === '' ? 'border-signal/40 bg-signal-soft text-signal' : 'border-line bg-surface text-ink-2 hover:text-ink'].join(' ')}
+          >
+            All
+          </button>
+          {channels.map((entry) => (
+            <button
+              key={entry.id}
+              type="button"
+              onClick={() => setChannel(entry.id)}
+              aria-pressed={channel === entry.id}
+              className={['min-h-11 min-w-11 rounded-pill border px-3 text-[0.6875rem] font-semibold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal',
+                channel === entry.id ? 'border-signal/40 bg-signal-soft text-signal' : 'border-line bg-surface text-ink-2 hover:text-ink'].join(' ')}
+            >
+              {entry.label}
+            </button>
+          ))}
+        </div>
+      )}
+
       {error === null ? null : <p role="alert" className="text-[0.75rem] text-danger">{error}</p>}
 
       {loadingFirstPage ? (
@@ -115,14 +139,14 @@ export default function SongbookList({ api, roomId, onAdded }: SongbookListProps
       ) : (
         // Refetches keep the rows already on screen and mark them busy instead
         // of flashing an empty list.
-        <ul className="grid gap-2 sm:grid-cols-2" aria-label="Songbook songs" aria-busy={busy}>
+        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Songbook songs" aria-busy={busy}>
           {items.map((song) => {
             const isAdded = added.includes(song.videoId);
             return (
               <li key={song.videoId}>
-                <div className="flex items-center gap-3 rounded-panel border border-line bg-surface p-2">
+                <div className="flex flex-wrap items-center gap-3 gap-y-2 rounded-panel border border-line bg-surface p-2">
                   <SongArtwork src={song.thumbnailUrl} className="h-12 w-16 shrink-0" iconSize={16} />
-                  <div className="min-w-0 flex-1">
+                  <div className="min-w-16 flex-1">
                     <p className="truncate text-[0.8125rem] font-semibold text-ink">{song.title}</p>
                     <p className="truncate text-[0.6875rem] text-ink-2">{song.channelTitle ?? 'YouTube'}</p>
                   </div>

@@ -137,4 +137,23 @@ describe('songbook list', () => {
     expect(screen.getAllByRole('listitem')).toHaveLength(59);
     expect(screen.getAllByText('Song 29 (Karaoke)')).toHaveLength(1);
   });
+
+  it('narrows by channel chip', async () => {
+    const { api, calls } = makeApi();
+    render(<SongbookList api={api} roomId={roomId} channels={[{ id: 'UC_sing', label: 'Sing King' }]} />);
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Sing King' }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.name === 'catalog-page'
+        && (call.body as { channel?: string }).channel === 'UC_sing')).toBe(true);
+    });
+  });
+
+  it('renders no channel chips unless the labels are supplied', async () => {
+    const { api } = makeApi();
+    render(<SongbookList api={api} roomId={roomId} />);
+
+    expect(await screen.findByText('Halo - Beyonce (Karaoke)')).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'All' })).not.toBeInTheDocument();
+  });
 });

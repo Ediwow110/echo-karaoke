@@ -133,6 +133,7 @@ export default function HostDiscoverPage() {
                   <PopularSongs
                     roomId={roomId}
                     queuedVideoIds={queue.map((song) => song.videoId)}
+                    moreHref={'/room/' + roomId + '/host/songbook'}
                     onAdded={() => { void refresh(); }}
                   />
                 )}

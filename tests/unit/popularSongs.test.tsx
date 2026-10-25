@@ -1,6 +1,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
+import { MemoryRouter } from 'react-router-dom';
 import PopularSongs from '../../src/features/queue/PopularSongs';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
@@ -33,12 +34,16 @@ function fakeApi(available: boolean): EdgeApi {
   };
 }
 
-function renderStrip(available: boolean) {
+function renderStrip(available: boolean, moreHref?: string) {
   localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
   return render(
     createElement(RoomApiProvider, {
       api: fakeApi(available),
-      children: createElement(PopularSongs, { roomId }),
+      children: createElement(
+        MemoryRouter,
+        null,
+        createElement(PopularSongs, { roomId, moreHref }),
+      ),
     }),
   );
 }
@@ -48,6 +53,21 @@ describe('popular songs', () => {
     renderStrip(true);
     const button = await screen.findByRole('button', { name: /queue dancing queen/i });
     expect(button).toBeInTheDocument();
+  });
+
+  it('keeps the lyrics caption when there is no songbook destination', async () => {
+    renderStrip(true);
+
+    expect(await screen.findByText('With lyrics')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /view more/i })).not.toBeInTheDocument();
+  });
+
+  it('links to the songbook when a destination is given', async () => {
+    renderStrip(true, '/room/' + roomId + '/songbook');
+
+    const link = await screen.findByRole('link', { name: 'View more' });
+    expect(link).toHaveAttribute('href', '/room/' + roomId + '/songbook');
+    expect(screen.queryByText('With lyrics')).not.toBeInTheDocument();
   });
 
   it('hides itself when suggestions are not configured', async () => {
