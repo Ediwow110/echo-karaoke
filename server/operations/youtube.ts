@@ -1,7 +1,8 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
-import { HttpError, jsonResponse, logFailure, mapDatabaseError, UNAUTHORIZED_MESSAGE } from './errors.js';
+import { HttpError, jsonResponse, logFailure, mapDatabaseError } from './errors.js';
 import { readJsonObject } from './tokens.js';
-import { requireRoomId, optionalTokenHeader, type Caller } from './room.js';
+import { requireRoomId, type Caller } from './room.js';
+import { requireRoomAccess } from './catalogAccess.js';
 
 export type SearchResult = {
   videoId: string;
@@ -164,36 +165,6 @@ async function queryAllowNull(name: string, params: unknown[]): Promise<unknown>
   } catch (error) {
     throw mapDatabaseError(error as { message?: string });
   }
-}
-
-async function requireRoomAccess(request: Request, caller: Caller, roomId: string): Promise<string> {
-  const guestToken = optionalTokenHeader(request, 'x-room-guest-token');
-  const hostToken = optionalTokenHeader(request, 'x-room-host-token');
-  if (guestToken !== null) {
-    const access = (await queryAllowNull('room_access_check', [roomId, caller.userId, guestToken])) as {
-      status?: string;
-    } | null;
-    if (access === null) {
-      throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
-    }
-    if (access.status === 'ended') {
-      throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
-    }
-    return guestToken;
-  }
-  if (hostToken !== null) {
-    const access = (await queryAllowNull('host_access_check', [roomId, caller.userId, hostToken])) as {
-      status?: string;
-    } | null;
-    if (access === null) {
-      throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
-    }
-    if (access.status === 'ended') {
-      throw new HttpError('ROOM_ENDED', 409, 'This room has ended');
-    }
-    return hostToken;
-  }
-  throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
 }
 
 async function enforceLimit(name: string, params: unknown[], message: string): Promise<void> {
