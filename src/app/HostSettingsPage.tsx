@@ -8,6 +8,7 @@ import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { useHostRoom } from './useHostRoom';
+import DoorList from '../features/rooms/DoorList';
 import InviteCard from '../features/rooms/InviteCard';
 import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
 
@@ -19,9 +20,13 @@ export default function HostSettingsPage() {
     code,
     joinUrl,
     roster,
+    door,
+    doorBusyId,
     room,
     connection,
     runHost,
+    approveGuest,
+    rejectGuest,
     transferRoom,
     endRoom,
     removeMember,
@@ -144,6 +149,21 @@ export default function HostSettingsPage() {
               <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
                 Host moderation stays active while the room is live. Changes apply to every remote on the next refresh.
               </p>
+            </div>
+          </section>
+
+          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="door-title">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="flex items-center gap-2">
+                <DoorOpenIcon size={18} className="text-signal" aria-hidden="true" />
+                <h3 id="door-title" className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">At the door</h3>
+              </div>
+              <span className="text-[0.6875rem] text-ink-2">
+                {door.length} {door.length === 1 ? 'guest waiting' : 'guests waiting'}
+              </span>
+            </div>
+            <div className="mt-4">
+              <DoorList door={door} busyId={doorBusyId} onApprove={approveGuest} onReject={rejectGuest} />
             </div>
           </section>
 

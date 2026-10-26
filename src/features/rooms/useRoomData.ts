@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { RoomApiError } from '../../lib/edgeApi';
-import { readRoomAsGuest, readRoomAsHost, touchRoomMember } from './roomApi';
+import { readRoomAsGuest, readRoomAsHost, touchRoomMember, type DoorEntry } from './roomApi';
 import { useRoomApi } from '../../app/RoomApiProvider';
 
 export type RosterEntry = {
@@ -39,6 +39,8 @@ export type RoomView = {
   };
   viewer?: { memberId: string; displayName: string; role: string };
   roster?: RosterEntry[];
+  /** Pending guests waiting for the host, present only on the host read. */
+  door?: DoorEntry[];
   queue?: QueueEntry[];
   playback?: {
     currentSongId: string | null;

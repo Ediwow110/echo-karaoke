@@ -10,6 +10,7 @@ import HostStagePage from '../../src/app/HostStagePage';
 import HostPartyPage from '../../src/app/HostPartyPage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
+import type { DoorEntry } from '../../src/features/rooms/roomApi';
 import { clearRoomTokens, saveGuestToken } from '../../src/features/rooms/tokenStore';
 import '@testing-library/jest-dom/vitest';
 
@@ -120,6 +121,7 @@ const liveRoom = {
     isPlaying: false,
     updatedAt: '2026-10-18T00:00:00Z',
   },
+  door: [] as DoorEntry[],
   events: [],
 };
 
@@ -227,6 +229,31 @@ describe('host room workspace', () => {
     expect(await screen.findByRole('switch', { name: /guests can add songs/i })).toBeChecked();
     expect(screen.getByRole('switch', { name: /guests can pause or resume/i })).not.toBeChecked();
     expect(screen.getByRole('button', { name: /leave & end room/i })).toBeInTheDocument();
+  });
+
+  it('shows who is waiting and admits them from settings', async () => {
+    const withDoor = {
+      ...liveRoom,
+      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
+    };
+    const { api, calls } = makeApi(withDoor);
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    expect(await screen.findByText('Waiting Guest')).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /let waiting guest in/i }));
+    await waitFor(() => {
+      expect(calls.some((call) => call.name === 'approve-member')).toBe(true);
+    });
+  });
+
+  it('announces the door count on every host screen', async () => {
+    const withDoor = {
+      ...liveRoom,
+      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
+    };
+    const { api } = makeApi(withDoor);
+    renderHost(api);
+    expect(await screen.findByText(/1 at the door/i)).toBeInTheDocument();
   });
 
   it('removes a guest and their queue from settings', async () => {

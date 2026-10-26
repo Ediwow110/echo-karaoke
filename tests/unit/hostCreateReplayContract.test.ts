@@ -70,7 +70,7 @@ describe('current host room creation replay contract (mock SQL)', () => {
     expect(state.operations).toHaveLength(2);
     expect(state.operations.every((call) => call.sql.includes('public.create_room('))).toBe(true);
     expect(state.operations.map((call) => call.params[1])).toEqual([caller.userId, caller.userId]);
-    expect(state.operations.every((call) => call.params.length === 8)).toBe(true);
+    expect(state.operations.every((call) => call.params.length === 9)).toBe(true);
     expect(firstRoom.roomId).not.toBe(secondRoom.roomId);
     expect(firstRoom.roomCode).not.toBe(secondRoom.roomCode);
     expect(firstRoom.hostToken).not.toBe(secondRoom.hostToken);

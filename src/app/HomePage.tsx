@@ -110,6 +110,7 @@ export default function HomePage() {
   const [hostName, setHostName] = useState(hostNameDefault);
   const [guestsCanAdd, setGuestsCanAdd] = useState(true);
   const [guestPlayback, setGuestPlayback] = useState(false);
+  const [requireApproval, setRequireApproval] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [guestName, setGuestName] = useState(hostNameDefault);
   const [hostNameError, setHostNameError] = useState<string | null>(null);
@@ -168,6 +169,7 @@ export default function HomePage() {
         roomName: finalName,
         guestsCanAdd,
         guestsCanControlPlayback: guestPlayback,
+        requireApproval,
       }, { storeTokens: false });
       if (createGeneration.current !== generation) return;
       // Only a current, validated success confirms the created room.
@@ -491,6 +493,14 @@ export default function HomePage() {
                   onChange={setGuestPlayback}
                   label="Guest playback controls"
                   description="Off by default. Only you can pause or resume playback."
+                  disabled={busy !== null}
+                />
+                <div className="h-px bg-line" aria-hidden="true" />
+                <Toggle
+                  checked={requireApproval}
+                  onChange={setRequireApproval}
+                  label="Approve each guest"
+                  description="New guests wait at the door until you let them in. You can close the room later from settings."
                   disabled={busy !== null}
                 />
               </div>

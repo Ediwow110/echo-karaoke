@@ -18,6 +18,7 @@ export async function createRoom(request: Request, caller: Caller): Promise<Resp
   const roomName = normalizeRoomName(body.roomName);
   const guestsCanAdd = readOptionalBoolean(body.guestsCanAdd, true);
   const guestsCanControlPlayback = readOptionalBoolean(body.guestsCanControlPlayback, false);
+  const requireApproval = readOptionalBoolean(body.requireApproval, false);
   const sweeps = await Promise.allSettled([sweepAbandonedRooms(), sweepEndedRooms()]);
   for (const sweep of sweeps) {
     if (sweep.status === 'rejected') {
@@ -38,6 +39,7 @@ export async function createRoom(request: Request, caller: Caller): Promise<Resp
       roomName,
       !guestsCanAdd,
       !guestsCanControlPlayback,
+      requireApproval,
     ]);
 
     try {

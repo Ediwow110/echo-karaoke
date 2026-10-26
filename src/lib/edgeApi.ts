@@ -16,7 +16,9 @@ export type EdgeFunctionName =
   | 'vote-command'
   | 'touch-member'
   | 'transfer-host'
-  | 'claim-host';
+  | 'claim-host'
+  | 'approve-member'
+  | 'reject-member';
 
 export type RoomTokens = {
   guestToken?: string;

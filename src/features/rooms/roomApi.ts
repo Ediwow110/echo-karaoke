@@ -99,6 +99,7 @@ export type CreateRoomOptions = {
   roomName?: string;
   guestsCanAdd?: boolean;
   guestsCanControlPlayback?: boolean;
+  requireApproval?: boolean;
 };
 
 export async function createRoom(
@@ -113,6 +114,7 @@ export async function createRoom(
     roomName: options.roomName ?? '',
     guestsCanAdd: options.guestsCanAdd ?? true,
     guestsCanControlPlayback: options.guestsCanControlPlayback ?? false,
+    requireApproval: options.requireApproval === true,
   });
   const created = verifyCreatedRoom(response);
 
@@ -220,6 +222,16 @@ export async function removeRoomMember(
     throw new Error('This browser has no host pass for the room.');
   }
   await api.invoke('host-remove-member', { roomId, memberId }, { hostToken });
+}
+
+export type DoorEntry = { memberId: string; displayName: string; online: boolean; joinedAt: string };
+
+export async function approveMember(api: EdgeApi, roomId: string, memberId: string): Promise<{ door: DoorEntry[] }> {
+  return api.invoke('approve-member', { roomId, memberId }, { hostToken: loadHostToken(roomId) ?? undefined });
+}
+
+export async function rejectMember(api: EdgeApi, roomId: string, memberId: string): Promise<{ door: DoorEntry[] }> {
+  return api.invoke('reject-member', { roomId, memberId }, { hostToken: loadHostToken(roomId) ?? undefined });
 }
 
 export type TransferredRoom = {

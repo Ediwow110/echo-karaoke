@@ -130,6 +130,7 @@ describe('room api', () => {
       roomName: 'After Hours',
       guestsCanAdd: false,
       guestsCanControlPlayback: true,
+      requireApproval: false,
     });
     expect(created.roomId).toBe('550e8400-e29b-41d4-a716-446655440000');
     expect(loadGuestToken('550e8400-e29b-41d4-a716-446655440000')).toBe('guest-token-value');

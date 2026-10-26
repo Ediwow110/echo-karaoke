@@ -1,6 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import type { QueueEntry, RoomView } from '../features/rooms/useRoomData';
-import type { HostAction } from '../features/rooms/roomApi';
+import type { DoorEntry, HostAction } from '../features/rooms/roomApi';
 import type { ToastTone } from '../ui';
 
 export type HostNotify = (message: string, detail?: string, tone?: ToastTone) => void;
@@ -13,6 +13,8 @@ export type HostRoomContext = {
   hostName: string;
   joinUrl: string;
   roster: NonNullable<RoomView['roster']>;
+  door: DoorEntry[];
+  doorBusyId: string | null;
   queue: QueueEntry[];
   nowPlaying: QueueEntry | null;
   upNext: QueueEntry[];
@@ -26,6 +28,8 @@ export type HostRoomContext = {
   removeSong: (songId: string) => Promise<void>;
   reorderSong: (songId: string, direction: 'up' | 'down') => Promise<void>;
   removeMember: (memberId: string) => Promise<void>;
+  approveGuest: (memberId: string) => Promise<void>;
+  rejectGuest: (memberId: string) => Promise<void>;
   transferRoom: (memberId: string) => Promise<void>;
   endRoom: () => Promise<void>;
 };

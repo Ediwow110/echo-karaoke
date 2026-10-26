@@ -6,6 +6,8 @@ import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHor
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import {
+  approveMember,
+  rejectMember,
   removeRoomMember,
   sendHostCommand,
   transferRoomTo,
@@ -44,6 +46,7 @@ export default function HostRoomPage() {
   const location = useLocation();
   const { data, error, loading, connection, restoredAt, refresh } = useRoomData(roomId, 'host');
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone: ToastTone } | null>(null);
+  const [doorBusyId, setDoorBusyId] = useState<string | null>(null);
   const playbackBusy = useRef(false);
   const advanceBusy = useRef(false);
   const playbackSettled = useRef<Promise<void> | null>(null);
@@ -135,6 +138,7 @@ export default function HostRoomPage() {
   }, [data, live, queue]);
   const upNext = useMemo(() => queue.filter((song) => song.status !== 'playing'), [queue]);
   const roster = live ? (data.roster ?? []) : [];
+  const door = live ? (data.door ?? []) : [];
   const hostName = roster.find((member) => member.role === 'host')?.displayName?.trim() || 'Host';
   const roomName = room?.name ?? 'Karaoke room';
   const code = room?.code ?? '';
@@ -256,6 +260,40 @@ export default function HostRoomPage() {
       notify('Guest removed.', 'Their queued songs and votes were removed too.', 'info');
     } catch (caught) {
       notify('The guest could not be removed.', caught instanceof Error ? caught.message : undefined, 'error');
+    }
+  }, [api, notify, refresh, roomId]);
+
+  const doorBusy = useRef(false);
+
+  const approveGuest = useCallback(async (memberId: string): Promise<void> => {
+    if (doorBusy.current) return;
+    doorBusy.current = true;
+    setDoorBusyId(memberId);
+    try {
+      await approveMember(api, roomId, memberId);
+      notify('They are in.');
+      await refresh();
+    } catch (caught) {
+      notify('That guest could not be admitted.', caught instanceof Error ? caught.message : undefined, 'error');
+    } finally {
+      doorBusy.current = false;
+      setDoorBusyId(null);
+    }
+  }, [api, notify, refresh, roomId]);
+
+  const rejectGuest = useCallback(async (memberId: string): Promise<void> => {
+    if (doorBusy.current) return;
+    doorBusy.current = true;
+    setDoorBusyId(memberId);
+    try {
+      await rejectMember(api, roomId, memberId);
+      notify('They were turned away.');
+      await refresh();
+    } catch (caught) {
+      notify('That guest could not be turned away.', caught instanceof Error ? caught.message : undefined, 'error');
+    } finally {
+      doorBusy.current = false;
+      setDoorBusyId(null);
     }
   }, [api, notify, refresh, roomId]);
 
@@ -468,6 +506,8 @@ export default function HostRoomPage() {
     hostName,
     joinUrl,
     roster,
+    door,
+    doorBusyId,
     queue,
     nowPlaying,
     upNext,
@@ -481,6 +521,8 @@ export default function HostRoomPage() {
     removeSong,
     reorderSong,
     removeMember,
+    approveGuest,
+    rejectGuest,
     transferRoom,
     endRoom,
   };
@@ -550,6 +592,9 @@ export default function HostRoomPage() {
                     <span aria-hidden="true" className="animate-presence-pulse size-1.5 rounded-full bg-live" />
                     {groupRoomCode(code)} · {roster.length} {roster.length === 1 ? 'person' : 'people'}
                   </span>
+                )}
+                {door.length === 0 ? null : (
+                  <Chip tone="gold">{door.length} at the door</Chip>
                 )}
                 <Link
                   to={'/room/' + roomId + '/host/party'}

@@ -415,6 +415,31 @@ describe('create room workspace', () => {
     expect(screen.getByText(/skip, remove and reorder are always host-only/i)).toBeInTheDocument();
   });
 
+  it('can hold new guests at the door from the create form', async () => {
+    stubWide(true);
+    const calls: Array<{ name: string; body: unknown }> = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        calls.push({ name, body });
+        return created;
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderHome(api);
+
+    const approval = screen.getByRole('switch', { name: /approve each guest/i });
+    expect(approval).not.toBeChecked();
+    fireEvent.click(approval);
+    expect(approval).toBeChecked();
+    fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Alex' } });
+    fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
+
+    expect(await screen.findByText('Host room')).toBeInTheDocument();
+    expect(calls[0]).toMatchObject({
+      name: 'create-room',
+      body: { requireApproval: true },
+    });
+  });
+
   it('shows the stage guide with real process steps', () => {
     stubWide(true);
     renderHome();
@@ -456,6 +481,7 @@ describe('create room workspace', () => {
         roomName: 'After Hours',
         guestsCanAdd: true,
         guestsCanControlPlayback: false,
+        requireApproval: false,
       },
     });
   });
