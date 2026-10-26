@@ -772,11 +772,47 @@ in that browser, typing "Rafa" moved the sidebar identity and nothing rendered t
 Creating a room brought all eight links back with zero console errors. `tests/unit/sidebarNav.test.tsx`
 and `sidebarIdentity.test.tsx` hold both rules; two of the nav assertions were red beforehand.
 
+## Moderated entry (migration 0037, shipped 2026-10-26)
+
+A host can require approval for each new guest, admit or reject them from **Room settings → At the
+door**, and close the door to arrivals mid-party. The gate is SQL, not UI: a pending member's
+`read_room_guest` returns only `{roomId, status:'waiting', room:{name,hostName}, viewer}`, and
+`private.require_guest` — which every participating operation already goes through — refuses a
+non-active member with `ROOM_PENDING`. Exactly three paths stay open to a waiting guest: the room read,
+`touch-member` and `room-access-check`.
+
+**Proven on production with three isolated browser contexts** (host at 1920, guests at 390):
+
+- Waiting: "WAITING AT THE DOOR / Door Proof / Rafa needs to let you in. This screen opens by itself
+  once they do." — zero iframes, no queue text.
+- Host: header badge "2 AT THE DOOR"; settings listed both names with Let/Keep controls.
+- Approve: the same guest tab flipped to the live remote within one poll, no reload.
+- Lock: a new context's join answered "The host has closed the room"; the admitted guest could still
+  rejoin, which is the exemption the lock deliberately keeps.
+- Reject: the rejected tab's next poll showed the revoked-pass screen ("Your room pass is no longer
+  valid…"), which is the ruled behaviour below.
+- Event rows: `approve` with the member id, `reject` with `member_id` null and the name in the
+  payload — required, because `room_events` cascades from `members` and an attached event would
+  delete itself with the row.
+
+**Two decisions worth knowing.** A rejected guest gets the revoked-pass screen, not a named message:
+rejection deletes the row, and naming the host would need a tombstone kept per rejection — a ban list
+by another name, and a lie for anyone whose pass was rotated. And the door lock exempts anyone the
+room already knows, so a waiting guest can rejoin to refresh a lost pass; only strangers are refused.
+
+**Deploy order is load-bearing.** The server calls the nine-argument `create_room` and the door
+functions, so `0037` must be applied before the build ships — the reverse order breaks room creation
+outright. The old client tolerates the new fields, so the window only affects a guest tab that
+reloads mid-deploy.
+
+**Not verified:** a second human on a real phone, and screen-reader announcement of the waiting status
+(the unit test asserts the role, not that it is announced).
+
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 345 passing assertions on a fresh branch.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 396 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 462 passing tests on the current tree.
+- [x] `npm test` reports 490 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
