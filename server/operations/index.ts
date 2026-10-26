@@ -1,5 +1,5 @@
 import { requireAnonymousCaller } from '../auth/identity.js';
-import { approveMember, rejectMember } from './admission.js';
+import { approveMember, rejectMember, setAdmissions } from './admission.js';
 import { catalogPage } from './catalogBrowse.js';
 import { catalogSync } from './catalogSync.js';
 import { claimHost, transferHost } from './transferHost.js';
@@ -40,6 +40,7 @@ const OPERATIONS = new Set([
   'claim-host',
   'approve-member',
   'reject-member',
+  'set-admissions',
 ]);
 
 function isAuthFailure(error: unknown): boolean {
@@ -101,6 +102,8 @@ export async function handleOperation(request: Request): Promise<Response> {
         return await approveMember(request, caller);
       case 'reject-member':
         return await rejectMember(request, caller);
+      case 'set-admissions':
+        return await setAdmissions(request, caller);
       default:
         throw new HttpError('NOT_IMPLEMENTED', 501, 'That operation is not available');
     }

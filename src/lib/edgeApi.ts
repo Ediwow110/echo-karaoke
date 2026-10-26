@@ -18,7 +18,8 @@ export type EdgeFunctionName =
   | 'transfer-host'
   | 'claim-host'
   | 'approve-member'
-  | 'reject-member';
+  | 'reject-member'
+  | 'set-admissions';
 
 export type RoomTokens = {
   guestToken?: string;
