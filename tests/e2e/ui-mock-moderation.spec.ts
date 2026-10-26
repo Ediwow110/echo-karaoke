@@ -17,6 +17,8 @@ type Scenario = {
   ended?: boolean;
   /** The viewer's own second on the queued song, mutated by vote-command. */
   vote?: { voted: boolean; count: number };
+  /** Every host-command action the app sent. */
+  hostActions?: string[];
   approvedMemberIds: unknown[];
 };
 
@@ -120,6 +122,7 @@ async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', join
         // Only the action matters here.
       }
       if (body.action === 'end') scenario.ended = true;
+      scenario.hostActions?.push(String(body.action));
       payload = { ok: true };
     }
     else if (op === 'join-room') payload = {
@@ -340,6 +343,25 @@ test('the party strip names the count it actually shows', async ({ page }) => {
   // "Queue · 1" for the same moment.
   await expect(page.getByText('Queue ·')).toHaveCount(0);
   await expect(page.getByText(/up next ·/i).first()).toBeVisible();
+});
+
+// The console redesign spec names this control (Trash, "Clear queue") and the
+// server has answered the action since 0014, but no screen ever sent it.
+test('the host can clear the queue from the queue page', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [], hostActions: [] };
+  await mock(page, scenario, 'host');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/queue', { waitUntil: 'networkidle' });
+
+  await page.getByRole('button', { name: 'Clear queue' }).click();
+  const dialog = page.getByRole('dialog');
+  await expect(dialog, 'no confirmation before an irreversible action').toBeVisible();
+  // The SQL deletes every row, the playing one included, and stops playback.
+  await expect(dialog.getByText(/including the one playing/i)).toBeVisible();
+  await dialog.getByRole('button', { name: 'Clear queue' }).click();
+
+  await expect.poll(() => scenario.hostActions).toContain('clear_queue');
+  await expect(dialog).toBeHidden();
 });
 
 const GUEST_SCREENS = [

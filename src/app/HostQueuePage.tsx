@@ -3,6 +3,7 @@ import { Link } from 'react-router-dom';
 import { ListChecksIcon } from '@phosphor-icons/react/dist/csr/ListChecks';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
+import { TrashIcon } from '@phosphor-icons/react/dist/csr/Trash';
 import { useHostRoom } from './useHostRoom';
 import LiveNowPlayingCard from '../features/queue/LiveNowPlayingCard';
 import { UpNextList } from '../features/queue/QueueRows';
@@ -10,7 +11,7 @@ import SongSearchPanel from '../features/queue/SongSearchPanel';
 import InviteCard from '../features/rooms/InviteCard';
 import { QUEUE_ELEMENT_ID, scrollToElement } from '../features/queue/queueAnchor';
 import { onlineGuestCount, queueSummary } from '../lib/format';
-import { Button, Chip } from '../ui';
+import { Button, Chip, ConfirmDialog } from '../ui';
 
 export default function HostQueuePage() {
   const {
@@ -26,6 +27,8 @@ export default function HostQueuePage() {
     upNext,
     playback,
     refresh,
+    runHost,
+    notify,
     next,
     removeSong,
     reorderSong,
@@ -34,12 +37,24 @@ export default function HostQueuePage() {
   } = useHostRoom();
   const [busySongId, setBusySongId] = useState<string | null>(null);
   const [skipping, setSkipping] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
   const searchRef = useRef<HTMLDivElement | null>(null);
 
   const focusSearch = useCallback(() => {
     scrollToElement(searchRef.current, 'center');
     window.setTimeout(() => document.getElementById('song-search')?.focus(), 80);
   }, []);
+
+  async function handleClearQueue(): Promise<void> {
+    setClearing(true);
+    const accepted = await runHost('clear_queue');
+    setClearing(false);
+    setConfirmClear(false);
+    if (accepted) {
+      notify('The queue is clear.', 'Nothing is waiting and playback has stopped.', 'info');
+    }
+  }
 
   async function handleRemove(songId: string): Promise<void> {
     setBusySongId(songId);
@@ -111,16 +126,27 @@ export default function HostQueuePage() {
                   {upNext.length === 0 ? 'The queue is empty.' : queueSummary(upNext) + ' · Host moderation'}
                 </p>
               </div>
-              <Button
-                variant="secondary"
-                size="sm"
-                icon={<SkipForwardIcon size={15} weight="fill" />}
-                disabled={nowPlaying === null || skipping}
-                busy={skipping}
-                onClick={() => void skip()}
-              >
-                Skip current song
-              </Button>
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<SkipForwardIcon size={15} weight="fill" />}
+                  disabled={nowPlaying === null || skipping}
+                  busy={skipping}
+                  onClick={() => void skip()}
+                >
+                  Skip current song
+                </Button>
+                <Button
+                  variant="secondary"
+                  size="sm"
+                  icon={<TrashIcon size={15} weight="duotone" />}
+                  disabled={upNext.length === 0 && nowPlaying === null}
+                  onClick={() => setConfirmClear(true)}
+                >
+                  Clear queue
+                </Button>
+              </div>
             </div>
             <div className="mt-3 rounded-panel border border-line bg-surface p-5">
               <UpNextList
@@ -191,6 +217,17 @@ export default function HostQueuePage() {
           />
         </aside>
       </div>
+
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear the queue?"
+        description="Every song is removed, including the one playing, and playback stops. This cannot be undone."
+        confirmLabel="Clear queue"
+        cancelLabel="Keep the queue"
+        busy={clearing}
+        onConfirm={() => { void handleClearQueue(); }}
+        onCancel={() => setConfirmClear(false)}
+      />
     </div>
   );
 }
