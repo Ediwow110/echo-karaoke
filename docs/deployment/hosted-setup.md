@@ -808,6 +808,11 @@ reloads mid-deploy.
 **Not verified:** a second human on a real phone, and screen-reader announcement of the waiting status
 (the unit test asserts the role, not that it is announced).
 
+**Known rough edges, deferred deliberately:** with two guests at the door, only the row being acted on
+shows a spinner (the others disable); the waiting screen has no offline signal and no way out except
+the browser's back button; and the door list fetches `online`/`joinedAt` without rendering them, so a
+host cannot yet tell who is still watching from who walked away.
+
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 396 passing assertions on a fresh branch.
