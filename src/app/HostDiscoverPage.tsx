@@ -11,7 +11,7 @@ import { UpNextList } from '../features/queue/QueueRows';
 import SongSearchPanel from '../features/queue/SongSearchPanel';
 import PopularSongs from '../features/queue/PopularSongs';
 import InviteCard from '../features/rooms/InviteCard';
-import { queueSummary } from '../lib/format';
+import { onlineGuestCount, queueSummary } from '../lib/format';
 import { Button } from '../ui';
 import { scrollToElement } from '../features/queue/queueAnchor';
 
@@ -38,7 +38,7 @@ export default function HostDiscoverPage() {
   const [starting, setStarting] = useState(false);
   const stageHref = '/room/' + roomId + '/host/stage';
   const queueHref = '/room/' + roomId + '/host/queue';
-  const players = roster.filter((member) => member.role === 'guest').length;
+  const players = onlineGuestCount(roster);
 
   const focusSearch = useCallback(() => {
     scrollToElement(searchRef.current, 'center');

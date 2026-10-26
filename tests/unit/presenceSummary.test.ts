@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { presenceSummary } from '../../src/lib/format';
+import { onlineGuestCount, presenceSummary } from '../../src/lib/format';
+
+const member = (role: 'host' | 'guest', online: boolean) => ({ role, online });
 
 const roster = (...online: boolean[]) => online.map((flag) => ({ online: flag }));
 
@@ -22,5 +24,22 @@ describe('presenceSummary', () => {
 
   it('counts an empty room as nobody, not nobody-nobody', () => {
     expect(presenceSummary([])).toBe('0 people');
+  });
+});
+
+describe('onlineGuestCount', () => {
+  it('never counts the host as a guest', () => {
+    // Room settings used to pass the whole roster to a chip that reads "N in",
+    // so it claimed one more person than the party screen beside it.
+    expect(onlineGuestCount([member('host', true), member('guest', true)])).toBe(1);
+  });
+
+  it('drops a guest whose phone stopped heartbeating', () => {
+    expect(onlineGuestCount([member('host', true), member('guest', true), member('guest', false)])).toBe(1);
+  });
+
+  it('counts nobody when no one is here', () => {
+    expect(onlineGuestCount([])).toBe(0);
+    expect(onlineGuestCount([member('host', true), member('guest', false)])).toBe(0);
   });
 });

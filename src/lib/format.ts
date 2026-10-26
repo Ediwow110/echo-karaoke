@@ -69,3 +69,15 @@ export function presenceSummary(members: { online: boolean }[]): string {
   if (away === 0) return members.length + ' ' + plural(members.length, 'person', 'people');
   return here + ' here · ' + away + ' away';
 }
+
+/**
+ * How many guests are in the room right now.
+ *
+ * The invite chip next to the QR says "N in", so it may only count phones that
+ * are still heartbeating, and it may not count the host -- four of the five
+ * screens that render it pass guests, and the one that passed the whole roster
+ * claimed one more person than the screen beside it.
+ */
+export function onlineGuestCount(members: { role: string; online: boolean }[]): number {
+  return members.filter((member) => member.role === 'guest' && member.online).length;
+}

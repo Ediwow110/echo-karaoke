@@ -9,7 +9,7 @@ import { UpNextList } from '../features/queue/QueueRows';
 import SongSearchPanel from '../features/queue/SongSearchPanel';
 import InviteCard from '../features/rooms/InviteCard';
 import { QUEUE_ELEMENT_ID, scrollToElement } from '../features/queue/queueAnchor';
-import { queueSummary } from '../lib/format';
+import { onlineGuestCount, queueSummary } from '../lib/format';
 import { Button, Chip } from '../ui';
 
 export default function HostQueuePage() {
@@ -185,7 +185,7 @@ export default function HostQueuePage() {
             code={code}
             hostName={hostName}
             joinUrl={joinUrl}
-            guests={roster.filter((member) => member.role === 'guest').length}
+            guests={onlineGuestCount(roster)}
             shareReady={connection === 'live'}
             variant="compact"
           />

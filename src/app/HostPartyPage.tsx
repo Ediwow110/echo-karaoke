@@ -11,7 +11,7 @@ import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
 import { useHostRoom } from './useHostRoom';
 import { useHostPlayer } from '../features/playback/useHostPlayer';
 import InviteCard from '../features/rooms/InviteCard';
-import { formatTime, queueSummary } from '../lib/format';
+import { formatTime, onlineGuestCount, queueSummary } from '../lib/format';
 import { Button, Chip, Logo, SongArtwork, TransportButton } from '../ui';
 
 export default function HostPartyPage() {
@@ -165,7 +165,7 @@ export default function HostPartyPage() {
             code={code}
             hostName={hostName}
             joinUrl={joinUrl}
-            guests={roster.filter((member) => member.role === 'guest').length}
+            guests={onlineGuestCount(roster)}
             shareReady={connection === 'live'}
             variant="party"
           />

@@ -298,6 +298,33 @@ test('a guest can second a song and the row remembers it', async ({ page }) => {
   expect(vote).toEqual({ voted: false, count: 2 });
 });
 
+// The invite chip reads "N in" beside the QR. Every screen but one counted
+// guests; Room settings counted the whole roster, so it claimed one more person
+// in the room than the party screen next to it at the same instant.
+test('the invite chip says the same head-count on every host screen', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'host');
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  for (const path of [
+    '/room/' + ROOM + '/host',
+    '/room/' + ROOM + '/host/settings',
+    '/room/' + ROOM + '/host/queue',
+    '/room/' + ROOM + '/host/stage',
+    '/room/' + ROOM + '/host/party',
+  ]) {
+    await page.goto(path, { waitUntil: 'networkidle' });
+    // The mock roster is one host plus one guest, both heartbeating. Screens
+    // that carry no chip are fine; ones that do must agree.
+    const chips = await page.getByText(/^\d+ in$/i).allInnerTexts();
+    // The chip is styled uppercase, and innerText reports what is painted.
+    expect(chips.every((chip) => chip.toLowerCase() === '1 in'), path + ' chips: ' + JSON.stringify(chips)).toBe(true);
+  }
+  // The claim is only worth anything if at least one screen renders it.
+  await page.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+  await expect(page.getByText('1 in').first()).toBeVisible();
+});
+
 const GUEST_SCREENS = [
   ['queue', '/room/' + ROOM],
   ['songbook', '/room/' + ROOM + '/songbook'],

@@ -12,7 +12,7 @@ import { useRoomApi } from './RoomApiProvider';
 import DoorList from '../features/rooms/DoorList';
 import InviteCard from '../features/rooms/InviteCard';
 import { setAdmissions, setApproval as requestApproval } from '../features/rooms/roomApi';
-import { presenceSummary } from '../lib/format';
+import { onlineGuestCount, presenceSummary } from '../lib/format';
 import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
 
 export default function HostSettingsPage() {
@@ -315,7 +315,7 @@ export default function HostSettingsPage() {
             code={code}
             hostName={hostName}
             joinUrl={joinUrl}
-            guests={roster.length}
+            guests={onlineGuestCount(roster)}
             variant="compact"
           />
           <section className="rounded-panel border border-line bg-surface p-5">

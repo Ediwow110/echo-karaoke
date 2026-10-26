@@ -16,7 +16,7 @@ import { useHostPlayer } from '../features/playback/useHostPlayer';
 import { UpNextList } from '../features/queue/QueueRows';
 import InviteCard from '../features/rooms/InviteCard';
 import { isFavorite, subscribeLibrary, toggleFavorite } from '../features/library/libraryStore';
-import { formatTime } from '../lib/format';
+import { formatTime, onlineGuestCount } from '../lib/format';
 import { Button, Chip, IconButton, Logo, SongArtwork, TransportButton } from '../ui';
 
 export default function HostStagePage() {
@@ -346,7 +346,7 @@ export default function HostStagePage() {
             code={code}
             hostName={hostName}
             joinUrl={joinUrl}
-            guests={roster.filter((member) => member.role === 'guest').length}
+            guests={onlineGuestCount(roster)}
             shareReady={connection === 'live'}
             variant="compact"
           />
