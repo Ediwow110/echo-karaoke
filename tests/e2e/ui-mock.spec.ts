@@ -279,9 +279,57 @@ test('the create action opens the create form and keeps the hosted room one clic
 
   const back = page.getByRole('link', { name: 'Back to the room' });
   await expect(back).toHaveAttribute('href', '/room/' + ROOM + '/host');
+
+  // On a wide window the create screen carries the sidebar the host arrived
+  // from, so the room they still commands has to stay in it. It used to
+  // collapse to a single "Create room" link beside a "Your next session" card.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  const nav = page.getByRole('navigation', { name: 'Primary' });
+  await expect(nav.getByRole('link', { name: 'Room queue' }))
+    .toHaveAttribute('href', '/room/' + ROOM + '/host/queue');
+  await expect(nav.getByRole('link', { name: 'Discover' }))
+    .toHaveAttribute('href', '/room/' + ROOM + '/host');
+  await expect(page.getByText('Your next session')).toHaveCount(0);
+  await expect(page.getByText("You're hosting this room.")).toBeVisible();
+
   await back.click();
   await expect(page).toHaveURL(new RegExp('/room/' + ROOM + '/host$'));
   await expect(page.getByRole('heading', { level: 1, name: 'Mock Night' })).toBeVisible();
+});
+
+// The bug that started this: a control named "Create room" that went
+// somewhere else. Every sidebar label promises a destination, so each one is
+// clicked and its landing checked, with no console error allowed in passing.
+test('every host sidebar destination lands where its label says', async ({ page }) => {
+  const noise: string[] = [];
+  await mockApi(page);
+  page.on('console', (message) => {
+    if (message.type() === 'error') noise.push('console: ' + message.text().slice(0, 140));
+  });
+  page.on('pageerror', (error) => noise.push('pageerror: ' + error.message.slice(0, 140)));
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  const destinations: Array<{ label: string; path: string }> = [
+    { label: 'Discover', path: '/room/' + ROOM + '/host' },
+    { label: 'Song library', path: '/room/' + ROOM + '/host/library' },
+    { label: 'Songbook', path: '/room/' + ROOM + '/host/songbook' },
+    { label: 'Room queue', path: '/room/' + ROOM + '/host/queue' },
+    { label: 'Favorites', path: '/room/' + ROOM + '/host/favorites' },
+    { label: 'Recently sung', path: '/room/' + ROOM + '/host/recent' },
+    { label: 'Create room', path: '/create' },
+    { label: 'Room settings', path: '/room/' + ROOM + '/host/settings' },
+  ];
+
+  for (const destination of destinations) {
+    await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+    const link = page.getByRole('navigation', { name: 'Primary' })
+      .getByRole('link', { name: destination.label, exact: true });
+    await expect(link, destination.label + ' is missing from the sidebar').toBeVisible();
+    await link.click();
+    await expect(page, destination.label + ' landed elsewhere')
+      .toHaveURL((url) => url.pathname === destination.path);
+  }
+  expect(noise).toEqual([]);
 });
 
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {

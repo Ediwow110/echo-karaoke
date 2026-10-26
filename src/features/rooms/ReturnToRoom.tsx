@@ -1,46 +1,11 @@
-import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
-import type { EdgeApi } from '../../lib/edgeApi';
-import { readRoomAsHost } from './roomApi';
-import { getHostedRoom, type RoomSession } from './sessionStore';
-
-type RoomRead = { status?: string };
+import type { RoomSession } from './sessionStore';
 
 /**
- * A way back to the room this browser hosted.
- *
- * The host screen owns the only player, so leaving it for another room would
- * otherwise orphan the room the guests are still standing in. Whether the room
- * is still alive is the server's answer: the sweep only deletes a room once
- * every member has stopped heartbeating, so a local timestamp would either
- * offer a dead room or hide a live one.
+ * A way back to the room this browser hosted. The caller decides whether that
+ * room is still alive, because the same answer also fills the navigation.
  */
-export default function ReturnToRoom({ api, className }: { api: EdgeApi; className?: string }) {
-  const [room, setRoom] = useState<RoomSession | null>(null);
-
-  useEffect(() => {
-    const candidate = getHostedRoom();
-    if (candidate === null) {
-      return;
-    }
-    let active = true;
-    void readRoomAsHost<RoomRead>(api, candidate.roomId)
-      .then((read) => {
-        if (active && read.status === 'live') {
-          setRoom(candidate);
-        }
-      })
-      .catch(() => {
-        // A room that cannot be read is a room this browser cannot return to.
-        if (active) {
-          setRoom(null);
-        }
-      });
-    return () => {
-      active = false;
-    };
-  }, [api]);
-
+export default function ReturnToRoom({ room, className }: { room: RoomSession | null; className?: string }) {
   if (room === null) {
     return null;
   }

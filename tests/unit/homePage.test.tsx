@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import HomePage from '../../src/app/HomePage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
@@ -42,9 +42,9 @@ function renderHome(api: EdgeApi = { invoke: (async () => ({})) as unknown as Ed
   );
 }
 
-function renderHomeAt(path: string, props: { intent?: 'landing' | 'create' } = {}) {
+function renderHomeAt(path: string, props: { intent?: 'landing' | 'create' } = {}, api?: EdgeApi) {
   return render(
-    <RoomApiProvider api={{ invoke: (async () => ({})) as unknown as EdgeApi['invoke'] }}>
+    <RoomApiProvider api={api ?? { invoke: (async () => ({})) as unknown as EdgeApi['invoke'] }}>
       <MemoryRouter initialEntries={[path]}>
         <Routes>
           <Route path="/" element={<HomePage {...props} />} />
@@ -575,6 +575,73 @@ describe('create room workspace', () => {
 
     expect(await screen.findByRole('link', { name: 'Back to the room' }))
       .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
+  });
+
+  it('keeps the live room in the sidebar beside the create form', async () => {
+    // The create screen is reached from the host's own sidebar. Passing no room
+    // there stripped every room destination and left "Your next session" on the
+    // same screen as "Still hosting After Hours".
+    stubWide(true);
+    saveHostToken('550e8400-e29b-41d4-a716-446655440000', 'host-pass');
+    rememberSession({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      code: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      hostName: 'Alex',
+      role: 'host',
+    });
+    renderHomeAt('/create', { intent: 'create' }, liveRoomApi());
+
+    await screen.findByRole('link', { name: 'Back to the room' });
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    expect(within(nav).getByRole('link', { name: 'Discover' }))
+      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
+    expect(within(nav).getByRole('link', { name: 'Room queue' }))
+      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host/queue');
+    expect(screen.queryByText('Your next session')).toBeNull();
+    expect(screen.getByText("You're hosting this room.")).toBeInTheDocument();
+  });
+
+  it('keeps the live room in the sidebar on the landing page too', async () => {
+    stubWide(true);
+    saveHostToken('550e8400-e29b-41d4-a716-446655440000', 'host-pass');
+    rememberSession({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      code: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      hostName: 'Alex',
+      role: 'host',
+    });
+    renderHome(liveRoomApi());
+
+    await screen.findByRole('link', { name: 'Back to the room' });
+    expect(screen.queryByText('Your next session')).toBeNull();
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    expect(within(nav).getByRole('link', { name: 'Room queue' }))
+      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host/queue');
+  });
+
+  it('keeps the room out of the sidebar once the server says it ended', async () => {
+    // No room, no promises: the nav returns to the single action that works.
+    stubWide(true);
+    saveHostToken('550e8400-e29b-41d4-a716-446655440000', 'host-pass');
+    rememberSession({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      code: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      hostName: 'Alex',
+      role: 'host',
+    });
+    renderHomeAt('/create', { intent: 'create' }, {
+      invoke: (async () => ({ status: 'ended' })) as unknown as EdgeApi['invoke'],
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'Back to the room' })).toBeNull();
+    });
+    expect(screen.getByText('Your next session')).toBeInTheDocument();
+    const nav = screen.getByRole('navigation', { name: 'Primary' });
+    expect(within(nav).queryByRole('link', { name: 'Room queue' })).toBeNull();
   });
 
   it('offers no way back to a room the server says has ended', async () => {

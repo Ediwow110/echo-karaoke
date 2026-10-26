@@ -16,6 +16,8 @@ import { saveGuestToken, saveHostToken } from '../features/rooms/tokenStore';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import AppShell from '../features/rooms/AppShell';
 import ReturnToRoom from '../features/rooms/ReturnToRoom';
+import { useHostedRoom } from '../features/rooms/useHostedRoom';
+import type { ActiveRoom } from '../features/rooms/Sidebar';
 import { Avatar, Button, Field, Logo } from '../ui';
 
 function describeError(error: unknown): string {
@@ -115,6 +117,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
   // A screen is wide only when both edges reach 640px. The shorter edge, not
   // the width alone, decides whether this device is a phone remote.
   const wide = useMediaQuery('(min-width: 640px) and (min-height: 640px)');
+  const hostedRoom = useHostedRoom(api);
   const [mode, setMode] = useState<'join' | 'host'>(intent === 'create' ? 'host' : 'join');
   const [roomName, setRoomName] = useState('');
   const [hostName, setHostName] = useState(hostNameDefault);
@@ -267,7 +270,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
             </p>
           </div>
 
-          <ReturnToRoom api={api} className="mt-6" />
+          <ReturnToRoom room={hostedRoom} className="mt-6" />
 
           <div key={mode} className="page-enter">
             {mode === 'join' ? (
@@ -402,11 +405,19 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
   }
 
   const resolvedHost = hostName.trim().length > 0 ? hostName.trim() : 'You';
+  const activeRoom: ActiveRoom | null = hostedRoom === null
+    ? null
+    : {
+        roomId: hostedRoom.roomId,
+        name: hostedRoom.roomName,
+        code: hostedRoom.code,
+        hostName: hostedRoom.hostName,
+      };
 
   return (
     <AppShell
       activeNav="create"
-      activeRoom={null}
+      activeRoom={activeRoom}
       hostName={hostName.trim()}
       mobileAction={<Link to="/scan" className="inline-flex min-h-11 items-center text-[0.75rem] font-semibold text-signal">Scan a code</Link>}
     >
@@ -438,7 +449,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
             data-start-card
             aria-label="Start a room"
           >
-            <ReturnToRoom api={api} className="mb-5" />
+            <ReturnToRoom room={hostedRoom} className="mb-5" />
 
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display text-[1.65rem] font-bold tracking-[-0.025em] text-ink">Make it your room.</h2>
