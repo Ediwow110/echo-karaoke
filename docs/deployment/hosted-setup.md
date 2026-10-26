@@ -856,9 +856,9 @@ production database is still a mistake the code cannot detect.
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 396 passing assertions on a fresh branch.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 490 passing tests on the current tree.
+- [x] `npm test` reports 502 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
 - [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
