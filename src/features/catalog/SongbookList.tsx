@@ -2,7 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { RoomApiError, type EdgeApi } from '../../lib/edgeApi';
-import { queueCatalogSong, readCatalogPage, runCatalogSync, type CatalogSong } from './catalogApi';
+import { queueCatalogSong, readCatalogPage, runCatalogSync, type CatalogSong, type CatalogSyncResult } from './catalogApi';
 import { describeAddError } from '../queue/queueApi';
 import { SongArtwork } from '../../ui';
 
@@ -31,6 +31,21 @@ export type SongbookListProps = {
   canSync?: boolean;
   onAdded?: () => void;
 };
+
+/**
+ * What a refresh that added nothing still knows.
+ *
+ * The server sends a message only when something went wrong, so a quiet result
+ * needs a reason. A skipped channel was never asked -- the six-hour throttle
+ * held it -- while a walked channel that added nothing really is spent. Telling
+ * the host the second story when the first happened gives them a cause they
+ * cannot act on, and a reason to press again that leads nowhere.
+ */
+function syncOutcome(result: CatalogSyncResult): string | null {
+  if (result.added > 0) return null;
+  if (result.skipped > 0) return 'The channels were refreshed within the last six hours, so this run fetched nothing.';
+  return 'The channels have nothing new yet. Try again in a few hours.';
+}
 
 export default function SongbookList({ api, roomId, channels, disabled = false, canSync = false, onAdded }: SongbookListProps) {
   const [query, setQuery] = useState('');
@@ -107,9 +122,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
     try {
       const result = await runCatalogSync(api, roomId);
       await load(0, true);
-      setSyncNote(result.message ?? (result.added > 0
-        ? null
-        : 'The channels have nothing new yet. Try again in a few hours.'));
+      setSyncNote(result.message ?? syncOutcome(result));
     } catch (caught) {
       if (caught instanceof RoomApiError && caught.code === 'CATALOG_REFRESH_RUNNING') {
         // Another host is already walking the same channels. That is a wait, not a

@@ -247,6 +247,20 @@ describe('songbook list', () => {
     expect(await screen.findByText('61 songs')).toBeInTheDocument();
   });
 
+  it('names the throttle when the walk never looked at YouTube', async () => {
+    // Every channel inside its six-hour window answers 'skipped' and adds
+    // nothing. Telling the host the channels "have nothing new" states a fact
+    // about YouTube that this run never checked -- the true cause is our own
+    // schedule, and it is the reason a second press does nothing.
+    const { api } = makeEmptyApi({ available: true, added: 0, skipped: 4 });
+    render(<SongbookList api={api} roomId={roomId} canSync />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /refresh the songbook/i }));
+
+    expect(await screen.findByText(/last six hours/i)).toBeInTheDocument();
+    expect(screen.queryByText(/nothing new/i)).toBeNull();
+  });
+
   it('lets the host refresh an already populated songbook without clearing the list', async () => {
     const { api, calls } = makeApi();
     render(<SongbookList api={api} roomId={roomId} canSync />);
