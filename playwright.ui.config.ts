@@ -4,7 +4,7 @@ import { defineConfig, devices } from '@playwright/test';
 // Neon branch or YouTube key, so CI can gate every phone and host visual rule.
 export default defineConfig({
   testDir: './tests/e2e',
-  testMatch: 'ui-mock.spec.ts',
+  testMatch: 'ui-mock*.spec.ts',
   timeout: 30_000,
   expect: { timeout: 10_000 },
   fullyParallel: false,

@@ -302,11 +302,27 @@ test('the create action opens the create form and keeps the hosted room one clic
 // clicked and its landing checked, with no console error allowed in passing.
 test('every host sidebar destination lands where its label says', async ({ page }) => {
   const noise: string[] = [];
+  const note = (text: string) => noise.push(text);
   await mockApi(page);
   page.on('console', (message) => {
-    if (message.type() === 'error') noise.push('console: ' + message.text().slice(0, 140));
+    if (message.type() !== 'error') return;
+    const location = message.location();
+    if (location.url.length === 0) {
+      note('console: ' + message.text().slice(0, 140));
+      return;
+    }
+    // The player is a YouTube frame and answers to YouTube's own policies --
+    // it logs a compute-pressure violation on some Chrome builds. This gate is
+    // about the app's console, so only same-origin messages count.
+    try {
+      if (new URL(location.url).origin === new URL(page.url()).origin) {
+        note('console: ' + message.text().slice(0, 140));
+      }
+    } catch {
+      note('console: ' + message.text().slice(0, 140));
+    }
   });
-  page.on('pageerror', (error) => noise.push('pageerror: ' + error.message.slice(0, 140)));
+  page.on('pageerror', (error) => note('pageerror: ' + error.message.slice(0, 140)));
   await page.setViewportSize({ width: 1440, height: 900 });
 
   const destinations: Array<{ label: string; path: string }> = [
