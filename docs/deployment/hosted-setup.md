@@ -812,6 +812,14 @@ functions, so `0037` must be applied before the build ships — the reverse orde
 outright. The old client tolerates the new fields, so the window only affects a guest tab that
 reloads mid-deploy.
 
+**Voting reaches the room (0039, 2026-10-27).** The server has counted votes since `0005` and three
+screens have promised guests could cast one, but no screen ever sent `vote-command`. Queue rows now
+carry a ThumbsUp with the count, filled when this member has seconded the song. `0039` threads the
+viewer's member id into `private.room_queue` and drops the one-argument form, so the queue can never
+again be projected without saying whose view it is. Apply it with this build: the redefined reads
+answer the currently deployed build exactly as before plus one field per row, so either order is
+safe -- but a build shipped without the migration shows counts that never fill.
+
 **Not verified:** a second human on a real phone, and screen-reader announcement of the waiting status
 (the unit test asserts the role, not that it is announced).
 
