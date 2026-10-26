@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import SongbookList from '../../src/features/catalog/SongbookList';
-import type { EdgeApi } from '../../src/lib/edgeApi';
+import { RoomApiError, type EdgeApi } from '../../src/lib/edgeApi';
 import '@testing-library/jest-dom/vitest';
 
 const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
@@ -256,6 +256,37 @@ describe('songbook list', () => {
       expect(calls.some((call) => call.name === 'catalog-sync')).toBe(true);
     });
     expect(screen.getByText('Halo - Beyonce (Karaoke)')).toBeInTheDocument();
+  });
+
+  it('reports a concurrent refresh as a wait rather than a failure', async () => {
+    // Another host already holds the walk, so the operation answers 409. The songbook
+    // is not broken and must not read as red.
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'catalog-page') return { total: 61, items: [songAt(0)] };
+        throw new RoomApiError('CATALOG_REFRESH_RUNNING', 409, 'The songbook is already being refreshed');
+      }) as unknown as EdgeApi['invoke'],
+    };
+    render(<SongbookList api={api} roomId={roomId} canSync />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /refresh the songbook/i }));
+
+    expect(await screen.findByText(/already being refreshed/i)).toBeInTheDocument();
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('still reports a real refresh failure as an error', async () => {
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'catalog-page') return { total: 61, items: [songAt(0)] };
+        throw new RoomApiError('INTERNAL_ERROR', 500, 'The songbook could not be refreshed');
+      }) as unknown as EdgeApi['invoke'],
+    };
+    render(<SongbookList api={api} roomId={roomId} canSync />);
+
+    fireEvent.click(await screen.findByRole('button', { name: /refresh the songbook/i }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent(/could not be refreshed/i);
   });
 
   it('does not expose a refresh action to guests even when the catalog is populated', async () => {

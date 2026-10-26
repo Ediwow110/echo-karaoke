@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
-import type { EdgeApi } from '../../lib/edgeApi';
+import { RoomApiError, type EdgeApi } from '../../lib/edgeApi';
 import { queueCatalogSong, readCatalogPage, runCatalogSync, type CatalogSong } from './catalogApi';
 import { SongArtwork } from '../../ui';
 
@@ -110,7 +110,13 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
         ? null
         : 'The channels have nothing new yet. Try again in a few hours.'));
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'The songbook could not be refreshed.');
+      if (caught instanceof RoomApiError && caught.code === 'CATALOG_REFRESH_RUNNING') {
+        // Another host is already walking the same channels. That is a wait, not a
+        // fault, so it belongs in the status line rather than the error slot.
+        setSyncNote(caught.message);
+      } else {
+        setError(caught instanceof Error ? caught.message : 'The songbook could not be refreshed.');
+      }
     } finally {
       setSyncing(false);
     }

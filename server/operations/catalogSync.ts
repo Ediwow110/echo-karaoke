@@ -1,5 +1,5 @@
 import { HttpError, jsonResponse, logFailure } from './errors.js';
-import { readJsonObject } from './tokens.js';
+import { generateToken, readJsonObject } from './tokens.js';
 import { requireRoomId, type Caller } from './room.js';
 import { operationCall, serviceDatabase } from '../db/client.js';
 import { requireHostAccess } from './catalogAccess.js';
@@ -141,6 +141,36 @@ async function quotaAllows(name: string, params: unknown[]): Promise<boolean> {
   return (result as { allowed?: unknown }).allowed === true;
 }
 
+/**
+ * Claim the right to walk the catalog. The holder is a fresh random token per
+ * request, so a walk resumed across requests renews its own lease and nobody else
+ * can release it. A lease that cannot be read is a failure, not a free pass: the
+ * guard is only worth having if a broken one stops the walk rather than excusing it.
+ */
+async function takeCatalogLease(holder: string): Promise<boolean> {
+  const call = operationCall('karaoke_catalog_lease_take', [holder]);
+  const rows = await serviceDatabase().query(call.text, call.params);
+  const result = (rows[0] as { result?: unknown } | undefined)?.result;
+  if (result === null || typeof result !== 'object') {
+    throw new HttpError('INTERNAL_ERROR', 500, 'The songbook refresh could not be checked. Try again.');
+  }
+  return (result as { acquired?: unknown }).acquired === true;
+}
+
+/**
+ * Give the claim back. A failed release is not worth an error the caller cannot act
+ * on: the lease expires on its own four minutes later, which is the same outcome
+ * with a shorter wait than a failed refresh response.
+ */
+async function releaseCatalogLease(holder: string): Promise<void> {
+  const call = operationCall('karaoke_catalog_lease_release', [holder]);
+  try {
+    await serviceDatabase().query(call.text, call.params);
+  } catch (caught) {
+    logFailure('catalog lease release', caught);
+  }
+}
+
 async function loadCursors(): Promise<Cursor[]> {
   const call = operationCall('karaoke_catalog_cursors', []);
   const rows = await serviceDatabase().query(call.text, call.params);
@@ -209,6 +239,21 @@ export async function catalogSync(request: Request, caller: Caller): Promise<Res
     return jsonResponse({ available: false, added: 0, message: 'YouTube is not configured' });
   }
 
+  // One walk at a time, because the catalog is global: a second host pressing
+  // Refresh would fetch the same four channels again and spend about half the
+  // daily units on work already under way.
+  const holder = generateToken();
+  if (!(await takeCatalogLease(holder))) {
+    throw new HttpError('CATALOG_REFRESH_RUNNING', 409, 'The songbook is already being refreshed');
+  }
+  try {
+    return await walkCatalog(apiKey, request);
+  } finally {
+    await releaseCatalogLease(holder);
+  }
+}
+
+async function walkCatalog(apiKey: string, request: Request): Promise<Response> {
   // Purge aged provider metadata before the next fetch. This RPC is installed
   // by forward-only migration 0033 and must be deployed before this server code.
   const retire = operationCall('karaoke_catalog_retire_stale', []);

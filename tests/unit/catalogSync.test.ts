@@ -200,6 +200,8 @@ function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
 function baseHandlers(overrides: Record<string, Handler> = {}): Record<string, Handler> {
   return {
     host_access_check: () => ({ status: 'live' }),
+    karaoke_catalog_lease_take: () => ({ acquired: true }),
+    karaoke_catalog_lease_release: () => true,
     karaoke_catalog_cursors: () => [],
     consume_daily_rate_limit: () => ({ allowed: true }),
     karaoke_catalog_cursor_save: () => ({}),
@@ -534,5 +536,50 @@ describe('catalog sync orchestration', () => {
     const body = await (await catalogSync(syncRequest(), CALLER)).json() as { unresolved: string[] };
 
     expect(body.unresolved).toEqual([]);
+  });
+});
+
+describe('the catalog walk lease', () => {
+  it('refuses a second walk before it can spend any quota', async () => {
+    useDatabase(baseHandlers({
+      karaoke_catalog_lease_take: () => ({ acquired: false, holder: 'someone-else' }),
+    }));
+    const fetched = stubFetch({ rows: [row(1)] });
+
+    await expectHttpError(catalogSync(syncRequest(), CALLER), 409, 'CATALOG_REFRESH_RUNNING');
+
+    expect(fetched.urls).toHaveLength(0);
+  });
+
+  it('stops rather than excuses itself when the lease cannot be read', async () => {
+    useDatabase(baseHandlers({
+      karaoke_catalog_lease_take: () => null,
+    }));
+    const fetched = stubFetch({ rows: [row(1)] });
+
+    await expectHttpError(catalogSync(syncRequest(), CALLER), 500, 'INTERNAL_ERROR');
+
+    expect(fetched.urls).toHaveLength(0);
+  });
+
+  it('claims before fetching anything and gives the claim back afterwards', async () => {
+    useDatabase(baseHandlers());
+    stubFetch({ rows: [row(1)] });
+
+    await catalogSync(syncRequest(), CALLER);
+
+    expect(db.timeline).toContain('karaoke_catalog_lease_take');
+    expect(db.timeline.indexOf('karaoke_catalog_lease_take')).toBeLessThan(db.timeline.indexOf('fetch'));
+    expect(db.timeline[db.timeline.length - 1]).toBe('karaoke_catalog_lease_release');
+  });
+
+  it('gives the claim back even when the walk throws', async () => {
+    useDatabase(baseHandlers({
+      karaoke_catalog_cursors: () => new Error('connection terminated'),
+    }));
+
+    await expect(catalogSync(syncRequest(), CALLER)).rejects.toThrow('connection terminated');
+
+    expect(db.timeline).toContain('karaoke_catalog_lease_release');
   });
 });
