@@ -259,6 +259,11 @@ begin
     raise exception 'ROOM_ENDED' using errcode = '22023';
   end if;
 
+  -- Deliberately no FOR UPDATE here. A lock on this row would be taken after
+  -- the room lock above, while the door operations take the member lock first
+  -- and then a KEY SHARE lock on the room via the room_events foreign key;
+  -- that is a lock cycle. The update below checks FOUND instead, which is
+  -- enough to refuse a member a concurrent reject deleted.
   select * into v_member
   from public.members m
   where m.room_id = v_room.id and m.user_id = p_user_id;
@@ -290,6 +295,13 @@ begin
         last_seen_at = now()
     where id = v_member.id
     returning * into v_member;
+
+    -- room_reject_member can delete the row between the read and this update.
+    -- The update then touches nothing and v_member is all NULL, so refuse
+    -- rather than hand back a deleted member's empty identity.
+    if not found then
+      raise exception 'UNAUTHORIZED' using errcode = '28000';
+    end if;
   else
     select count(*) into v_member_count
     from public.members m

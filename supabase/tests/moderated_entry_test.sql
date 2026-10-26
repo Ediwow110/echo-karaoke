@@ -53,6 +53,22 @@ select is(
 select is(
   (select public.read_room_guest(
     (select room_id from ctx), 'me-guest', repeat('a', 40)
+  ) ? 'playback'),
+  false,
+  'a waiting guest cannot read the playback state'
+);
+
+select is(
+  (select public.read_room_guest(
+    (select room_id from ctx), 'me-guest', repeat('a', 40)
+  ) ? 'events'),
+  false,
+  'a waiting guest cannot read the event feed'
+);
+
+select is(
+  (select public.read_room_guest(
+    (select room_id from ctx), 'me-guest', repeat('a', 40)
   ) ->> 'status'),
   'waiting',
   'the waiting read is its own status, not a live room with empty data'
@@ -73,6 +89,70 @@ select lives_ok(
     (select room_id from ctx), 'me-guest', repeat('a', 40)
   )$$,
   'a waiting guest can still say hello, which is what the doorbell runs on'
+);
+
+select throws_ok(
+  $$select public.queue_read(
+    (select room_id from ctx), 'me-guest', repeat('a', 40)
+  )$$,
+  '42501',
+  null,
+  'a waiting guest cannot read the queue through the queue endpoint'
+);
+
+select throws_ok(
+  $$select public.vote_toggle(
+    (select room_id from ctx), 'me-guest', repeat('a', 40),
+    '00000000-0000-0000-0000-000000000000'::uuid
+  )$$,
+  '42501',
+  null,
+  'a waiting guest cannot vote'
+);
+
+select throws_ok(
+  $$select public.playback_command(
+    (select room_id from ctx), 'me-guest', repeat('a', 40),
+    null::text, 'play'
+  )$$,
+  '42501',
+  null,
+  'a waiting guest cannot drive playback'
+);
+
+select throws_ok(
+  $$select public.room_approve_member(
+    (select room_id from ctx), 'me-bystander', repeat('z', 40),
+    (select m.id from public.members m where m.user_id = 'me-guest')
+  )$$,
+  '28000',
+  null,
+  'a bystander with no host token cannot admit the waiting guest'
+);
+
+select is(
+  (select jsonb_build_object(
+    'count', jsonb_array_length(host -> 'door'),
+    'displayName', host -> 'door' -> 0 ->> 'displayName',
+    'memberId', host -> 'door' -> 0 ->> 'memberId'
+  )
+  from (
+    select public.read_room_host(
+      (select room_id from ctx), 'me-host', (select host_token from ctx)
+    ) as host
+  ) h),
+  jsonb_build_object(
+    'count', 1,
+    'displayName', 'Waiting Guest',
+    'memberId', (select m.id::text from public.members m where m.user_id = 'me-guest')
+  ),
+  'the door holds exactly the waiting guest before the host decides'
+);
+
+select is(
+  (select private.room_roster((select room_id from ctx))::text like '%Waiting Guest%'),
+  false,
+  'a pending guest never appears in the roster'
 );
 
 select is(
@@ -157,12 +237,6 @@ select lives_ok(
     (select room_code from ctx), 'me-guest', 'Waiting Guest', repeat('a', 40)
   )$$,
   'an admitted guest still gets back in while the door is locked'
-);
-
-select is(
-  (select private.room_roster((select room_id from ctx))::text like '%Turned Away%'),
-  false,
-  'rejected guests never appear in the roster'
 );
 
 select is(
