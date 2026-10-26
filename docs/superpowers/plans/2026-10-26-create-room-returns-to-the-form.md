@@ -8,6 +8,12 @@
 
 **Tech Stack:** React 19, React Router 7, Vite, Tailwind, Vitest + Testing Library (jsdom), Playwright UI checks with mocked `/api`.
 
+**Status (2026-10-27):** committed on `feature/songbook` as `39fcc24` and **not deployed**. Production
+still serves `862e747`, whose sidebar links "Create room" to `/` — verified by fetching the live
+origin and grepping every served chunk for `/create` and `Back to the room` (zero hits in 35 chunks,
+while the positive controls matched). The runbook section now reads
+`## The create action opens the create form (committed 2026-10-26, NOT DEPLOYED as of 2026-10-27)`.
+
 ## Global Constraints
 
 - Keep authorization, duplicate checks, room limits, and quota checks in SQL or the server. UI hiding is not authorization.
@@ -493,7 +499,7 @@ Not committed — see "Commit policy" below.
 
 ---
 
-### Task 4: Record what shipped
+### Task 4: Record what changed
 
 **Files:**
 - Modify: `docs/deployment/hosted-setup.md`
@@ -504,8 +510,8 @@ Not committed — see "Commit policy" below.
 
 - [x] **Step 1: Write the section**
 
-The shipped section is `## The create action opens the create form (shipped 2026-10-26)` in
-`docs/deployment/hosted-setup.md`. It covers what was wrong, what ships now (including why the
+The section is `## The create action opens the create form (committed 2026-10-26, NOT DEPLOYED as of
+2026-10-27)` in `docs/deployment/hosted-setup.md`. It covers what was wrong, what ships now (including why the
 server decides liveness), the proof against the running app, and the React Router keying note.
 
 - [x] **Step 2: Update the verification checklist**
