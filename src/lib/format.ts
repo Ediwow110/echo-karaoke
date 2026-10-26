@@ -54,3 +54,18 @@ export function queueSummary(
   const total = songs.reduce((sum, song) => sum + (song.durationSeconds ?? 0), 0);
   return songCountLabel(songs.length) + (total > 0 ? ' · ' + formatTotalTime(total) : '');
 }
+
+/**
+ * Who a room can claim is in it right now.
+ *
+ * The roster keeps everyone who joined while the room lives, and a member whose
+ * phone stopped heartbeating is listed as "Away" a few rows lower. Counting
+ * those people as present contradicts the list printed under the same heading,
+ * so they are named instead of folded into the total.
+ */
+export function presenceSummary(members: { online: boolean }[]): string {
+  const here = members.filter((member) => member.online).length;
+  const away = members.length - here;
+  if (away === 0) return members.length + ' ' + plural(members.length, 'person', 'people');
+  return here + ' here · ' + away + ' away';
+}

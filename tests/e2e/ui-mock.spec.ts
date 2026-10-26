@@ -453,6 +453,18 @@ test('the host screen reports a dropped room and recovers on its own', async ({ 
   await expect(page.getByText('Connection restored.'), 'the recovery went unannounced').toBeVisible();
 });
 
+// The roster keeps everyone who joined while the room lives, and the rows under
+// the head-count label the drifted-off ones "Away". A total that folded them in
+// contradicted the list a few pixels below it.
+test('the host header counts only the people still here', async ({ page }) => {
+  await mockApi(page, false);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+
+  await expect(page.getByText('1 here · 1 away')).toBeVisible();
+  await expect(page.getByText('2 people')).toHaveCount(0);
+});
+
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
   await mockApi(page);
   await openGuestSearch(page);

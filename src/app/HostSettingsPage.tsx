@@ -12,6 +12,7 @@ import { useRoomApi } from './RoomApiProvider';
 import DoorList from '../features/rooms/DoorList';
 import InviteCard from '../features/rooms/InviteCard';
 import { setAdmissions, setApproval as requestApproval } from '../features/rooms/roomApi';
+import { presenceSummary } from '../lib/format';
 import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
 
 export default function HostSettingsPage() {
@@ -212,7 +213,7 @@ export default function HostSettingsPage() {
                 <UsersThreeIcon size={18} className="text-signal" aria-hidden="true" />
                 <h3 id="people-title" className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">In the room</h3>
               </div>
-              <span className="text-[0.6875rem] text-ink-2">{roster.length} {roster.length === 1 ? 'person' : 'people'}</span>
+              <span className="text-[0.6875rem] text-ink-2">{presenceSummary(roster)}</span>
             </div>
             <ul className="mt-4 divide-y divide-line">
               {host === undefined ? null : (

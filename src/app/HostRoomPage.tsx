@@ -22,7 +22,7 @@ import { buildJoinUrl } from '../features/rooms/roomUrl';
 import { loadHostToken } from '../features/rooms/tokenStore';
 import { rememberSession, forgetSession } from '../features/rooms/sessionStore';
 import { rememberPlayed, rememberSongs } from '../features/library/libraryStore';
-import { groupRoomCode } from '../lib/format';
+import { groupRoomCode, presenceSummary } from '../lib/format';
 import { Button, Chip, IconButton, Logo, Toast, type ToastTone } from '../ui';
 import type { HostNotify, HostRoomContext } from './useHostRoom';
 
@@ -613,7 +613,7 @@ export default function HostRoomPage() {
                 ) : (
                   <span className="hidden items-center gap-2 text-[0.6875rem] text-ink-2 sm:flex">
                     <span aria-hidden="true" className="animate-presence-pulse size-1.5 rounded-full bg-live" />
-                    {groupRoomCode(code)} · {roster.length} {roster.length === 1 ? 'person' : 'people'}
+                    {groupRoomCode(code)} · {presenceSummary(roster)}
                   </span>
                 )}
                 {door.length === 0 ? null : (
