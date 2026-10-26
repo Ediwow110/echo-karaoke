@@ -3,7 +3,7 @@ import { useRoomApi } from '../../app/RoomApiProvider';
 import { RoomApiError } from '../../lib/edgeApi';
 import type { RoomTokens } from '../../lib/edgeApi';
 import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
-import { addSong, type QueueSong } from './queueApi';
+import { addSong, describeAddError, type QueueSong } from './queueApi';
 import { parseYouTubeVideoId } from './youtubeVideo';
 import type { SearchResult } from '../../types/search';
 
@@ -23,19 +23,6 @@ type Options = {
 };
 
 const DEBOUNCE_MS = 380;
-
-export function describeAddError(error: unknown): string {
-  if (error instanceof RoomApiError) {
-    if (error.code === 'RATE_LIMITED') return 'That is five songs this minute. Give it a moment.';
-    if (error.code === 'GUEST_CONTROLS_LOCKED') return 'The host turned off guest requests.';
-    if (error.code === 'METADATA_UNAVAILABLE') return 'That video could not be read. Try another copy.';
-    if (error.code === 'DUPLICATE_SONG') return 'That song is already in the queue.';
-    if (error.code === 'ROOM_ENDED') return 'This room has ended.';
-    if (error.code === 'NETWORK_ERROR') return 'The room service could not be reached. Try again.';
-    return error.message;
-  }
-  return error instanceof Error ? error.message : 'That song could not be added.';
-}
 
 export function useSongSearch({ roomId, initialQuery = '', disabled = false, onAdded }: Options) {
   const api = useRoomApi();

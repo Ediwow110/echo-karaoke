@@ -6,7 +6,7 @@ import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { useRoomApi } from '../../app/RoomApiProvider';
 import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
-import { addSong, type QueueSong } from './queueApi';
+import { addSong, describeAddError, type QueueSong } from './queueApi';
 import { SongArtwork } from '../../ui';
 import type { SearchResult } from '../../types/search';
 
@@ -85,7 +85,7 @@ export default function PopularSongs({ roomId, layout = 'horizontal', disabled =
       setAdded((current) => [...current, videoId]);
       onAdded?.(song);
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'That song could not be added.');
+      setError(describeAddError(caught));
     } finally {
       setQueued(null);
     }

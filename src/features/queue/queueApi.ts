@@ -1,4 +1,4 @@
-import type { EdgeApi } from '../../lib/edgeApi';
+import { RoomApiError, type EdgeApi } from '../../lib/edgeApi';
 import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
 
 export type QueueSong = {
@@ -57,6 +57,27 @@ export async function addSong(
   videoId: string,
 ): Promise<QueueSong> {
   return sendQueueCommand<QueueSong>(api, roomId, { kind: 'add', videoId });
+}
+
+/**
+ * What a refused add says back to the room.
+ *
+ * The server answers a queue command with its own sentence -- "The host locked
+ * guest controls" -- which is a log line, not a message for a guest holding a
+ * phone. Every screen that adds a song has to say the same thing in the app's
+ * voice, so the mapping lives beside the call rather than in one caller.
+ */
+export function describeAddError(error: unknown): string {
+  if (error instanceof RoomApiError) {
+    if (error.code === 'RATE_LIMITED') return 'That is five songs this minute. Give it a moment.';
+    if (error.code === 'GUEST_CONTROLS_LOCKED') return 'The host turned off guest requests.';
+    if (error.code === 'METADATA_UNAVAILABLE') return 'That video could not be read. Try another copy.';
+    if (error.code === 'DUPLICATE_SONG') return 'That song is already in the queue.';
+    if (error.code === 'ROOM_ENDED') return 'This room has ended.';
+    if (error.code === 'NETWORK_ERROR') return 'The room service could not be reached. Try again.';
+    return error.message;
+  }
+  return error instanceof Error ? error.message : 'That song could not be added.';
 }
 
 export async function removeSong(api: EdgeApi, roomId: string, songId: string): Promise<void> {

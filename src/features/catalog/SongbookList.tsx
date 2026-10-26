@@ -3,6 +3,7 @@ import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGl
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { RoomApiError, type EdgeApi } from '../../lib/edgeApi';
 import { queueCatalogSong, readCatalogPage, runCatalogSync, type CatalogSong } from './catalogApi';
+import { describeAddError } from '../queue/queueApi';
 import { SongArtwork } from '../../ui';
 
 export const PAGE_SIZE = 30;
@@ -88,7 +89,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
       setAdded((current) => [...current, song.videoId]);
       onAdded?.();
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : 'That song could not be added.');
+      setError(describeAddError(caught));
     } finally {
       setAdding(null);
     }

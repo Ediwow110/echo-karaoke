@@ -57,9 +57,17 @@ function guestView(scenario: Scenario) {
   };
 }
 
-async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', joinStatus: 'joined' | 'waiting' = 'joined') {
+async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', joinStatus: 'joined' | 'waiting' = 'joined', refusal?: { op: string; status: number; code: string }) {
   await page.route('**/api/**', async (route) => {
     const op = new URL(route.request().url()).pathname.replace('/api/', '');
+    if (refusal !== undefined && refusal.op === op) {
+      // The server's own words for this code, which is not the app's voice.
+      const serverMessage = refusal.code === 'GUEST_CONTROLS_LOCKED'
+        ? 'The host locked guest controls'
+        : 'That song is already in the queue';
+      await route.fulfill({ status: refusal.status, contentType: 'application/json', body: JSON.stringify({ error: { code: refusal.code, message: serverMessage } }) });
+      return;
+    }
     let payload: unknown = {};
     if (op === 'auth/token') payload = { token: 'mock-jwt' };
     else if (op === 'touch-member') payload = { memberId: role === 'host' ? 'm1' : 'm2' };
@@ -171,6 +179,22 @@ test('a locked songbook says why its controls are off', async ({ page }) => {
   const firstAdd = page.getByRole('button', { name: /add halo/i }).first();
   await expect(firstAdd).toBeVisible();
   await expect(firstAdd).toBeDisabled();
+});
+
+// A refusal reaches a guest as the server's sentence, which is not the app's.
+// The search tab maps it; the songbook tab printed "The host locked guest
+// controls" where every other screen says "The host turned off guest requests."
+test('a refused add reads in the app voice from the songbook too', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'guest', 'joined', { op: 'queue-command', status: 403, code: 'GUEST_CONTROLS_LOCKED' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/room/' + ROOM + '/songbook', { waitUntil: 'networkidle' });
+
+  const add = page.getByRole('button', { name: /add halo/i }).first();
+  await expect(add).toBeEnabled();
+  await add.click();
+  await expect(page.getByText('The host turned off guest requests.')).toBeVisible();
+  await expect(page.getByText('The host locked guest controls')).toHaveCount(0);
 });
 
 const GUEST_SCREENS = [
