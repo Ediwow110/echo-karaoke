@@ -12,6 +12,7 @@ import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { useRoomData } from '../features/rooms/useRoomData';
 import GuestSongbook from './GuestSongbook';
+import WaitingRoom from './WaitingRoom';
 import { useRoomApi } from './RoomApiProvider';
 import { sendPlaybackCommand } from '../features/playback/playbackApi';
 import { claimHostPass } from '../features/rooms/roomApi';
@@ -214,6 +215,16 @@ export default function GuestRoomPage() {
           </div>
         </div>
       </main>
+    );
+  }
+
+  if (data !== null && data.status === 'waiting') {
+    const waitingRoom = (data as { room?: { name?: unknown; hostName?: unknown } }).room;
+    return (
+      <WaitingRoom
+        roomName={typeof waitingRoom?.name === 'string' ? waitingRoom.name : 'This room'}
+        hostName={typeof waitingRoom?.hostName === 'string' ? waitingRoom.hostName : 'The host'}
+      />
     );
   }
 

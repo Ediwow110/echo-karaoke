@@ -188,6 +188,58 @@ describe('room api', () => {
     expect(loadGuestToken('3a1ee27f-a539-4190-9250-bdc14ff631e0')).toBeNull();
   });
 
+  it('carries the waiting status from a moderated join and still stores the pass', async () => {
+    const { api } = fakeApi({
+      roomId: '3a1ee27f-a539-4190-9250-bdc14ff631e0',
+      roomCode: 'ABCDEFGHJKMNPQRS',
+      roomName: 'Songs',
+      memberId: 'member-2',
+      displayName: 'Guest 07',
+      role: 'guest',
+      guestToken: 'guest-waiting',
+      status: 'waiting',
+    });
+
+    const joined = await joinRoom({ api }, 'ABCDEFGHJKMNPQRS', 'Guest 07');
+
+    expect(joined.status).toBe('waiting');
+    expect(loadGuestToken('3a1ee27f-a539-4190-9250-bdc14ff631e0')).toBe('guest-waiting');
+  });
+
+  it('leaves an older server\'s join response without a status field', async () => {
+    const { api } = fakeApi({
+      roomId: '3a1ee27f-a539-4190-9250-bdc14ff631e0',
+      roomCode: 'ABCDEFGHJKMNPQRS',
+      roomName: 'Songs',
+      memberId: 'member-2',
+      displayName: 'Guest 07',
+      role: 'guest',
+      guestToken: 'guest-2',
+    });
+
+    const joined = await joinRoom({ api }, 'ABCDEFGHJKMNPQRS', 'Guest 07');
+
+    expect('status' in joined).toBe(false);
+    expect(joined.status).toBeUndefined();
+  });
+
+  it('does not invent a join status it does not recognize', async () => {
+    const { api } = fakeApi({
+      roomId: '3a1ee27f-a539-4190-9250-bdc14ff631e0',
+      roomCode: 'ABCDEFGHJKMNPQRS',
+      roomName: 'Songs',
+      memberId: 'member-2',
+      displayName: 'Guest 07',
+      role: 'guest',
+      guestToken: 'guest-2',
+      status: 'pending',
+    });
+
+    const joined = await joinRoom({ api }, 'ABCDEFGHJKMNPQRS', 'Guest 07');
+
+    expect('status' in joined).toBe(false);
+  });
+
   it.each([
     ['missing response', null],
     ['missing roomId', { roomCode: 'ABCDEFGHJKMNPQRS', roomName: 'Songs', memberId: 'm1', displayName: 'Jamie', role: 'guest', guestToken: 'guest-test' }],

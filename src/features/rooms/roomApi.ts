@@ -22,6 +22,8 @@ export type JoinedRoom = {
   displayName: string;
   role: string;
   guestToken: string;
+  /** 'waiting' means the host has to admit this device; absent on older servers. */
+  status?: 'joined' | 'waiting';
 };
 
 const ROOM_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -75,6 +77,7 @@ function verifyJoinedRoom(value: unknown, requestedCode: string): JoinedRoom {
     || typeof room.guestToken !== 'string' || room.guestToken.length === 0) {
     return invalid();
   }
+  const status = room.status === 'waiting' ? 'waiting' : room.status === 'joined' ? 'joined' : undefined;
   return {
     roomId: room.roomId,
     roomCode: requestedCode,
@@ -83,6 +86,7 @@ function verifyJoinedRoom(value: unknown, requestedCode: string): JoinedRoom {
     displayName: room.displayName,
     role: 'guest',
     guestToken: room.guestToken,
+    ...(status === undefined ? {} : { status }),
   };
 }
 

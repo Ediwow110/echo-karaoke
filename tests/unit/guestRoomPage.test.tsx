@@ -1,5 +1,5 @@
-import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createElement } from 'react';
 import GuestRoomPage from '../../src/app/GuestRoomPage';
@@ -139,6 +139,61 @@ describe('guest phone remote', () => {
 
     expect(await screen.findByRole('heading', { name: 'This room has ended.' })).toBeInTheDocument();
     expect(screen.getByRole('status')).toHaveTextContent(/host closed the session/i);
+  });
+
+  it('waits at the door instead of showing an empty room', async () => {
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'guest-room-read') {
+          return {
+            roomId, status: 'waiting',
+            room: { id: roomId, name: 'Moderated', hostName: 'Rafa' },
+            viewer: { memberId: 'm1', displayName: 'Guest', role: 'guest', status: 'pending' },
+          };
+        }
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderGuest(api);
+    expect(await screen.findByText(/rafa needs to let you in/i)).toBeInTheDocument();
+    expect(screen.queryByText(/shared playlist/i)).toBeNull();
+  });
+
+  it('keeps polling while the guest waits, so the screen opens when the host admits them', async () => {
+    // A waiting read must not stop the four-second poll: the host admits from
+    // the other screen, and this screen only learns about it by reading again.
+    vi.useFakeTimers();
+    let reads = 0;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'touch-member') return {};
+        if (name === 'guest-room-read') {
+          reads += 1;
+          if (reads === 1) {
+            return {
+              roomId, status: 'waiting',
+              room: { id: roomId, name: 'Moderated', hostName: 'Rafa' },
+              viewer: { memberId: 'm1', displayName: 'Guest', role: 'guest', status: 'pending' },
+            };
+          }
+          return liveRoom();
+        }
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    const view = renderGuest(api);
+    try {
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(screen.getByText(/rafa needs to let you in/i)).toBeInTheDocument();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+      expect(screen.getByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+      expect(reads).toBeGreaterThanOrEqual(2);
+      expect(screen.queryByText(/rafa needs to let you in/i)).toBeNull();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
   });
 
   it('shows the room identity and the shared queue', async () => {
