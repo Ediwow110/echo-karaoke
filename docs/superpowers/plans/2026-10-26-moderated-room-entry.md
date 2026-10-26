@@ -62,7 +62,7 @@
   - `public.room_reject_member(p_room_id uuid, p_user_id text, p_host_token text, p_member_id uuid) returns jsonb` → `{ memberId, displayName, door }`
   - `private.require_guest(uuid, text, text)` keeps its signature but now admits only `status = 'active'`; `private.require_guest_any(uuid, text, text)` is the same digest check without the status test, used by the three paths a waiting guest legitimately needs (room read, touch, access check).
   - `private.room_door(uuid) returns jsonb` → `[{ memberId, displayName, online, joinedAt }]`
-  - `join_room(...)` return gains `status: 'joined' | 'waiting'`; `read_room_guest(...)` can return `status: 'waiting'`; `read_room_host(...)` gains `door` and `viewer.status`; `create_room(...)` gains `p_require_approval boolean default false`.
+  - `join_room(...)` return gains `status: 'joined' | 'waiting'`; `read_room_guest(...)` can return `status: 'waiting'`; `read_room_host(...)` gains `door` (it has no `viewer` key and never did — the host's own identity comes from the roster); `create_room(...)` gains `p_require_approval boolean default false`.
 
 - [ ] **Step 1: Write the failing pgTAP file**
 
