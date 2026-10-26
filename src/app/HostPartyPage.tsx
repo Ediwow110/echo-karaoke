@@ -274,7 +274,7 @@ export default function HostPartyPage() {
           )}
         </div>
         <div className="flex shrink-0 items-center gap-3 text-[0.625rem] text-ink-2">
-          <Link to={'/room/' + roomId + '/host/queue'} className="hover:text-ink">Queue · {upNext.length}</Link>
+          <Link to={'/room/' + roomId + '/host/queue'} className="hover:text-ink">Up next · {upNext.length}</Link>
           {nextSong === null ? null : <span className="hidden sm:block">Starts automatically when this video ends</span>}
         </div>
       </section>

@@ -325,6 +325,23 @@ test('the invite chip says the same head-count on every host screen', async ({ p
   await expect(page.getByText('1 in').first()).toBeVisible();
 });
 
+// "Queue · N" appeared on two screens a room looks at together, computed from
+// two different sets: the phones counted every row including the playing song,
+// the TV counted only what is waiting. Same words, different numbers, one
+// glance apart.
+test('the party strip names the count it actually shows', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'host');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/party', { waitUntil: 'networkidle' });
+
+  // The mock queue is one song playing and none waiting. The strip beside the
+  // "UP NEXT" label used to read "Queue · 0" while every phone in the room read
+  // "Queue · 1" for the same moment.
+  await expect(page.getByText('Queue ·')).toHaveCount(0);
+  await expect(page.getByText(/up next ·/i).first()).toBeVisible();
+});
+
 const GUEST_SCREENS = [
   ['queue', '/room/' + ROOM],
   ['songbook', '/room/' + ROOM + '/songbook'],
