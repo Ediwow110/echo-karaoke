@@ -234,6 +234,12 @@ export async function rejectMember(api: EdgeApi, roomId: string, memberId: strin
   return api.invoke('reject-member', { roomId, memberId }, { hostToken: loadHostToken(roomId) ?? undefined });
 }
 
+export type AdmissionsState = { roomId: string; admissionsLocked: boolean };
+
+export async function setAdmissions(api: EdgeApi, roomId: string, locked: boolean): Promise<AdmissionsState> {
+  return api.invoke('set-admissions', { roomId, locked }, { hostToken: loadHostToken(roomId) ?? undefined });
+}
+
 export type TransferredRoom = {
   roomId: string;
   guestToken: string;

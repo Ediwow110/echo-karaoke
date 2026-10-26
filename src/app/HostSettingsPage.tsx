@@ -8,8 +8,10 @@ import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { useHostRoom } from './useHostRoom';
+import { useRoomApi } from './RoomApiProvider';
 import DoorList from '../features/rooms/DoorList';
 import InviteCard from '../features/rooms/InviteCard';
+import { setAdmissions } from '../features/rooms/roomApi';
 import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
 
 export default function HostSettingsPage() {
@@ -24,6 +26,8 @@ export default function HostSettingsPage() {
     doorBusyId,
     room,
     connection,
+    notify,
+    refresh,
     runHost,
     approveGuest,
     rejectGuest,
@@ -31,8 +35,9 @@ export default function HostSettingsPage() {
     endRoom,
     removeMember,
   } = useHostRoom();
+  const api = useRoomApi();
   const navigate = useNavigate();
-  const [pending, setPending] = useState<'add' | 'playback' | null>(null);
+  const [pending, setPending] = useState<'add' | 'playback' | 'door' | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -78,6 +83,23 @@ export default function HostSettingsPage() {
     setPending('playback');
     try {
       await runHost(next ? 'unlock_playback' : 'lock_playback');
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function setDoorLock(next: boolean): Promise<void> {
+    if (pending !== null) return;
+    setPending('door');
+    try {
+      await setAdmissions(api, roomId, next);
+      await refresh();
+    } catch (caught) {
+      notify(
+        next ? 'The door could not be closed.' : 'The door could not be reopened.',
+        caught instanceof Error ? caught.message : undefined,
+        'error',
+      );
     } finally {
       setPending(null);
     }
@@ -132,6 +154,15 @@ export default function HostSettingsPage() {
                 description="Off by default. Playback stays under the host's control."
                 disabled={offline || pending !== null}
                 busy={pending === 'playback'}
+              />
+              <div className="h-px bg-line" aria-hidden="true" />
+              <Toggle
+                checked={room.admissionsLocked === true}
+                onChange={(next) => { void setDoorLock(next); }}
+                label="Close the door to new guests"
+                description="Anyone already in stays. New people are turned away until you reopen it."
+                disabled={offline || pending !== null}
+                busy={pending === 'door'}
               />
               <div className="h-px bg-line" aria-hidden="true" />
               <div className="flex items-start justify-between gap-4">

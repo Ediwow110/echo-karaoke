@@ -80,6 +80,7 @@ const liveRoom = {
     status: 'live',
     guestControlLocked: false,
     guestPlaybackLocked: true,
+    admissionsLocked: false,
     createdAt: '2026-10-18T00:00:00Z',
   },
   roster: [
@@ -243,6 +244,37 @@ describe('host room workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: /let waiting guest in/i }));
     await waitFor(() => {
       expect(calls.some((call) => call.name === 'approve-member')).toBe(true);
+    });
+  });
+
+  it('closes the door to new guests from settings', async () => {
+    const { api, calls } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    const closeDoor = await screen.findByRole('switch', { name: /close the door to new guests/i });
+    expect(closeDoor).not.toBeChecked();
+    fireEvent.click(closeDoor);
+    await waitFor(() => {
+      expect(calls).toContainEqual(expect.objectContaining({
+        name: 'set-admissions',
+        body: { roomId, locked: true },
+      }));
+    });
+  });
+
+  it('shows a closed door as closed and reopens it from settings', async () => {
+    const closedRoom = { ...liveRoom, room: { ...liveRoom.room, admissionsLocked: true } };
+    const { api, calls } = makeApi(closedRoom);
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    const closeDoor = await screen.findByRole('switch', { name: /close the door to new guests/i });
+    expect(closeDoor).toBeChecked();
+    fireEvent.click(closeDoor);
+    await waitFor(() => {
+      expect(calls).toContainEqual(expect.objectContaining({
+        name: 'set-admissions',
+        body: { roomId, locked: false },
+      }));
     });
   });
 
