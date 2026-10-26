@@ -27,7 +27,7 @@ select ok((select relrowsecurity from pg_class where oid = 'private.room_host_se
 select ok(not has_schema_privilege('anon', 'private', 'USAGE'), 'anon cannot use the private schema');
 select ok(not has_schema_privilege('authenticated', 'private', 'USAGE'), 'authenticated cannot use the private schema');
 
-select function_privs_are('public', 'create_room', array['text', 'text', 'text', 'text', 'text', 'text', 'boolean', 'boolean'], 'anon', array[]::text[], 'anon cannot execute create_room');
+select function_privs_are('public', 'create_room', array['text', 'text', 'text', 'text', 'text', 'text', 'boolean', 'boolean', 'boolean'], 'anon', array[]::text[], 'anon cannot execute create_room');
 select function_privs_are('public', 'join_room', array['text', 'text', 'text', 'text', 'integer'], 'anon', array[]::text[], 'anon cannot execute join_room');
 select function_privs_are('public', 'read_room_guest', array['uuid', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute read_room_guest');
 select function_privs_are('public', 'read_room_host', array['uuid', 'text', 'text'], 'authenticated', array[]::text[], 'authenticated cannot execute read_room_host');
