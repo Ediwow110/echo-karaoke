@@ -5,6 +5,7 @@ import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { BellRingingIcon } from '@phosphor-icons/react/dist/csr/BellRinging';
 import { LockSimpleIcon } from '@phosphor-icons/react/dist/csr/LockSimple';
 import { MagnifyingGlassIcon } from '@phosphor-icons/react/dist/csr/MagnifyingGlass';
+import { MusicNotesIcon } from '@phosphor-icons/react/dist/csr/MusicNotes';
 import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
@@ -27,7 +28,7 @@ import { QUEUE_ELEMENT_ID } from '../features/queue/queueAnchor';
 import { formatTime, queueSummary } from '../lib/format';
 import { Avatar, Button, IconButton, Logo, SongArtwork, Toast } from '../ui';
 
-type GuestTab = 'search' | 'queue';
+type GuestTab = 'search' | 'queue' | 'songbook';
 
 function useGuestTab(): GuestTab {
   const location = useLocation();
@@ -41,11 +42,10 @@ export default function GuestRoomPage() {
   const navigate = useNavigate();
   const location = useLocation();
   const tab = useGuestTab();
-  // The songbook is a screen inside the remote, not a third remote tab. The
-  // shell keeps running here so the session heartbeat and BottomNav survive.
+  // The songbook is a screen inside the remote and its own tab. The shell keeps
+  // running here so the session heartbeat and BottomNav survive.
   const songbook = location.pathname.endsWith('/songbook');
-  // Neither remote tab owns the songbook, so leave both unselected there.
-  const navTab: GuestTab | null = songbook ? null : tab;
+  const navTab: GuestTab | null = songbook ? 'songbook' : tab;
   const { data, error, loading, connection, restoredAt, lastLiveAt, refresh } = useRoomData(roomId, 'guest');
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string } | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
@@ -325,7 +325,7 @@ export default function GuestRoomPage() {
             </ol>
           </section>
 
-          <div className="mt-4 grid grid-cols-3 gap-2">
+          <div className="mt-4 grid grid-cols-2 gap-2">
             {['Add', 'Pause', 'Skip'].map((label) => (
               <button
                 key={label}
@@ -619,7 +619,7 @@ function BottomNav({
       aria-label="Remote sections"
       className="fixed inset-x-0 bottom-0 z-40 mx-auto w-full max-w-[430px] border-t border-line bg-graphite-deep/95 px-4 pb-[max(0.5rem,env(safe-area-inset-bottom))] pt-2 backdrop-blur"
     >
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-3 gap-2">
         <Link
           to={'/room/' + roomId + '/search'}
           aria-current={tab === 'search' ? 'page' : undefined}
@@ -630,6 +630,17 @@ function BottomNav({
         >
           <MagnifyingGlassIcon size={16} weight={tab === 'search' ? 'fill' : 'regular'} aria-hidden="true" />
           Search
+        </Link>
+        <Link
+          to={'/room/' + roomId + '/songbook'}
+          aria-current={tab === 'songbook' ? 'page' : undefined}
+          className={[
+            'flex min-h-11 items-center justify-center gap-2 rounded-media text-[0.75rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
+            tab === 'songbook' ? 'bg-surface text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
+          ].join(' ')}
+        >
+          <MusicNotesIcon size={16} weight={tab === 'songbook' ? 'fill' : 'regular'} aria-hidden="true" />
+          Songbook
         </Link>
         <Link
           to={'/room/' + roomId}

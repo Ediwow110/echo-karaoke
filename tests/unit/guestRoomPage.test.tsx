@@ -301,7 +301,7 @@ describe('guest phone remote', () => {
     expect(await screen.findByRole('button', { name: 'Add Never Gonna Give You Up' })).toBeEnabled();
   });
 
-  it('opens the songbook inside the remote without adding a third tab', async () => {
+  it('opens the songbook inside the remote as its own tab', async () => {
     const { api, calls } = makeApi();
     renderGuest(api, '/room/' + roomId + '/songbook');
 
@@ -314,14 +314,16 @@ describe('guest phone remote', () => {
     expect(calls).toContain('catalog-page');
 
     const nav = screen.getByRole('navigation', { name: /remote sections/i });
-    expect(within(nav).getAllByRole('link')).toHaveLength(2);
+    expect(within(nav).getAllByRole('link')).toHaveLength(3);
     expect(within(nav).getByRole('link', { name: 'Search' }))
       .toHaveAttribute('href', '/room/' + roomId + '/search');
     expect(within(nav).getByRole('link', { name: /queue/i }))
       .toHaveAttribute('href', '/room/' + roomId);
-    for (const link of within(nav).getAllByRole('link')) {
-      expect(link).not.toHaveAttribute('aria-current');
-    }
+    expect(within(nav).getByRole('link', { name: 'Songbook' }))
+      .toHaveAttribute('href', '/room/' + roomId + '/songbook');
+    // The screen you are on owns the highlight.
+    expect(within(nav).getByRole('link', { name: 'Songbook' })).toHaveAttribute('aria-current', 'page');
+    expect(within(nav).getByRole('link', { name: 'Search' })).not.toHaveAttribute('aria-current');
   });
 
   it('lets a guest leave the room and drops the pass', async () => {
