@@ -1,6 +1,6 @@
 import { HttpError, jsonResponse } from './errors.js';
 import { readJsonObject } from './tokens.js';
-import { callOperation, requireMemberId, requireRoomId, type Caller } from './room.js';
+import { callOperation, optionalTokenHeader, requireMemberId, requireRoomId, type Caller } from './room.js';
 import { requireHostAccess } from './catalogAccess.js';
 
 async function admission(
@@ -8,8 +8,8 @@ async function admission(
   caller: Caller,
   operation: 'room_approve_member' | 'room_reject_member',
 ): Promise<Response> {
-  const hostToken = request.headers.get('x-room-host-token');
-  if (hostToken === null || hostToken.length === 0) {
+  const hostToken = optionalTokenHeader(request, 'x-room-host-token');
+  if (hostToken === null) {
     throw new HttpError('FORBIDDEN', 403, 'Only the host can answer the door');
   }
   const body = await readJsonObject(request);
