@@ -64,9 +64,9 @@ becomes:
 
 1. unchanged validation and `ROOM_NOT_FOUND`;
 2. unchanged `ROOM_ENDED` — an ended room is not a waiting room;
-3. **new** `ROOM_CLOSED` when `admissions_locked` is set *and* this device is not already an
-   active member. A member who is already in can always get back in, and a pending member can
-   rejoin to refresh their pass without skipping the queue;
+3. **new** `ROOM_CLOSED` when `admissions_locked` is set *and* this device has no member row in the
+   room at all. Anyone the room already knows — admitted or still waiting — can get back to where
+   they were; only a stranger is turned away;
 4. the existing rejoin branch, unchanged, which preserves `status`;
 5. a new member is inserted with `status = 'pending'` when `require_approval` is set, and
    `'active'` when it is not.
@@ -100,10 +100,12 @@ Two operations mirroring `room_transfer_host` and `host_remove_member`, both `re
 then `require_live`:
 
 - `public.room_approve_member(room, host_token, member_id)` — sets `status = 'active'`, logs
-  `approve`, returns the roster.
+  `approve`, returns `{ memberId, displayName, door }` with the freshly filtered waiting list.
 - `public.room_reject_member(room, host_token, member_id)` — deletes the row, logs `reject`,
-  returns the roster. Deleting is what revokes the pass: the digest goes with the row, so the
-  next poll from that device authenticates as nothing.
+  returns the same shape. It returns the door rather than the roster because a roster computed
+  before the change has just been proven stale, and the client re-reads anyway. Deleting is what
+  revokes the pass: the digest goes with the row, so the next poll from that device
+  authenticates as nothing.
 
 Both refuse to act on a member who is not pending, and on the host's own row.
 
@@ -120,7 +122,11 @@ host's natural position is watching a song, and a doorbell nobody sees is not a 
   `ended` and must not do that for `waiting`.
 - When a poll flips to a live room, the same component stops waiting with no reload.
 - A rejected guest's next poll authenticates as nothing, which is the existing revoked-pass
-  path; it must read "Rafa removed you from the room" rather than a generic failure.
+  screen ("Your room pass is no longer valid. Return home and join the room again."). Naming the
+  host there — "Rafa removed you" — would need a tombstone row kept for every rejection, or it
+  would lie to anyone whose pass was rotated rather than revoked, and this design deliberately
+  deletes the row. The generic copy is the honest signal; a guest who re-enters the code lands
+  back at the door, where the host can admit them.
 - `createRoom` sends the third permission toggle.
 
 ## 9. Failure modes
