@@ -361,6 +361,44 @@ test('the party view names the playing song as its heading', async ({ page }) =>
   await expect(page.getByText('Afterglow', { exact: true })).toHaveCount(2);
 });
 
+// Nothing in the suite drove a room by keyboard before. A control you can reach
+// but not see is worse than one you cannot reach, so every tab stop on the
+// screens a host and a guest live in has to paint a focus indicator.
+test('every keyboard tab stop shows where focus landed', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  for (const path of [
+    '/room/' + ROOM + '/host',
+    '/room/' + ROOM + '/host/queue',
+    '/room/' + ROOM + '/host/settings',
+    '/room/' + ROOM,
+  ]) {
+    await page.goto(path, { waitUntil: 'networkidle' });
+    const blind: string[] = [];
+    for (let press = 0; press < 24; press += 1) {
+      await page.keyboard.press('Tab');
+      const focused = await page.evaluate(() => {
+        const el = document.activeElement as HTMLElement | null;
+        if (el === null || el === document.body) return null;
+        const style = getComputedStyle(el);
+        return {
+          label: (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 34),
+          tag: el.tagName,
+          outlined: style.outlineStyle !== 'none' && parseFloat(style.outlineWidth) > 0,
+          shadowed: style.boxShadow !== 'none',
+        };
+      });
+      if (focused === null) continue;
+      // The player is a YouTube frame. Its focus ring is drawn by YouTube and no
+      // stylesheet in this app can add to it or take it away.
+      if (focused.tag === 'IFRAME') continue;
+      if (!focused.outlined && !focused.shadowed) blind.push(focused.label + ' <' + focused.tag + '>');
+    }
+    expect(blind, path + ' has tab stops with no visible focus indicator').toEqual([]);
+  }
+});
+
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
   await mockApi(page);
   await openGuestSearch(page);
