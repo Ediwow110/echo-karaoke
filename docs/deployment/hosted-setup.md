@@ -813,6 +813,40 @@ shows a spinner (the others disable); the waiting screen has no offline signal a
 the browser's back button; and the door list fetches `online`/`joinedAt` without rendering them, so a
 host cannot yet tell who is still watching from who walked away.
 
+## What protects the API from a browser console (2026-10-26)
+
+DevTools holds the page's own session, so "only the UI calls the API" was never a control. The
+layers that are real, each checked in source and one of them proven live:
+
+- **A budget per session**, at the shared dispatch point: 300 requests a minute per anonymous
+  session, then `429 RATE_LIMITED` with "Slow down: too many requests from this session". It sits
+  after identity (an unauthenticated flood never reaches the counter) and before the switch (an
+  operation added later inherits it). 300 is the product's own worst case plus headroom — the
+  songbook filters on a 200ms debounce — not a comfortable average.
+- **No credential that works alone.** The session cookie is `httpOnly` (`document.cookie` is empty
+  on the live origin), the access token lives only in a module variable, and no `VITE_`-prefixed
+  variable exists anywhere, so no server secret can be baked into the bundle. The room passes are in
+  `localStorage` and readable — but every operation re-checks the pass **and** the authenticated
+  user id in SQL, so a copied pass without the cookie authenticates as nothing.
+- **Same-origin only**: the CSP's `connect-src` is `'self'` plus YouTube, so a page cannot post the
+  API anywhere else.
+- **Server guards still apply to every call**: POST-only with a 405, an operation allowlist with a
+  404, `requireAnonymousCaller` before dispatch, per-room host/guest capabilities, a 4KB JSON-object
+  body cap, and a cron that is production-only, GET-only and timing-safe.
+- **Dev mode does not widen any of it.** The dev proxy points at the local function runtime
+  (`VITE_API_DEV_ORIGIN`, default `127.0.0.1:3002`) instead of port 3001, which on this machine is
+  another project's server; and the client's development log prints operation, status and duration,
+  with a test that it never prints a pass or a body.
+
+**Proven live:** from the page's own session, 290 `guest-room-read` calls returned 200 and request
+291 returned the 429 body above; a minute later the same call returned 200 again, so the budget
+throttles rather than locks out.
+
+**What this does not do:** it does not stop someone who copies an `httpOnly` cookie out of the
+Network panel — that is the session, by definition — it does not replace a WAF against many
+sessions at once (anonymous sign-in is capped per network), and a local dev server pointed at the
+production database is still a mistake the code cannot detect.
+
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 396 passing assertions on a fresh branch.
