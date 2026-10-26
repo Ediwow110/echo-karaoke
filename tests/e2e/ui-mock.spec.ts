@@ -423,6 +423,36 @@ test('a favorited song survives a reload and reaches the favorites page', async 
   await expect(page.getByText('Afterglow').first(), 'the favorites page never showed the saved song').toBeVisible();
 });
 
+// The QR is how a room full of phones gets in, and a decorative one once passed
+// through review unnoticed. Nothing here proved it is an encoded image.
+test('the invite QR is a real encoded image', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+
+  const src = await page.getByRole('img', { name: /QR code to join Mock Night/i }).first().getAttribute('src');
+  expect(src ?? '', 'the invite card rendered no QR').toMatch(/^data:image\/png;base64,/);
+  expect((src ?? '').length, 'the QR image is too small to hold a join link').toBeGreaterThan(2000);
+});
+
+// The other thing a host notices without looking for it: the room going quiet
+// while everyone is still singing, and coming back by itself.
+test('the host screen reports a dropped room and recovers on its own', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+
+  await page.route('**/api/host-room-read', async (route) => { await route.abort('connectionrefused'); });
+  await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+  await expect(page.getByText('Reconnecting').first(), 'the host was never told the room went quiet')
+    .toBeVisible({ timeout: 25_000 });
+
+  await page.unroute('**/api/host-room-read');
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(page.getByText('Reconnecting')).toHaveCount(0, { timeout: 25_000 });
+  await expect(page.getByText('Connection restored.'), 'the recovery went unannounced').toBeVisible();
+});
+
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
   await mockApi(page);
   await openGuestSearch(page);
