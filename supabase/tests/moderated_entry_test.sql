@@ -239,10 +239,59 @@ select lives_ok(
   'an admitted guest still gets back in while the door is locked'
 );
 
+-- The settings switch is the same gate, not a second one: whatever the host
+-- sets must show up in the host read the switch renders from.
+select is(
+  (select public.room_set_admissions(
+    (select room_id from ctx), 'me-host', (select host_token from ctx), false
+  ) ->> 'admissionsLocked'),
+  'false',
+  'the host reopens the door through the settings operation'
+);
+
+select is(
+  (select public.read_room_host(
+    (select room_id from ctx), 'me-host', (select host_token from ctx)
+  ) -> 'room' ->> 'admissionsLocked'),
+  'false',
+  'the host read agrees the door is open again'
+);
+
+select is(
+  (select public.room_set_admissions(
+    (select room_id from ctx), 'me-host', (select host_token from ctx), true
+  ) ->> 'admissionsLocked'),
+  'true',
+  'the host closes the door through the settings operation'
+);
+
+select is(
+  (select public.read_room_host(
+    (select room_id from ctx), 'me-host', (select host_token from ctx)
+  ) -> 'room' ->> 'admissionsLocked'),
+  'true',
+  'the host read reflects the closed door the switch renders'
+);
+
+select throws_ok(
+  $$select public.join_room(
+    (select room_code from ctx), 'me-locked-out', 'Locked Out', repeat('d', 40)
+  )$$,
+  '22023',
+  'ROOM_CLOSED',
+  'a guest arriving after the host closes the door is turned away'
+);
+
 select is(
   has_function_privilege('authenticated', 'public.room_approve_member(uuid, text, text, uuid)', 'execute'),
   false,
   'only the service role may call the door operations'
+);
+
+select is(
+  has_function_privilege('authenticated', 'public.room_set_admissions(uuid, text, text, boolean)', 'execute'),
+  false,
+  'only the service role may close the door'
 );
 
 select * from finish();

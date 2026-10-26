@@ -576,6 +576,46 @@ begin
 end;
 $$;
 
+-- The mid-party switch. Approval decides what happens to the next arrival; the
+-- lock decides whether there is a next arrival at all. Both go through the same
+-- host and live-room checks as the door operations, and the update is the whole
+-- effect: join_room already refuses a new member when this column is set.
+create or replace function public.room_set_admissions(
+  p_room_id uuid,
+  p_user_id text,
+  p_host_token text,
+  p_locked boolean
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_room public.rooms;
+begin
+  if p_user_id is null then
+    raise exception 'UNAUTHORIZED' using errcode = '28000';
+  end if;
+  if p_locked is null then
+    raise exception 'VALIDATION_ERROR' using errcode = '22023';
+  end if;
+
+  v_room := private.require_host(p_room_id, p_host_token);
+  perform private.require_live(v_room);
+
+  update public.rooms
+  set admissions_locked = p_locked
+  where id = p_room_id
+  returning * into v_room;
+
+  return jsonb_build_object(
+    'roomId', v_room.id,
+    'admissionsLocked', p_locked
+  );
+end;
+$$;
+
 revoke all on function private.require_guest_any(uuid, text, text) from public, anon, authenticated;
 revoke all on function private.room_door(uuid) from public, anon, authenticated;
 
@@ -593,6 +633,9 @@ grant execute on function public.room_approve_member(uuid, text, text, uuid) to 
 revoke all on function public.room_reject_member(uuid, text, text, uuid) from public, anon, authenticated;
 grant execute on function public.room_reject_member(uuid, text, text, uuid) to service_role;
 
+revoke all on function public.room_set_admissions(uuid, text, text, boolean) from public, anon, authenticated;
+grant execute on function public.room_set_admissions(uuid, text, text, boolean) to service_role;
+
 do $$
 declare
   has_runtime_role boolean;
@@ -609,6 +652,7 @@ begin
   execute 'grant execute on function public.join_room(text, text, text, text, integer) to echo_service';
   execute 'grant execute on function public.room_approve_member(uuid, text, text, uuid) to echo_service';
   execute 'grant execute on function public.room_reject_member(uuid, text, text, uuid) to echo_service';
+  execute 'grant execute on function public.room_set_admissions(uuid, text, text, boolean) to echo_service';
 
   raise notice 'runtime role echo_service granted the moderated-entry surface';
 end;
