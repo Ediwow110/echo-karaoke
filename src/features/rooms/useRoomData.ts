@@ -22,6 +22,8 @@ export type QueueEntry = {
   memberId: string;
   addedBy: string;
   voteCount: number;
+  /** Whether this device's member already seconded it. Absent on older servers. */
+  votedByViewer?: boolean;
 };
 
 export type RoomView = {

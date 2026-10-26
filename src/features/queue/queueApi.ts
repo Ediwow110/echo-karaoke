@@ -80,6 +80,36 @@ export function describeAddError(error: unknown): string {
   return error instanceof Error ? error.message : 'That song could not be added.';
 }
 
+export type VoteResult = { songId: string; voteCount: number; votedByViewer: boolean };
+/**
+ * Second a queued song, or take the second back.
+ *
+ * The server reads a vote from the guest pass even when the voter is the host,
+ * and a host tab holds both passes, so the guest one is the identity that votes.
+ */
+export async function voteSong(api: EdgeApi, roomId: string, songId: string): Promise<VoteResult> {
+  return api.invoke<VoteResult>(
+    'vote-command',
+    { roomId, songId },
+    { guestToken: requireGuestPass(roomId) },
+  );
+}
+
+/**
+ * Why a vote did not land. The refusals overlap the add ones but not their
+ * budgets, so the rate-limit line has to speak about votes.
+ */
+export function describeVoteError(error: unknown): string {
+  if (error instanceof RoomApiError) {
+    if (error.code === 'RATE_LIMITED') return 'That is a lot of votes at once. Give it a moment.';
+    if (error.code === 'GUEST_CONTROLS_LOCKED') return 'The host turned off guest requests.';
+    if (error.code === 'ROOM_ENDED') return 'This room has ended.';
+    if (error.code === 'NETWORK_ERROR') return 'The room service could not be reached. Try again.';
+    return error.message;
+  }
+  return error instanceof Error ? error.message : 'That vote could not be counted.';
+}
+
 export async function removeSong(api: EdgeApi, roomId: string, songId: string): Promise<void> {
   await sendQueueCommand(api, roomId, { kind: 'remove', songId });
 }

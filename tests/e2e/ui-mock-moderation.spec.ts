@@ -15,6 +15,8 @@ type Scenario = {
   locked?: boolean;
   /** The host ended the room; every read then answers 'ended'. */
   ended?: boolean;
+  /** The viewer's own second on the queued song, mutated by vote-command. */
+  vote?: { voted: boolean; count: number };
   approvedMemberIds: unknown[];
 };
 
@@ -59,7 +61,10 @@ function guestView(scenario: Scenario) {
       { memberId: 'm2', displayName: 'Jamie', role: 'guest', online: true },
     ],
     door: [],
-    queue: [{ songId: 's1', videoId: 'dQw4w9WgXcQ', title: 'Afterglow', channelTitle: 'Luna Vale', thumbnailUrl: null, durationSeconds: 222, status: 'playing', position: 1, memberId: 'm1', addedBy: 'Ana', voteCount: 0 }],
+    queue: [
+      { songId: 's1', videoId: 'dQw4w9WgXcQ', title: 'Afterglow', channelTitle: 'Luna Vale', thumbnailUrl: null, durationSeconds: 222, status: 'playing', position: 1, memberId: 'm1', addedBy: 'Ana', voteCount: 0, votedByViewer: false },
+      { songId: 's2', videoId: 'abc123XYZ_-', title: 'Midnight City', channelTitle: 'M83', thumbnailUrl: null, durationSeconds: 243, status: 'queued', position: 2, memberId: 'm1', addedBy: 'Ana', voteCount: scenario.vote?.count ?? 0, votedByViewer: scenario.vote?.voted ?? false },
+    ],
     playback: { currentSongId: 's1', currentVideoId: 'dQw4w9WgXcQ', positionSeconds: 10, durationSeconds: 222, isPlaying: true, updatedAt: new Date().toISOString() },
     events: [],
   };
@@ -93,6 +98,19 @@ async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', join
         scenario.admitted = true;
       }
       payload = { door: [] };
+    }
+    else if (op === 'vote-command') {
+      let body: Record<string, unknown> = {};
+      try {
+        body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+      } catch {
+        // Only the song matters here.
+      }
+      if (scenario.vote !== undefined) {
+        scenario.vote.voted = !scenario.vote.voted;
+        scenario.vote.count += scenario.vote.voted ? 1 : -1;
+      }
+      payload = { songId: body.songId, voteCount: scenario.vote?.count ?? 0, votedByViewer: scenario.vote?.voted ?? false };
     }
     else if (op === 'host-command') {
       let body: Record<string, unknown> = {};
@@ -251,6 +269,33 @@ test('an open guest tab learns the room ended without reloading', async ({ page,
 
   await expect(page.getByRole('heading', { name: 'This room has ended.' })).toBeVisible({ timeout: 15_000 });
   await host.close();
+});
+
+// Voting is the capability the server has always had and no screen ever
+// offered. The row has to show the count, take a second, and read the pressed
+// state back from the server rather than trusting the click.
+test('a guest can second a song and the row remembers it', async ({ page }) => {
+  const vote = { voted: false, count: 2 };
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [], vote };
+  await mock(page, scenario, 'guest');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+
+  const second = page.getByRole('button', { name: 'Second Midnight City' });
+  await expect(second).toBeVisible();
+  await expect(second).toHaveAttribute('aria-pressed', 'false');
+  await expect(second).toHaveText('2');
+
+  await second.click();
+
+  const taken = page.getByRole('button', { name: 'Take back your vote for Midnight City' });
+  await expect(taken).toHaveAttribute('aria-pressed', 'true');
+  await expect(taken).toHaveText('3');
+  expect(vote, 'the vote never reached the room').toEqual({ voted: true, count: 3 });
+
+  await taken.click();
+  await expect(page.getByRole('button', { name: 'Second Midnight City' })).toHaveAttribute('aria-pressed', 'false');
+  expect(vote).toEqual({ voted: false, count: 2 });
 });
 
 const GUEST_SCREENS = [

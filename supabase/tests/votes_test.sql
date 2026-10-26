@@ -74,6 +74,48 @@ select is(
   '1',
   'a second member adds their own vote');
 
+-- The queue read has to carry the viewer's own vote, or a vote control cannot
+-- show whether it is already pressed once the next poll replaces the response
+-- from the toggle. Vote counts alone cannot say this.
+select is(
+  (select (q -> 'votedByViewer')::text from (
+     select jsonb_array_elements(
+       (public.read_room_guest(
+         (select room_id from vctx),
+         '33333333-3333-3333-3333-333333333333'::text,
+         repeat('n', 40)
+       ) -> 'queue')
+     ) as q
+   ) s where (q ->> 'songId') = (select song_id::text from song)),
+  'true',
+  'the queue read marks the song this viewer voted for');
+
+select is(
+  (select (q -> 'votedByViewer')::text from (
+     select jsonb_array_elements(
+       (public.read_room_guest(
+         (select room_id from vctx),
+         '22222222-2222-2222-2222-222222222222'::text,
+         repeat('m', 40)
+       ) -> 'queue')
+     ) as q
+   ) s where (q ->> 'songId') = (select song_id::text from song)),
+  'false',
+  'a member whose vote was withdrawn is not shown as voting');
+
+select is(
+  (select (q -> 'votedByViewer')::text from (
+     select jsonb_array_elements(
+       (public.read_room_host(
+         (select room_id from vctx),
+         '11111111-1111-1111-1111-111111111111'::text,
+         (select host_token from vctx)
+       ) -> 'queue')
+     ) as q
+   ) s where (q ->> 'songId') = (select song_id::text from song)),
+  'false',
+  'the host read carries the host view, not the guest who voted');
+
 select throws_ok(
   format('select public.vote_toggle(%L::uuid, %L::text, %L, %L::uuid)', (select room_id from vctx), '22222222-2222-2222-2222-222222222222', repeat('z', 40), (select song_id from song)),
   '28000', 'UNAUTHORIZED',

@@ -13,7 +13,7 @@ import {
   transferRoomTo,
   type HostAction,
 } from '../features/rooms/roomApi';
-import { removeSong as removeQueueSong, reorderSong as reorderQueueSong } from '../features/queue/queueApi';
+import { removeSong as removeQueueSong, reorderSong as reorderQueueSong, voteSong as castVote, describeVoteError } from '../features/queue/queueApi';
 import { sendPlaybackCommand, reportPlaybackPosition } from '../features/playback/playbackApi';
 import HostPlayer from '../features/playback/HostPlayer';
 import PlayerDock from '../features/playback/PlayerDock';
@@ -252,6 +252,23 @@ export default function HostRoomPage() {
       notify('The queue could not be reordered.', caught instanceof Error ? caught.message : undefined, 'error');
     }
   }, [api, notify, refresh, roomId]);
+
+  const [votingSongId, setVotingSongId] = useState<string | null>(null);
+
+  const voteSong = useCallback(async (songId: string): Promise<void> => {
+    if (votingSongId !== null) return;
+    setVotingSongId(songId);
+    try {
+      await castVote(api, roomId, songId);
+      // The read carries this member's own vote, so the pressed state survives
+      // the refresh instead of living in a click handler.
+      await refresh();
+    } catch (caught) {
+      notify('That vote could not be counted.', describeVoteError(caught), 'error');
+    } finally {
+      setVotingSongId(null);
+    }
+  }, [api, notify, refresh, roomId, votingSongId]);
 
   const removeMember = useCallback(async (memberId: string): Promise<void> => {
     try {
@@ -524,6 +541,8 @@ export default function HostRoomPage() {
     next,
     removeSong,
     reorderSong,
+    voteSong,
+    votingSongId,
     removeMember,
     approveGuest,
     rejectGuest,

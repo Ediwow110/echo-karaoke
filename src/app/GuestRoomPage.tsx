@@ -19,6 +19,7 @@ import { sendPlaybackCommand } from '../features/playback/playbackApi';
 import { claimHostPass } from '../features/rooms/roomApi';
 import NowPlayingCard from '../features/queue/NowPlayingCard';
 import { UpNextList } from '../features/queue/QueueRows';
+import { describeVoteError, voteSong } from '../features/queue/queueApi';
 import SongSearchPanel from '../features/queue/SongSearchPanel';
 import PopularSongs from '../features/queue/PopularSongs';
 import { clearGuestToken, loadHostToken } from '../features/rooms/tokenStore';
@@ -144,6 +145,21 @@ export default function GuestRoomPage() {
     playedSong.current = nowPlaying.songId;
     rememberPlayed([nowPlaying]);
   }, [nowPlaying]);
+
+  const [votingSongId, setVotingSongId] = useState<string | null>(null);
+
+  const secondSong = useCallback(async (songId: string): Promise<void> => {
+    if (votingSongId !== null) return;
+    setVotingSongId(songId);
+    try {
+      await voteSong(api, roomId, songId);
+      await refresh();
+    } catch (caught) {
+      setToast({ id: Date.now(), message: 'That vote could not be counted.', detail: describeVoteError(caught) });
+    } finally {
+      setVotingSongId(null);
+    }
+  }, [api, refresh, roomId, votingSongId]);
 
   useEffect(() => {
     const fresh = queue.filter((song) => !seenSongs.current.has(song.videoId));
@@ -571,6 +587,8 @@ export default function GuestRoomPage() {
                 variant="guest"
                 listId={QUEUE_ELEMENT_ID}
                 viewerMemberId={viewer?.memberId}
+                onVote={(songId) => { void secondSong(songId); }}
+                votingSongId={votingSongId}
                 emptyTitle="The queue is waiting."
                 emptyDescription="Be the one who picks the next song."
                 emptyAction={<Button variant="primary" size="sm" className="min-h-11" icon={<MagnifyingGlassIcon size={13} />} onClick={() => goTab('search')}>Search songs</Button>}

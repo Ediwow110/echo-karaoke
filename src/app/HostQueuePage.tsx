@@ -29,6 +29,8 @@ export default function HostQueuePage() {
     next,
     removeSong,
     reorderSong,
+    voteSong,
+    votingSongId,
   } = useHostRoom();
   const [busySongId, setBusySongId] = useState<string | null>(null);
   const [skipping, setSkipping] = useState(false);
@@ -127,6 +129,8 @@ export default function HostQueuePage() {
                 listId={QUEUE_ELEMENT_ID}
                 onRemove={(songId) => { void handleRemove(songId); }}
                 onReorder={(songId, direction) => { void handleReorder(songId, direction); }}
+                onVote={(songId) => { void voteSong(songId); }}
+                votingSongId={votingSongId}
                 busySongId={busySongId}
                 emptyTitle="A fresh running order."
                 emptyDescription="Add the first song to get things started. Everyone in the room can contribute."

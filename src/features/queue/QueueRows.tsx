@@ -2,6 +2,7 @@ import type { ReactNode } from 'react';
 import { ArrowDownIcon } from '@phosphor-icons/react/dist/csr/ArrowDown';
 import { ArrowUpIcon } from '@phosphor-icons/react/dist/csr/ArrowUp';
 import { MusicNotesIcon } from '@phosphor-icons/react/dist/csr/MusicNotes';
+import { ThumbsUpIcon } from '@phosphor-icons/react/dist/csr/ThumbsUp';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import type { QueueEntry } from '../rooms/useRoomData';
 import { formatTime } from '../../lib/format';
@@ -14,6 +15,8 @@ type UpNextListProps = {
   variant?: QueueListVariant;
   onRemove?: (songId: string) => void;
   onReorder?: (songId: string, direction: 'up' | 'down') => void;
+  onVote?: (songId: string) => void;
+  votingSongId?: string | null;
   busySongId?: string | null;
   emptyTitle?: string;
   emptyDescription?: string;
@@ -31,11 +34,48 @@ function stagger(index: number): { animationDelay: string } {
   return { animationDelay: Math.min(index, 10) * 30 + 'ms' };
 }
 
+/**
+ * Second a song, or take the second back.
+ *
+ * The count is the only text the row carries; the pressed state comes from the
+ * read rather than from the click, so a vote a member cast on another device
+ * shows here too.
+ */
+function VoteButton({ song, busy, onVote, compact = false }: {
+  song: QueueEntry;
+  busy: boolean;
+  onVote: (songId: string) => void;
+  compact?: boolean;
+}) {
+  const voted = song.votedByViewer === true;
+  return (
+    <button
+      type="button"
+      onClick={() => onVote(song.songId)}
+      disabled={busy}
+      aria-pressed={voted}
+      aria-label={(voted ? 'Take back your vote for ' : 'Second ') + song.title}
+      className={[
+        'flex shrink-0 items-center gap-1 rounded-full border transition-[background-color,border-color,color,transform,scale] active:scale-95',
+        compact ? 'min-h-8 px-2 text-[0.625rem]' : 'min-h-11 px-3 text-[0.6875rem]',
+        voted
+          ? 'border-signal/40 bg-signal-soft text-signal'
+          : 'border-line text-ink-2 hover:bg-surface-2 hover:text-ink',
+      ].join(' ')}
+    >
+      <ThumbsUpIcon size={compact ? 13 : 15} weight={voted ? 'fill' : 'duotone'} aria-hidden="true" />
+      <span className="tabular font-semibold">{song.voteCount}</span>
+    </button>
+  );
+}
+
 export function UpNextList({
   queue,
   variant = 'guest',
   onRemove,
   onReorder,
+  onVote,
+  votingSongId = null,
   busySongId = null,
   emptyTitle = 'Nothing in the queue yet.',
   emptyDescription = 'Search for a song and add it to the room.',
@@ -134,6 +174,9 @@ export function UpNextList({
                   </button>
                 </div>
               )}
+              {onVote === undefined ? null : (
+                <VoteButton song={song} busy={busy || votingSongId !== null} onVote={onVote} compact />
+              )}
               {onRemove === undefined ? null : (
                 <button
                   type="button"
@@ -176,6 +219,9 @@ export function UpNextList({
                 <span className="rounded-badge bg-signal-soft px-1.5 py-0.5 text-[0.5rem] font-semibold uppercase tracking-[0.06em] text-signal">Next</span>
               ) : null}
             </div>
+            {onVote === undefined ? null : (
+              <VoteButton song={song} busy={votingSongId !== null} onVote={onVote} />
+            )}
           </li>
         );
       })}
