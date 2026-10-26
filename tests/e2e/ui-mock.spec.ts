@@ -250,6 +250,40 @@ test('host creation warns and blocks automatic retries after an uncertain server
   expect(attempts).toBe(2);
 });
 
+test('the create action opens the create form and keeps the hosted room one click away', async ({ page }) => {
+  await mockApi(page);
+  // The host session the browser still holds a pass for, the way the app
+  // remembers it after the host screen opened the room.
+  await page.addInitScript(([roomId, code]) => {
+    localStorage.setItem('karaoke.sessions', JSON.stringify([{
+      roomId,
+      code,
+      roomName: 'Mock Night',
+      hostName: 'Ana',
+      role: 'host',
+      lastSeenAt: new Date().toISOString(),
+    }]));
+    localStorage.setItem('karaoke.last-room', JSON.stringify({ roomId, role: 'host' }));
+  }, [ROOM, 'ABCDEFGHJKMNPQRS']);
+  // A short window is where the create action used to answer with the phone
+  // join screen instead of the form that creates a room.
+  await page.setViewportSize({ width: 1024, height: 600 });
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+
+  await page.getByRole('link', { name: 'Create room' }).click();
+  await expect(page).toHaveURL(/\/create$/);
+  await expect(page.getByLabel('Room name')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Create room' })).toBeVisible();
+  await expect(page.getByRole('heading', { name: /join the room/i })).toHaveCount(0);
+  await expect(page.getByLabel('Room code')).toHaveCount(0);
+
+  const back = page.getByRole('link', { name: 'Back to the room' });
+  await expect(back).toHaveAttribute('href', '/room/' + ROOM + '/host');
+  await back.click();
+  await expect(page).toHaveURL(new RegExp('/room/' + ROOM + '/host$'));
+  await expect(page.getByRole('heading', { level: 1, name: 'Mock Night' })).toBeVisible();
+});
+
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
   await mockApi(page);
   await openGuestSearch(page);

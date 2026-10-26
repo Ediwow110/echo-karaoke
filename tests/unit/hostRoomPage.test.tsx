@@ -11,7 +11,8 @@ import HostPartyPage from '../../src/app/HostPartyPage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
 import type { DoorEntry } from '../../src/features/rooms/roomApi';
-import { clearRoomTokens, saveGuestToken } from '../../src/features/rooms/tokenStore';
+import { clearRoomTokens, saveGuestToken, saveHostToken } from '../../src/features/rooms/tokenStore';
+import { getHostedRoom, getLastRoom, rememberSession } from '../../src/features/rooms/sessionStore';
 import '@testing-library/jest-dom/vitest';
 
 const playerClock = vi.hoisted(() => ({
@@ -387,6 +388,30 @@ describe('host room workspace', () => {
 
     expect(await screen.findByText('Back at the start')).toBeInTheDocument();
     expect(calls.some((call) => call.name === 'host-command' && (call.body as { action?: string }).action === 'end')).toBe(true);
+  });
+
+  it('forgets the ended room so it is never offered back', async () => {
+    // The home screen offers "Back to the room" for a room this browser hosts.
+    // An ended room must never be that offer, and the last-room pointer must
+    // not lead into it either.
+    clearRoomTokens(roomId);
+    saveHostToken(roomId, 'host-pass-value');
+    rememberSession({
+      roomId,
+      code: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      hostName: 'Ana',
+      role: 'host',
+    });
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    fireEvent.click(await screen.findByRole('button', { name: /leave & end room/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^end the room$/i }));
+
+    expect(await screen.findByText('Back at the start')).toBeInTheDocument();
+    expect(getHostedRoom()).toBeNull();
+    expect(getLastRoom()).toBeNull();
   });
 
   it('lets the host leave the screen while keeping the room open', async () => {

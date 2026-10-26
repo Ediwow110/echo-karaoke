@@ -15,6 +15,7 @@ import { RoomApiError } from '../lib/edgeApi';
 import { saveGuestToken, saveHostToken } from '../features/rooms/tokenStore';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import AppShell from '../features/rooms/AppShell';
+import ReturnToRoom from '../features/rooms/ReturnToRoom';
 import { Avatar, Button, Field, Logo } from '../ui';
 
 function describeError(error: unknown): string {
@@ -99,13 +100,22 @@ function hostNameDefault(): string {
   return '';
 }
 
-export default function HomePage() {
+type HomePageProps = {
+  /**
+   * 'landing' is the front door and leads with joining on a narrow screen.
+   * 'create' is the answer to an explicit "Create room" action, so it opens the
+   * form that creates a room in every viewport.
+   */
+  intent?: 'landing' | 'create';
+};
+
+export default function HomePage({ intent = 'landing' }: HomePageProps) {
   const api = useRoomApi();
   const navigate = useNavigate();
   // A screen is wide only when both edges reach 640px. The shorter edge, not
   // the width alone, decides whether this device is a phone remote.
   const wide = useMediaQuery('(min-width: 640px) and (min-height: 640px)');
-  const [mode, setMode] = useState<'join' | 'host'>('join');
+  const [mode, setMode] = useState<'join' | 'host'>(intent === 'create' ? 'host' : 'join');
   const [roomName, setRoomName] = useState('');
   const [hostName, setHostName] = useState(hostNameDefault);
   const [joinCode, setJoinCode] = useState('');
@@ -256,6 +266,8 @@ export default function HomePage() {
                 : 'Start a room on a big screen. Everyone else brings their phone and their next song.'}
             </p>
           </div>
+
+          <ReturnToRoom api={api} className="mt-6" />
 
           <div key={mode} className="page-enter">
             {mode === 'join' ? (
@@ -426,6 +438,8 @@ export default function HomePage() {
             data-start-card
             aria-label="Start a room"
           >
+            <ReturnToRoom api={api} className="mb-5" />
+
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display text-[1.65rem] font-bold tracking-[-0.025em] text-ink">Make it your room.</h2>
               <SlidersHorizontalIcon size={19} className="text-signal" aria-hidden="true" />

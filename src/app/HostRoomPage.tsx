@@ -20,7 +20,7 @@ import PlayerDock from '../features/playback/PlayerDock';
 import Sidebar, { type SidebarNav } from '../features/rooms/Sidebar';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
 import { loadHostToken } from '../features/rooms/tokenStore';
-import { rememberSession, clearLastRoom } from '../features/rooms/sessionStore';
+import { rememberSession, forgetSession } from '../features/rooms/sessionStore';
 import { rememberPlayed, rememberSongs } from '../features/library/libraryStore';
 import { groupRoomCode } from '../lib/format';
 import { Button, Chip, IconButton, Logo, Toast, type ToastTone } from '../ui';
@@ -324,7 +324,9 @@ export default function HostRoomPage() {
     try {
       await sendHostCommand(api, roomId, 'end');
       roomClosedRef.current = true;
-      clearLastRoom();
+      // An ended room is not an offer any more, and the last-room pointer must
+      // not lead back into it.
+      forgetSession(roomId);
       navigate('/');
     } catch (caught) {
       notify('The room could not be ended.', caught instanceof Error ? caught.message : undefined, 'error');
@@ -473,7 +475,7 @@ export default function HostRoomPage() {
           <p role="status" className="mt-2 text-[0.8125rem] leading-[1.6] text-ink-2">
             Nobody can join after the host closes the room. Start another and pass the mic.
           </p>
-          <Button variant="primary" size="md" className="mt-5" onClick={() => navigate('/')}>Start another room</Button>
+          <Button variant="primary" size="md" className="mt-5" onClick={() => navigate('/create')}>Start another room</Button>
         </div>
       </main>
     );
@@ -574,7 +576,7 @@ export default function HostRoomPage() {
           <header className="relative z-30 border-b border-line bg-graphite/95 backdrop-blur">
             <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
-                <Link to="/" className="lg:hidden" aria-label="kara-echo, create a room">
+                <Link to="/" className="lg:hidden" aria-label="kara-echo home">
                   <Logo size="sm" withWordmark={false} />
                 </Link>
                 <div className="min-w-0">

@@ -854,13 +854,54 @@ Network panel — that is the session, by definition — it does not replace a W
 sessions at once (anonymous sign-in is capped per network), and a local dev server pointed at the
 production database is still a mistake the code cannot detect.
 
+## The create action opens the create form (shipped 2026-10-26)
+
+**What was wrong.** The sidebar's "Create room" was a plain link to `/`, so a host who clicked it
+while hosting a room landed on the landing page. On a wide screen that page happens to be the create
+workspace, which is why the bug read as "the host suddenly goes to home". On a short window — 1024x600,
+a laptop at 125%, or any phone — the landing page opens in join mode, so the action named "Create
+room" answered with **"Join the room."** and no create form at all. The room being hosted was left
+behind as well: the host screen owns the only player, so clicking the action tears the player down,
+and the "My sessions" list that used to offer a way back was removed in `10d09e6` because it kept
+listing dead rooms.
+
+**What ships now.** `/create` is a route of its own and renders the create form in every viewport;
+the landing page `/` keeps its join-first behaviour on a narrow screen. **Every** create action
+points at that route — the sidebar's "Create room" item, the sidebar's "Start something good."
+card, the collection pages' mobile action, the "Create a room" link in the songbook, and the
+"Start another room" buttons — so no control that promises a new room can answer with the join
+screen. The logo, which goes home, now says so: its accessible name is "kara-echo home" instead of
+"kara-echo, create a room", which was a promise the landing page cannot keep on a phone.
+
+The hosted room the browser
+still holds a pass for is offered back as **"Back to the room"**, and **the server decides whether
+it is still alive**: the offer appears only after a `host-room-read` answers `live`, and disappears
+when the room has ended or gone. A local timestamp cannot answer that — the abandoned-room sweep
+only deletes a room once *every* member has stopped heartbeating, so a room the host left an hour
+ago can still be live, and a room the host left five minutes ago can already be gone. Ending a room
+forgets its session, so an ended room is never offered and the last-room pointer never leads into
+it.
+
+**Proven against the running app, not only in jsdom.** A host created a room at 1440x900, resized to
+1024x600, and clicked "Create room" in the sidebar: the URL became `/create`, the screen showed
+"Make it your room." with the room name and host name fields, and there was no room code field
+anywhere. "Still hosting Mock Night? Back to the room" carried the room's own URL, and following it
+returned the host to the live host screen at 1024x600 and at 390x844, with no horizontal overflow.
+When the same room was answered as ended, the offer was gone. Red-proved by restoring the pre-fix
+`src/`: the same click landed on `/` and the check failed.
+
+**One thing the review caught, worth keeping in mind.** React Router reuses a route element when
+only the path changes, so the landing page and the create route are keyed separately. Without the
+keys the landing page's join-first mode followed the host to `/create`, and the create route
+answered with the phone join screen again — the same bug, one navigation deeper.
+
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 502 passing tests on the current tree.
+- [x] `npm test` reports 519 passing tests on the current tree.
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 16 passing tests on the current tree.
+- [x] `npm run test:e2e:ui` reports 17 passing tests on the current tree.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is

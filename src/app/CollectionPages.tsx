@@ -34,7 +34,7 @@ function GlobalCollection({ mode, activeNav }: { mode: CollectionMode; activeNav
     <AppShell
       activeNav={activeNav}
       activeRoom={null}
-      mobileAction={<Link to="/" className="text-[0.75rem] font-semibold text-signal">Create room</Link>}
+      mobileAction={<Link to="/create" className="text-[0.75rem] font-semibold text-signal">Create room</Link>}
     >
       <main className="page-enter mx-auto w-full max-w-[1180px] px-4 py-8 sm:px-6 lg:px-8">
         <SongCollectionView

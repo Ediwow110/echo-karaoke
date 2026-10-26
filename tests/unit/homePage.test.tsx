@@ -1,11 +1,12 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import HomePage from '../../src/app/HomePage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
 import { RoomApiError } from '../../src/lib/edgeApi';
-import { clearGuestToken, clearRoomTokens, loadGuestToken, loadHostToken } from '../../src/features/rooms/tokenStore';
+import { clearGuestToken, clearRoomTokens, loadGuestToken, loadHostToken, saveHostToken } from '../../src/features/rooms/tokenStore';
+import { rememberSession } from '../../src/features/rooms/sessionStore';
 import '@testing-library/jest-dom/vitest';
 
 afterEach(() => {
@@ -39,6 +40,35 @@ function renderHome(api: EdgeApi = { invoke: (async () => ({})) as unknown as Ed
       </MemoryRouter>
     </RoomApiProvider>,
   );
+}
+
+function renderHomeAt(path: string, props: { intent?: 'landing' | 'create' } = {}) {
+  return render(
+    <RoomApiProvider api={{ invoke: (async () => ({})) as unknown as EdgeApi['invoke'] }}>
+      <MemoryRouter initialEntries={[path]}>
+        <Routes>
+          <Route path="/" element={<HomePage {...props} />} />
+          <Route path="/create" element={<HomePage {...props} />} />
+        </Routes>
+      </MemoryRouter>
+    </RoomApiProvider>,
+  );
+}
+
+/** The room read the way the server answers for a room that is still live. */
+function liveRoomApi(): EdgeApi {
+  return {
+    invoke: (async () => ({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      status: 'live',
+      room: {
+        id: '550e8400-e29b-41d4-a716-446655440000',
+        code: 'ABCDEFGHJKMNPQRS',
+        name: 'After Hours',
+        status: 'live',
+      },
+    })) as unknown as EdgeApi['invoke'],
+  };
 }
 
 describe('create room workspace', () => {
@@ -492,6 +522,85 @@ describe('create room workspace', () => {
     fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
 
     expect(await screen.findByRole('alert')).toHaveTextContent(/add the name guests will see/i);
+  });
+
+  it('opens the create form, not the join form, when the host asks to create a room', () => {
+    // The create action is a destination, not a mood. A short window — a laptop
+    // at 125%, a phone — must still answer it with the form that creates a room.
+    stubWide(false);
+    renderHomeAt('/create', { intent: 'create' });
+
+    expect(screen.getByLabelText('Room name')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create room' })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Room code')).toBeNull();
+  });
+
+  it('still leads a phone landing with joining', () => {
+    stubWide(false);
+    renderHomeAt('/');
+
+    expect(screen.getByRole('heading', { name: /join the room/i })).toBeInTheDocument();
+    expect(screen.queryByLabelText('Room name')).toBeNull();
+  });
+
+  it('keeps the room the host just left one click away', async () => {
+    // The host screen owns the only player, so leaving it for another room
+    // would otherwise orphan the room the guests are still standing in.
+    stubWide(true);
+    saveHostToken('550e8400-e29b-41d4-a716-446655440000', 'host-pass');
+    rememberSession({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      code: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      hostName: 'Alex',
+      role: 'host',
+    });
+    renderHome(liveRoomApi());
+
+    expect(await screen.findByRole('link', { name: 'Back to the room' }))
+      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
+  });
+
+  it('keeps the hosted room one click away on a phone as well', async () => {
+    stubWide(false);
+    saveHostToken('550e8400-e29b-41d4-a716-446655440000', 'host-pass');
+    rememberSession({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      code: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      hostName: 'Alex',
+      role: 'host',
+    });
+    renderHome(liveRoomApi());
+
+    expect(await screen.findByRole('link', { name: 'Back to the room' }))
+      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
+  });
+
+  it('offers no way back to a room the server says has ended', async () => {
+    // A local timestamp cannot tell a live room from a dead one: the sweep
+    // only deletes a room once every member has stopped heartbeating.
+    stubWide(true);
+    saveHostToken('550e8400-e29b-41d4-a716-446655440000', 'host-pass');
+    rememberSession({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      code: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      hostName: 'Alex',
+      role: 'host',
+    });
+    renderHome({ invoke: (async () => ({ status: 'ended' })) as unknown as EdgeApi['invoke'] });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('link', { name: 'Back to the room' })).toBeNull();
+    });
+  });
+
+  it('offers no way back when this browser hosts no room', () => {
+    stubWide(true);
+    renderHome();
+
+    expect(screen.queryByRole('link', { name: 'Back to the room' })).toBeNull();
   });
 });
 

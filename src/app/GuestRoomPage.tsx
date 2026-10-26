@@ -235,7 +235,7 @@ export default function GuestRoomPage() {
           <Logo size="sm" />
           <h1 className="mt-5 font-display text-[1.8rem] font-bold tracking-[-0.02em]">This room has ended.</h1>
           <p role="status" className="mt-2 text-[0.8125rem] leading-[1.6] text-ink-2">The host closed the session. Thanks for singing.</p>
-          <Button variant="primary" size="sm" className="mt-4" onClick={() => navigate('/')}>Start another room</Button>
+          <Button variant="primary" size="sm" className="mt-4" onClick={() => navigate('/create')}>Start another room</Button>
         </div>
       </main>
     );

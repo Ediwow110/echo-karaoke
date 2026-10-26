@@ -205,7 +205,7 @@ export default function SongCollectionView({ mode, roomId = null, queueHref = nu
                   <div className="mt-auto flex items-center justify-between gap-2 pt-4">
                     <span className="text-[0.625rem] text-ink-3">{saved ? 'Favorite' : 'YouTube reference'}</span>
                     {roomId === null ? (
-                      <Link to="/" className="text-[0.6875rem] font-semibold text-signal hover:underline">Create a room</Link>
+                      <Link to="/create" className="text-[0.6875rem] font-semibold text-signal hover:underline">Create a room</Link>
                     ) : (
                       <Button
                         variant={isAdded ? 'secondary' : 'primary'}

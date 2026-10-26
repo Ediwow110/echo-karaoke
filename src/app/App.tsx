@@ -98,7 +98,13 @@ export default function App() {
         }
       >
         <Routes>
-          <Route path="/" element={<HomePage />} />
+          {/* The landing page and the create route are different screens, not
+              two views of one. React Router reuses a route element when only
+              the path changes, so both are keyed: the landing page opens with
+              joining on a narrow screen and the create route must not inherit
+              that mode when the host answers a "Create room" action. */}
+          <Route path="/" element={<HomePage key="landing" />} />
+          <Route path="/create" element={<HomePage key="create" intent="create" />} />
           <Route path="/join" element={<JoinRoomPage />} />
           <Route path="/join/:roomCode" element={<JoinRoomPage />} />
           <Route path="/scan" element={<ScanRoomPage />} />

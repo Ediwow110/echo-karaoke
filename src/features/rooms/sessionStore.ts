@@ -1,4 +1,5 @@
 import { normalizeRoomCode } from './roomCode';
+import { loadHostToken } from './tokenStore';
 
 export type RoomRole = 'host' | 'guest';
 export type RoomSession = {
@@ -116,6 +117,33 @@ export function clearLastRoom(): void {
     localStorage.removeItem(LAST_ROOM_KEY);
   } catch {
     // Ignore unavailable storage.
+  }
+}
+
+/**
+ * The room this browser hosted and can still command.
+ *
+ * The host screen owns the only player, so a host who leaves it for another
+ * room would otherwise lose the room their guests are still standing in. The
+ * session is only a candidate: whether the room is still alive is the
+ * server's answer, not a local timestamp.
+ */
+export function getHostedRoom(): RoomSession | null {
+  return getSessions().find(
+    (entry) => entry.role === 'host' && loadHostToken(entry.roomId) !== null,
+  ) ?? null;
+}
+
+/**
+ * Drop a room this browser no longer hosts. An ended room must not come back
+ * as an offer, and the last-room pointer must not lead into it either.
+ */
+export function forgetSession(roomId: string): void {
+  const remaining = getSessions().filter((entry) => entry.roomId !== roomId);
+  writeJson(SESSIONS_KEY, remaining);
+  const last = getLastRoom();
+  if (last !== null && last.roomId === roomId) {
+    clearLastRoom();
   }
 }
 

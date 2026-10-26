@@ -46,7 +46,7 @@ const items: NavItem[] = [
   { key: 'queue', label: 'Room queue', href: '/queue', icon: QueueIcon, requiresRoom: true },
   { key: 'favorites', label: 'Favorites', href: '/favorites', icon: HeartIcon },
   { key: 'recent', label: 'Recently sung', href: '/recent', icon: ClockCounterClockwiseIcon },
-  { key: 'create', label: 'Create room', href: '/', icon: PlusIcon },
+  { key: 'create', label: 'Create room', href: '/create', icon: PlusIcon },
   { key: 'settings', label: 'Room settings', href: '/settings', icon: SlidersHorizontalIcon, requiresRoom: true },
 ];
 
@@ -88,7 +88,7 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
 
   return (
     <aside aria-label="Room navigation" className="hidden h-dvh w-[232px] shrink-0 flex-col border-r border-line bg-graphite-deep px-4 pb-5 pt-7 lg:sticky lg:top-0 lg:flex">
-      <Link to="/" className="px-2" aria-label="kara-echo, create a room">
+      <Link to="/" className="px-2" aria-label="kara-echo home">
         <Logo size="sm" />
       </Link>
 
@@ -132,7 +132,7 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
             <p className="mt-2 text-[0.6875rem] leading-[1.65] text-ink-2">
               One screen. A room full of voices.
             </p>
-            <Link to="/" className="mt-2 inline-block text-[0.6875rem] text-signal hover:underline">
+            <Link to="/create" className="mt-2 inline-block text-[0.6875rem] text-signal hover:underline">
               Start something good.
             </Link>
           </>
