@@ -18,6 +18,8 @@ const ERROR_MAP: Record<string, { status: number; message: string }> = {
   UNAUTHORIZED: { status: 401, message: UNAUTHORIZED_MESSAGE },
   ROOM_NOT_FOUND: { status: 404, message: 'No room uses that code' },
   ROOM_ENDED: { status: 409, message: 'This room has ended' },
+  ROOM_PENDING: { status: 403, message: 'The host has not let you into the room yet' },
+  ROOM_CLOSED: { status: 403, message: 'The host has closed the room' },
   ROOM_FULL: { status: 409, message: 'This room is full' },
   HOST_ALREADY_IN_ROOM: { status: 409, message: 'This browser is already hosting this room. Open the host screen instead of joining.' },
   GUEST_CONTROLS_LOCKED: { status: 403, message: 'The host locked guest controls' },

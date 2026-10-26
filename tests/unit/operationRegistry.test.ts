@@ -13,9 +13,9 @@ const dispatched = [...source.matchAll(/^      case '([a-z-]+)':$/gm)].map((matc
 
 describe('operation registry', () => {
   it('reads both lists from the source, not from a hand-kept copy', () => {
-    // 18 today. The floor exists only so a regex that stops matching cannot turn
+    // 20 today. The floor exists only so a regex that stops matching cannot turn
     // this gate into a comparison of two empty lists.
-    expect(listed.length).toBeGreaterThanOrEqual(15);
+    expect(listed.length).toBeGreaterThanOrEqual(17);
     expect(dispatched.length).toBe(listed.length);
   });
 
