@@ -2,7 +2,10 @@ import { defineConfig, devices } from '@playwright/test';
 
 export default defineConfig({
   testDir: './tests/e2e',
-  testIgnore: 'ui-mock.spec.ts',
+  // The mocked UI suite runs only under playwright.ui.config.ts, against Vite
+  // with /api stubbed. A name-exact ignore let a second ui-mock-* file slip in
+  // here, where it would be driven against the real app with no stubs.
+  testIgnore: /ui-mock/,
   timeout: 60000,
   expect: { timeout: 15000 },
   fullyParallel: false,

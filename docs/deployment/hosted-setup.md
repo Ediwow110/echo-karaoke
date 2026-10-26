@@ -905,11 +905,11 @@ answered with the phone join screen again — the same bug, one navigation deepe
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, and the local stack reports 409/409 with the full `0001→0039` chain replayed from scratch. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 519 passing tests on the current tree.
+- [x] `npm test` reports 527 passing tests on the current tree (measured 2026-10-27 at `93e08b1`).
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 17 passing tests on the current tree.
+- [x] `npm run test:e2e:ui` reports 36 passing tests on the current tree (measured 2026-10-27 at `93e08b1`; the suite is now two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`).
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is
