@@ -24,6 +24,13 @@ export default function GuestSongbook({ roomId, locked = false, onAdded }: {
       <div>
         <p className="eyebrow text-gold">Powered by YouTube</p>
         <h2 className="mt-1 font-display text-[1.4rem] font-bold tracking-[-0.02em] text-ink">Karaoke songbook</h2>
+        {/* Greyed-out controls with no reason read as a broken tab. The search
+            screen already says this; the songbook has to say it too. */}
+        {locked ? (
+          <p role="status" className="mt-2 text-[0.8125rem] leading-[1.6] text-ink-2">
+            The host turned off new requests.
+          </p>
+        ) : null}
       </div>
       <SongbookList api={api} roomId={roomId} channels={CATALOG_CHANNEL_LABELS} disabled={locked} onAdded={onAdded} />
     </div>

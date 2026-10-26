@@ -11,6 +11,8 @@ const CODE = 'ABCDEFGHJKMNPQRS';
 type Scenario = {
   /** Flipped mid-test to stand in for the host admitting a waiting guest. */
   admitted: boolean;
+  /** The host has turned guest requests off. */
+  locked?: boolean;
   approvedMemberIds: unknown[];
 };
 
@@ -42,7 +44,7 @@ function guestView(scenario: Scenario) {
   }
   return {
     roomId: ROOM, status: 'live',
-    room: { id: ROOM, code: CODE, name: 'Mock Night', status: 'live', guestControlLocked: false, guestPlaybackLocked: true, requireApproval: true, admissionsLocked: false, createdAt: '2026-10-18T00:00:00Z' },
+    room: { id: ROOM, code: CODE, name: 'Mock Night', status: 'live', guestControlLocked: scenario.locked === true, guestPlaybackLocked: true, requireApproval: true, admissionsLocked: false, createdAt: '2026-10-18T00:00:00Z' },
     viewer: { memberId: 'm2', displayName: 'Jamie', role: 'guest', status: 'active' },
     roster: [
       { memberId: 'm1', displayName: 'Ana', role: 'host', online: true },
@@ -154,6 +156,21 @@ test('a scanned join link prefills the code and lands the guest in the room', as
   await page.getByRole('button', { name: 'Join room' }).click();
   await expect(page).toHaveURL(new RegExp('/room/' + ROOM + '$'));
   await expect(page.getByRole('heading', { name: 'The room queue.' })).toBeVisible();
+});
+
+// The search tab tells a guest why its controls are greyed out when the host
+// turns requests off. The songbook tab greyed its own out and said nothing.
+test('a locked songbook says why its controls are off', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, locked: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'guest');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/room/' + ROOM + '/songbook', { waitUntil: 'networkidle' });
+
+  await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
+  await expect(page.getByText('The host turned off new requests.')).toBeVisible();
+  const firstAdd = page.getByRole('button', { name: /add halo/i }).first();
+  await expect(firstAdd).toBeVisible();
+  await expect(firstAdd).toBeDisabled();
 });
 
 const GUEST_SCREENS = [
