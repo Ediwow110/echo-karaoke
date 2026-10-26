@@ -127,4 +127,33 @@ describe('edge api client', () => {
     info.mockRestore();
     debug.mockRestore();
   });
+
+  it('logs the operation, status and duration in development, and nothing else', async () => {
+    const { impl } = fakeFetch({ status: 200, body: { ok: true } });
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const api = createEdgeApi({ ...base, fetchImpl: impl });
+
+    await api.invoke('queue-command', { roomId: 'room-marker-123' }, { hostToken: 'host-secret-value' });
+
+    expect(debug).toHaveBeenCalledTimes(1);
+    const line = debug.mock.calls[0].join(' ');
+    expect(line).toContain('queue-command');
+    expect(line).toContain('200');
+    expect(line).toMatch(/\d+ms/);
+    expect(line).not.toContain('host-secret-value');
+    expect(line).not.toContain('room-marker-123');
+    debug.mockRestore();
+  });
+
+  it('marks a network failure in the development log without naming the request', async () => {
+    const impl = (async () => { throw new Error('boom'); }) as unknown as typeof fetch;
+    const debug = vi.spyOn(console, 'debug').mockImplementation(() => {});
+    const api = createEdgeApi({ ...base, fetchImpl: impl });
+
+    await expect(api.invoke('join-room', { code: 'ABCDEFGHJKMNPQRS' })).rejects.toBeInstanceOf(RoomApiError);
+
+    expect(debug).toHaveBeenCalledTimes(1);
+    expect(debug.mock.calls[0].join(' ')).toContain('network');
+    debug.mockRestore();
+  });
 });

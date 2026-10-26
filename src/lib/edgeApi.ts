@@ -101,6 +101,15 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
       }
 
       let response: Response;
+      const started = performance.now();
+      // Development only, and deliberately narrow: the operation, its status and
+      // how long it took. Never the headers or the body — they carry the room
+      // passes, and a log line is the easiest place to leak one by accident.
+      const noteLatency = (status: number | 'network'): void => {
+        if (import.meta.env.DEV) {
+          console.debug('[api]', name, status, Math.round(performance.now() - started) + 'ms');
+        }
+      };
       try {
         response = await doFetch(baseUrl + '/api/' + name, {
           method: 'POST',
@@ -110,8 +119,10 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
           ...(options.keepalive === true ? { keepalive: true } : {}),
         });
       } catch {
+        noteLatency('network');
         throw new RoomApiError('NETWORK_ERROR', 0, 'The room service could not be reached');
       }
+      noteLatency(response.status);
 
       const text = await response.text();
       let payload: unknown = null;

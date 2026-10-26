@@ -12,12 +12,18 @@ const allowedHosts = (process.env.VITE_DEV_ALLOWED_HOSTS ?? '')
   .map((host) => host.trim())
   .filter((host) => host.length > 0);
 
+// The dev server proxies /api to the local function runtime. Port 3001 belongs to
+// this machine's POS server, so it must never be the default — a stray dev request
+// would be handed to an unrelated service. Override with VITE_API_DEV_ORIGIN when
+// the API runs somewhere else.
+const apiOrigin = process.env.VITE_API_DEV_ORIGIN ?? 'http://127.0.0.1:3002';
+
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   server: {
     allowedHosts: allowedHosts.length > 0 ? allowedHosts : undefined,
     proxy: {
-      '/api': 'http://127.0.0.1:3001',
+      '/api': apiOrigin,
     },
   },
 });
