@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState, type FormEvent } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
 import { MicrophoneStageIcon } from '@phosphor-icons/react/dist/csr/MicrophoneStage';
@@ -118,6 +118,12 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
   // the width alone, decides whether this device is a phone remote.
   const wide = useMediaQuery('(min-width: 640px) and (min-height: 640px)');
   const hostedRoom = useHostedRoom(api);
+  // A host who ends their room is sent here, and the screen that could have
+  // said so unmounts on that navigation. The word travels in the route state.
+  const endedRoom = (useLocation().state as { endedRoom?: unknown } | null)?.endedRoom;
+  const endedNote = typeof endedRoom === 'string' && endedRoom.length > 0
+    ? endedRoom + ' has ended. Start another whenever you are ready.'
+    : null;
   const [mode, setMode] = useState<'join' | 'host'>(intent === 'create' ? 'host' : 'join');
   const [roomName, setRoomName] = useState('');
   const [hostName, setHostName] = useState(hostNameDefault);
@@ -271,6 +277,12 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
           </div>
 
           <ReturnToRoom room={hostedRoom} className="mt-6" />
+
+          {endedNote === null ? null : (
+            <p role="status" className="mt-6 rounded-media border border-line bg-surface px-3.5 py-2.5 text-[0.8125rem] leading-[1.6] text-ink-2">
+              {endedNote}
+            </p>
+          )}
 
           <div key={mode} className="page-enter">
             {mode === 'join' ? (
@@ -450,6 +462,12 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
             aria-label="Start a room"
           >
             <ReturnToRoom room={hostedRoom} className="mb-5" />
+
+            {endedNote === null ? null : (
+              <p role="status" className="mb-5 rounded-media border border-line bg-surface-2 px-3.5 py-2.5 text-[0.8125rem] leading-[1.6] text-ink-2">
+                {endedNote}
+              </p>
+            )}
 
             <div className="flex items-center justify-between gap-3">
               <h2 className="font-display text-[1.65rem] font-bold tracking-[-0.025em] text-ink">Make it your room.</h2>

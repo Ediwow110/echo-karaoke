@@ -327,11 +327,13 @@ export default function HostRoomPage() {
       // An ended room is not an offer any more, and the last-room pointer must
       // not lead back into it.
       forgetSession(roomId);
-      navigate('/');
+      // The landing page owns the toast slot this screen would have used, and
+      // it unmounts with this navigation, so the acknowledgment travels with it.
+      navigate('/', { state: { endedRoom: roomName } });
     } catch (caught) {
       notify('The room could not be ended.', caught instanceof Error ? caught.message : undefined, 'error');
     }
-  }, [api, navigate, notify, roomId]);
+  }, [api, navigate, notify, roomId, roomName]);
 
   const onReport = useCallback((seconds: number, duration: number, songId: string | null): void => {
     void reportPlaybackPosition(api, roomId, seconds, duration > 0 ? duration : undefined, songId)

@@ -13,10 +13,15 @@ type Scenario = {
   admitted: boolean;
   /** The host has turned guest requests off. */
   locked?: boolean;
+  /** The host ended the room; every read then answers 'ended'. */
+  ended?: boolean;
   approvedMemberIds: unknown[];
 };
 
 function hostView(scenario: Scenario) {
+  if (scenario.ended === true) {
+    return { roomId: ROOM, status: 'ended', endedAt: new Date().toISOString() };
+  }
   return {
     roomId: ROOM, status: 'live',
     room: { id: ROOM, code: CODE, name: 'Mock Night', status: 'live', guestControlLocked: false, guestPlaybackLocked: true, requireApproval: true, admissionsLocked: false, createdAt: '2026-10-18T00:00:00Z' },
@@ -33,6 +38,9 @@ function hostView(scenario: Scenario) {
 }
 
 function guestView(scenario: Scenario) {
+  if (scenario.ended === true) {
+    return { roomId: ROOM, status: 'ended', endedAt: new Date().toISOString() };
+  }
   if (!scenario.admitted) {
     // A waiting guest learns the room name and who hosts it. Nothing else:
     // no code, no roster, no queue, no playback.
@@ -85,6 +93,16 @@ async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', join
         scenario.admitted = true;
       }
       payload = { door: [] };
+    }
+    else if (op === 'host-command') {
+      let body: Record<string, unknown> = {};
+      try {
+        body = (route.request().postDataJSON() ?? {}) as Record<string, unknown>;
+      } catch {
+        // Only the action matters here.
+      }
+      if (body.action === 'end') scenario.ended = true;
+      payload = { ok: true };
     }
     else if (op === 'join-room') payload = {
       roomId: ROOM, roomCode: CODE, roomName: 'Mock Night', memberId: 'm2',
@@ -195,6 +213,44 @@ test('a refused add reads in the app voice from the songbook too', async ({ page
   await add.click();
   await expect(page.getByText('The host turned off guest requests.')).toBeVisible();
   await expect(page.getByText('The host locked guest controls')).toHaveCount(0);
+});
+
+// Ending the room is the one action that cannot be undone, and the host used to
+// get no word of it: the screen simply became the landing page.
+test('a host who ends the room is told that it ended', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'host');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+
+  await page.getByRole('button', { name: /leave & end room/i }).click();
+  await page.getByRole('dialog').getByRole('button', { name: /^end the room$/i }).click();
+
+  await expect(page).toHaveURL((url) => url.pathname === '/');
+  expect(scenario.ended, 'the end command never reached the server').toBe(true);
+  await expect(page.getByText('Mock Night has ended.')).toBeVisible();
+  // The ended room must not come back as a way "back to the room".
+  await expect(page.getByRole('link', { name: 'Back to the room' })).toHaveCount(0);
+});
+
+// A guest holding a phone does not reload when the party ends. The four-second
+// read is the only thing that can tell them, and the pass stays valid long
+// enough to ask, so the room has to close in front of them.
+test('an open guest tab learns the room ended without reloading', async ({ page, browser }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
+  const host = await browser.newPage({ viewport: { width: 1440, height: 900 } });
+  await mock(page, scenario, 'guest');
+  await mock(host, scenario, 'host');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+  await expect(page.getByRole('heading', { name: 'The room queue.' })).toBeVisible();
+
+  await host.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+  await host.getByRole('button', { name: /leave & end room/i }).click();
+  await host.getByRole('dialog').getByRole('button', { name: /^end the room$/i }).click();
+
+  await expect(page.getByRole('heading', { name: 'This room has ended.' })).toBeVisible({ timeout: 15_000 });
+  await host.close();
 });
 
 const GUEST_SCREENS = [
