@@ -247,6 +247,56 @@ describe('host room workspace', () => {
     });
   });
 
+  it('names each door answer after the guest it applies to', async () => {
+    const withDoor = {
+      ...liveRoom,
+      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
+    };
+    const { api } = makeApi(withDoor);
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    expect(await screen.findByRole('button', { name: 'Let Waiting Guest in' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Keep Waiting Guest out' })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: 'Keep them out' })).not.toBeInTheDocument();
+  });
+
+  it('disables every door answer while one is already pending', async () => {
+    const withDoor = {
+      ...liveRoom,
+      door: [
+        { memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' },
+        { memberId: '7b2e', displayName: 'Second Guest', online: true, joinedAt: '2026-10-26T00:01:00Z' },
+      ],
+    };
+    let release: (value: unknown) => void = () => undefined;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return withDoor;
+        }
+        if (name === 'approve-member') {
+          return new Promise((resolve) => { release = resolve; });
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Let Waiting Guest in' }));
+
+    const otherApprove = await screen.findByRole('button', { name: 'Let Second Guest in' });
+    const otherReject = screen.getByRole('button', { name: 'Keep Second Guest out' });
+    await waitFor(() => {
+      expect(otherApprove).toBeDisabled();
+      expect(otherReject).toBeDisabled();
+    });
+
+    release({ ok: true });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Let Waiting Guest in' })).toBeEnabled();
+    });
+  });
+
   it('closes the door to new guests from settings', async () => {
     const { api, calls } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/settings');

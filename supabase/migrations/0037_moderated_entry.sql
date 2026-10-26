@@ -715,3 +715,96 @@ begin
   return jsonb_build_object('memberId', v_member.id);
 end;
 $$;
+
+-- Host transfer now has to respect the room's new notion of membership: a host
+-- row must be active. Copied from 0035 with that one condition added, because
+-- create or replace keeps the existing grants.
+create or replace function public.room_transfer_host(
+  p_room_id uuid,
+  p_user_id text,
+  p_host_token text,
+  p_member_id uuid,
+  p_guest_token text
+)
+returns jsonb
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  v_room public.rooms;
+  v_caller public.members;
+  v_target public.members;
+begin
+  if p_guest_token is null or char_length(p_guest_token) < 32 then
+    raise exception 'VALIDATION_ERROR' using errcode = '22023';
+  end if;
+
+  v_room := private.require_host(p_room_id, p_host_token);
+  perform private.require_live(v_room);
+
+  select m.* into v_caller
+    from public.members m
+   where m.room_id = p_room_id
+     and m.user_id = p_user_id
+     and m.role = 'host';
+  if not found then
+    raise exception 'UNAUTHORIZED' using errcode = '28000';
+  end if;
+
+  if p_member_id is null or p_member_id = v_caller.id then
+    raise exception 'VALIDATION_ERROR' using errcode = '22023';
+  end if;
+
+  -- Only someone the room has heard from recently can be handed control, so a
+  -- stale roster row cannot become the device nobody can pause.
+  -- A host row must be active: a pending host is invisible to the roster and listed at their own door.
+  select m.* into v_target
+    from public.members m
+   where m.id = p_member_id
+     and m.room_id = p_room_id
+     and m.role = 'guest'
+     and m.status = 'active'
+     and m.last_seen_at > now() - interval '2 minutes';
+  if not found then
+    raise exception 'VALIDATION_ERROR' using errcode = '22023';
+  end if;
+
+  -- Demote first: the one-host index would reject promoting before the current
+  -- host gives the role up.
+  update public.members
+     set role = 'guest',
+         guest_token_hash = private.digest_token(p_guest_token),
+         last_seen_at = now()
+   where id = v_caller.id;
+
+  update public.members
+     set role = 'host'
+   where id = v_target.id;
+
+  -- Replace the secret with a digest of a value nobody holds. The outgoing host
+  -- loses the ability to act immediately, and there is nothing to leak.
+  update private.room_host_secrets
+     set token_hash = private.digest_token('revoked:' || gen_random_uuid()::text)
+   where room_id = p_room_id;
+  if not found then
+    raise exception 'INTERNAL_ERROR' using errcode = 'P0001';
+  end if;
+
+  insert into public.room_events (room_id, member_id, event_type, payload)
+  values (
+    p_room_id, v_caller.id, 'transfer_host',
+    jsonb_build_object('toMemberId', v_target.id, 'toDisplayName', v_target.display_name)
+  );
+
+  return jsonb_build_object(
+    'roomId', p_room_id,
+    'role', 'guest',
+    'guestToken', p_guest_token,
+    'newHost', jsonb_build_object(
+      'memberId', v_target.id,
+      'displayName', v_target.display_name
+    )
+  );
+end;
+$$;

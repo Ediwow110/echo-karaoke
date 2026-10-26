@@ -22,6 +22,7 @@ export default function DoorList({ door, busyId, onApprove, onReject }: Props) {
               size="sm"
               variant="primary"
               busy={busyId === entry.memberId}
+              disabled={busyId !== null}
               onClick={() => onApprove(entry.memberId)}
             >
               Let {entry.displayName} in
@@ -29,10 +30,10 @@ export default function DoorList({ door, busyId, onApprove, onReject }: Props) {
             <Button
               size="sm"
               variant="quiet"
-              disabled={busyId === entry.memberId}
+              disabled={busyId !== null}
               onClick={() => onReject(entry.memberId)}
             >
-              Keep them out
+              Keep {entry.displayName} out
             </Button>
           </span>
         </li>
