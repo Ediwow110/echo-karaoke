@@ -399,6 +399,30 @@ test('every keyboard tab stop shows where focus landed', async ({ page }) => {
   }
 });
 
+// The store is unit-tested and the nav reaches the page, but nothing proved the
+// heart of it: pressing the heart on a library card actually saves the song,
+// remembers it across a reload, and shows up on the favorites page.
+test('a favorited song survives a reload and reaches the favorites page', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  // The host screen records the room's songs locally; the library reads them back.
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+  await page.goto('/room/' + ROOM + '/host/library', { waitUntil: 'networkidle' });
+
+  const save = page.getByRole('button', { name: 'Save Afterglow to favorites' });
+  await expect(save, 'the library never listed a song the room has queued').toBeVisible();
+  await save.click();
+  await expect(page.getByRole('button', { name: 'Remove Afterglow from favorites' })).toBeVisible();
+
+  await page.reload({ waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: 'Remove Afterglow from favorites' }), 'the favorite did not survive a reload')
+    .toBeVisible();
+
+  await page.goto('/room/' + ROOM + '/host/favorites', { waitUntil: 'networkidle' });
+  await expect(page.getByText('Afterglow').first(), 'the favorites page never showed the saved song').toBeVisible();
+});
+
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
   await mockApi(page);
   await openGuestSearch(page);
