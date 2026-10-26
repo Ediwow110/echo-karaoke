@@ -8,7 +8,7 @@ vi.mock('../../server/db/client.js', async (importOriginal) => {
   return { ...actual, serviceDatabase: () => ({ query: db.query }) };
 });
 
-import { approveMember, rejectMember, setAdmissions } from '../../server/operations/admission';
+import { approveMember, rejectMember, setAdmissions, setApproval } from '../../server/operations/admission';
 import { requireHostAccess } from '../../server/operations/catalogAccess';
 
 vi.mock('../../server/operations/catalogAccess', () => ({
@@ -92,6 +92,32 @@ describe('admission operations', () => {
     )).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
     await expect(setAdmissions(
       request({ 'x-room-host-token': HOST_TOKEN }, { roomId: ROOM_ID, locked: 'yes' }),
+      CALLER as never,
+    )).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
+    expect(db.query).not.toHaveBeenCalled();
+  });
+});
+
+describe('the approval setting', () => {
+  it('changes it through the door function and returns who was admitted', async () => {
+    db.query.mockReset();
+    db.query.mockResolvedValue([{ result: { roomId: ROOM_ID, requireApproval: false, admitted: 1, door: [] } }]);
+
+    const response = await setApproval(
+      request({ 'x-room-host-token': HOST_TOKEN }, { roomId: ROOM_ID, requireApproval: false }),
+      CALLER as never,
+    );
+
+    expect(response.status).toBe(200);
+    expect(await response.json()).toEqual({ roomId: ROOM_ID, requireApproval: false, admitted: 1, door: [] });
+    expect(String(db.query.mock.calls[0][0])).toContain('room_set_approval');
+    expect(db.query.mock.calls[0][1]).toEqual([ROOM_ID, CALLER.userId, HOST_TOKEN, false]);
+  });
+
+  it('refuses a body without the boolean rather than guessing', async () => {
+    db.query.mockReset();
+    await expect(setApproval(
+      request({ 'x-room-host-token': HOST_TOKEN }, { roomId: ROOM_ID }),
       CALLER as never,
     )).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
     expect(db.query).not.toHaveBeenCalled();

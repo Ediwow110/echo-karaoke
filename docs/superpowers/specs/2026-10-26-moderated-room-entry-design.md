@@ -29,14 +29,19 @@ things, and two of them already exist in part:
 
 Two booleans on `rooms`, matching the shape of the two locks already there:
 
-- `require_approval` — set at create time, a third toggle beside the two existing guest
-  permissions. Off by default, so no room that exists today changes behavior, and the
-  upgrade is invisible until a host opts in.
+- `require_approval` — **on for every new room** since `0038`, and changed from Room settings rather
+  than chosen at create (product decision, 2026-10-26). Turning it off admits whoever is already
+  waiting: the hosts who stop moderating should not leave a doorbell ringing. Rooms that existed
+  before `0037` stay off, because the column defaulted to false there.
 - `admissions_locked` — a mid-party action in Room settings, next to the other locks. The
   host's own QR and code stay visible; they simply refuse while set.
 
-The asymmetry is deliberate: approval is how you plan a room, the lock is something you reach
-for when the door is already busy.
+`guest_control_locked` stops being a setting at all in the same change: guests always add songs, so
+the create form no longer offers it and Room settings no longer shows it. The column stays for the
+rooms that already carry a value; nothing sets it from the app any more.
+
+The asymmetry that remains is deliberate: approval is the standing policy, the lock is what you
+reach for when the door is already busy.
 
 ## 4. Data
 

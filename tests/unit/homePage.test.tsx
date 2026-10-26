@@ -406,16 +406,19 @@ describe('create room workspace', () => {
     expect(screen.getByRole('button', { name: /^create room$/i })).toBeInTheDocument();
   });
 
-  it('offers the two guest permissions and explains the host-only rules', () => {
+  it('states the guest defaults on the create form instead of offering toggles', () => {
     stubWide(true);
     renderHome();
 
-    expect(screen.getByRole('switch', { name: /guests can add songs/i })).toBeChecked();
-    expect(screen.getByRole('switch', { name: /guest playback controls/i })).not.toBeChecked();
-    expect(screen.getByText(/skip, remove and reorder are always host-only/i)).toBeInTheDocument();
+    // The three permission switches moved into room settings; the create form only
+    // says what the room will do.
+    expect(screen.queryByRole('switch')).toBeNull();
+    expect(screen.getByText(/guests can add songs/i)).toBeInTheDocument();
+    expect(screen.getByText(/every new guest waits for your approval/i)).toBeInTheDocument();
+    expect(screen.getByText(/skip, remove and reorder stay host-only/i)).toBeInTheDocument();
   });
 
-  it('can hold new guests at the door from the create form', async () => {
+  it('creates a room with approval on and guest playback locked', async () => {
     stubWide(true);
     const calls: Array<{ name: string; body: unknown }> = [];
     const api: EdgeApi = {
@@ -426,17 +429,13 @@ describe('create room workspace', () => {
     };
     renderHome(api);
 
-    const approval = screen.getByRole('switch', { name: /approve each guest/i });
-    expect(approval).not.toBeChecked();
-    fireEvent.click(approval);
-    expect(approval).toBeChecked();
     fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Alex' } });
     fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
 
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     expect(calls[0]).toMatchObject({
       name: 'create-room',
-      body: { requireApproval: true },
+      body: { requireApproval: true, guestsCanAdd: true, guestsCanControlPlayback: false },
     });
   });
 
@@ -481,7 +480,7 @@ describe('create room workspace', () => {
         roomName: 'After Hours',
         guestsCanAdd: true,
         guestsCanControlPlayback: false,
-        requireApproval: false,
+        requireApproval: true,
       },
     });
   });

@@ -79,6 +79,7 @@ const liveRoom = {
     name: 'After Hours',
     status: 'live',
     guestControlLocked: false,
+    requireApproval: true,
     guestPlaybackLocked: true,
     admissionsLocked: false,
     createdAt: '2026-10-18T00:00:00Z',
@@ -223,13 +224,38 @@ describe('host room workspace', () => {
     expect(invite).not.toHaveTextContent('2 in');
   });
 
-  it('exposes the two independent guest permissions', async () => {
+  it('keeps the settings that still have a decision, and no add-songs switch', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/settings');
 
-    expect(await screen.findByRole('switch', { name: /guests can add songs/i })).toBeChecked();
-    expect(screen.getByRole('switch', { name: /guests can pause or resume/i })).not.toBeChecked();
+    expect(await screen.findByRole('switch', { name: /guests can pause or resume/i })).not.toBeChecked();
+    expect(screen.getByRole('switch', { name: /approve each guest/i })).toBeChecked();
+    // Guests can always add songs now, so the control is gone rather than hidden.
+    expect(screen.queryByRole('switch', { name: /guests can add songs/i })).toBeNull();
     expect(screen.getByRole('button', { name: /leave & end room/i })).toBeInTheDocument();
+  });
+
+  it('turns approval off and says who was let in', async () => {
+    const calls: Array<{ name: string; body: unknown }> = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        calls.push({ name, body });
+        if (name === 'set-approval') return { roomId, requireApproval: false, admitted: 2, door: [] };
+        if (name === 'host-room-read') return liveRoom;
+        if (name === 'touch-member') return {};
+        if (name === 'youtube-popular') return { available: false, results: [], message: 'not configured' };
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    fireEvent.click(await screen.findByRole('switch', { name: /approve each guest/i }));
+
+    await waitFor(() => {
+      expect(calls.some((call) => call.name === 'set-approval')).toBe(true);
+    });
+    expect(calls.find((call) => call.name === 'set-approval')?.body).toEqual({ roomId, requireApproval: false });
+    expect(await screen.findByText(/let 2 waiting guests in/i)).toBeInTheDocument();
   });
 
   it('shows who is waiting and admits them from settings', async () => {

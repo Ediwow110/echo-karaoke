@@ -36,6 +36,7 @@ export type RoomView = {
     guestPlaybackLocked: boolean;
     /** Absent on servers that predate the door lock; treat it as open. */
     admissionsLocked?: boolean;
+    requireApproval?: boolean;
     createdAt: string;
     endedAt?: string | null;
   };

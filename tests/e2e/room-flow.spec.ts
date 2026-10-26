@@ -153,23 +153,26 @@ test('a guest adds a song and the host sees it in the queue', async ({ page, bro
   await guest.context().close();
 });
 
-test('the host can split request and playback permissions', async ({ page, browser }) => {
+test('the host admits a guest and keeps playback control', async ({ page, browser }) => {
   const { code } = await createRoom(page, 'Rules Night', 'Host Cleo');
   const guest = await joinRoom(browser, code, 'Guest Dee');
   const hostId = roomIdFromUrl(page.url());
 
+  // Every new room moderates entry now, so the guest waits until the host opens it.
+  await expect(guest.getByText(/needs to let you in/i)).toBeVisible({ timeout: 15000 });
+
   await page.goto(BASE + '/room/' + hostId + '/host/settings');
-  const adds = page.getByRole('switch', { name: /guests can add songs/i });
+  const approval = page.getByRole('switch', { name: /approve each guest/i });
   const playback = page.getByRole('switch', { name: /guests can pause or resume/i });
-  await expect(adds).toBeChecked();
+  await expect(approval).toBeChecked();
   await expect(playback).not.toBeChecked();
+  // Adding songs is not a permission any more, so there is no switch to find.
+  await expect(page.getByRole('switch', { name: /guests can add songs/i })).toHaveCount(0);
 
-  await adds.click();
-  await expect(guest.getByText(/guest requests are off/i)).toBeVisible({ timeout: 15000 });
-  await guest.getByRole('link', { name: 'Search' }).click();
-  await expect(await searchForSong(guest)).toBeDisabled();
+  await page.getByRole('button', { name: /^Let Guest Dee in$/ }).click();
+  await expect(guest.getByText(/shared playlist/i)).toBeVisible({ timeout: 15000 });
 
-  await page.getByRole('switch', { name: /guests can pause or resume/i }).click();
+  await playback.click();
   await guest.getByRole('link', { name: /queue ·/i }).click();
   await expect(guest.getByText(/you can pause and resume/i)).toBeVisible({ timeout: 15000 });
 

@@ -11,7 +11,7 @@ import { useHostRoom } from './useHostRoom';
 import { useRoomApi } from './RoomApiProvider';
 import DoorList from '../features/rooms/DoorList';
 import InviteCard from '../features/rooms/InviteCard';
-import { setAdmissions } from '../features/rooms/roomApi';
+import { setAdmissions, setApproval as requestApproval } from '../features/rooms/roomApi';
 import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
 
 export default function HostSettingsPage() {
@@ -37,7 +37,7 @@ export default function HostSettingsPage() {
   } = useHostRoom();
   const api = useRoomApi();
   const navigate = useNavigate();
-  const [pending, setPending] = useState<'add' | 'playback' | 'door' | null>(null);
+  const [pending, setPending] = useState<'playback' | 'door' | 'approval' | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -68,11 +68,19 @@ export default function HostSettingsPage() {
     }
   }
 
-  async function setGuestAdds(next: boolean): Promise<void> {
+  async function changeApproval(next: boolean): Promise<void> {
     if (pending !== null) return;
-    setPending('add');
+    setPending('approval');
     try {
-      await runHost(next ? 'unlock' : 'lock');
+      const result = await requestApproval(api, roomId, next);
+      // Turning approval off admits whoever was waiting; say so rather than let
+      // the door list quietly empty itself.
+      if (result.admitted > 0) {
+        notify(result.admitted === 1 ? 'Let the waiting guest in.' : 'Let ' + result.admitted + ' waiting guests in.');
+      }
+      await refresh();
+    } catch (caught) {
+      notify('The approval setting could not be changed.', caught instanceof Error ? caught.message : undefined, 'error');
     } finally {
       setPending(null);
     }
@@ -139,21 +147,21 @@ export default function HostSettingsPage() {
             <p id="permissions-title" className="eyebrow text-ink-2">Guest permissions</p>
             <div className="mt-5 flex flex-col gap-5">
               <Toggle
-                checked={!room.guestControlLocked}
-                onChange={(next) => { void setGuestAdds(next); }}
-                label="Guests can add songs"
-                description="Let everyone search YouTube and add to the shared queue."
-                disabled={offline || pending !== null}
-                busy={pending === 'add'}
-              />
-              <div className="h-px bg-line" aria-hidden="true" />
-              <Toggle
                 checked={!room.guestPlaybackLocked}
                 onChange={(next) => { void setGuestPlayback(next); }}
                 label="Guests can pause or resume"
                 description="Off by default. Playback stays under the host's control."
                 disabled={offline || pending !== null}
                 busy={pending === 'playback'}
+              />
+              <div className="h-px bg-line" aria-hidden="true" />
+              <Toggle
+                checked={room.requireApproval === true}
+                onChange={(next) => { void changeApproval(next); }}
+                label="Approve each guest"
+                description="On by default. New guests wait at the door; turning this off lets whoever is already waiting in."
+                disabled={offline || pending !== null}
+                busy={pending === 'approval'}
               />
               <div className="h-px bg-line" aria-hidden="true" />
               <Toggle

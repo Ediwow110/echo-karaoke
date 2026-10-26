@@ -114,7 +114,7 @@ export async function createRoom(
     roomName: options.roomName ?? '',
     guestsCanAdd: options.guestsCanAdd ?? true,
     guestsCanControlPlayback: options.guestsCanControlPlayback ?? false,
-    requireApproval: options.requireApproval === true,
+    requireApproval: options.requireApproval !== false,
   });
   const created = verifyCreatedRoom(response);
 
@@ -238,6 +238,18 @@ export type AdmissionsState = { roomId: string; admissionsLocked: boolean };
 
 export async function setAdmissions(api: EdgeApi, roomId: string, locked: boolean): Promise<AdmissionsState> {
   return api.invoke('set-admissions', { roomId, locked }, { hostToken: loadHostToken(roomId) ?? undefined });
+}
+
+export type ApprovalState = {
+  roomId: string;
+  requireApproval: boolean;
+  /** How many waiting guests the change admitted. Only a turn-off can admit. */
+  admitted: number;
+  door: DoorEntry[];
+};
+
+export async function setApproval(api: EdgeApi, roomId: string, requireApproval: boolean): Promise<ApprovalState> {
+  return api.invoke('set-approval', { roomId, requireApproval }, { hostToken: loadHostToken(roomId) ?? undefined });
 }
 
 export type TransferredRoom = {

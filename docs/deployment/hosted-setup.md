@@ -800,6 +800,13 @@ rejection deletes the row, and naming the host would need a tombstone kept per r
 by another name, and a lie for anyone whose pass was rotated. And the door lock exempts anyone the
 room already knows, so a waiting guest can rejoin to refresh a lost pass; only strangers are refused.
 
+**The create form stopped asking (0038, 2026-10-26).** Every new room now moderates entry: the
+three permission switches left the landing page, approval defaults on, guest playback stays locked,
+and guests always add songs — the add-songs control is gone from Room settings too. Approval is
+changed in settings, and turning it **off admits whoever is already waiting** rather than leaving
+them at a doorbell nobody answers. `0038` must be applied before this build ships, for the same
+reason as `0037`.
+
 **Deploy order is load-bearing.** The server calls the nine-argument `create_room` and the door
 functions, so `0037` must be applied before the build ships — the reverse order breaks room creation
 outright. The old client tolerates the new fields, so the window only affects a guest tab that

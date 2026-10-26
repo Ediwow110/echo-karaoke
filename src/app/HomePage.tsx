@@ -15,7 +15,7 @@ import { RoomApiError } from '../lib/edgeApi';
 import { saveGuestToken, saveHostToken } from '../features/rooms/tokenStore';
 import { useMediaQuery } from '../lib/useMediaQuery';
 import AppShell from '../features/rooms/AppShell';
-import { Avatar, Button, Field, Logo, Toggle } from '../ui';
+import { Avatar, Button, Field, Logo } from '../ui';
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Try again.';
@@ -108,9 +108,6 @@ export default function HomePage() {
   const [mode, setMode] = useState<'join' | 'host'>('join');
   const [roomName, setRoomName] = useState('');
   const [hostName, setHostName] = useState(hostNameDefault);
-  const [guestsCanAdd, setGuestsCanAdd] = useState(true);
-  const [guestPlayback, setGuestPlayback] = useState(false);
-  const [requireApproval, setRequireApproval] = useState(false);
   const [joinCode, setJoinCode] = useState('');
   const [guestName, setGuestName] = useState(hostNameDefault);
   const [hostNameError, setHostNameError] = useState<string | null>(null);
@@ -167,9 +164,6 @@ export default function HomePage() {
       const finalName = roomName.trim().length > 0 ? roomName.trim() : hostName.trim() + "'s room";
       const created = await createRoom({ api }, hostName, {
         roomName: finalName,
-        guestsCanAdd,
-        guestsCanControlPlayback: guestPlayback,
-        requireApproval,
       }, { storeTokens: false });
       if (createGeneration.current !== generation) return;
       // Only a current, validated success confirms the created room.
@@ -477,37 +471,12 @@ export default function HomePage() {
               <MonitorPlayIcon size={18} className="text-ink-2" aria-hidden="true" />
             </div>
 
-            <div className="mt-6">
-              <p className="eyebrow text-ink-2">Guest permissions</p>
-              <div className="mt-4 flex flex-col gap-4">
-                <Toggle
-                  checked={guestsCanAdd}
-                  onChange={setGuestsCanAdd}
-                  label="Guests can add songs"
-                  description="Let everyone search YouTube and add to the shared queue."
-                  disabled={busy !== null}
-                />
-                <div className="h-px bg-line" aria-hidden="true" />
-                <Toggle
-                  checked={guestPlayback}
-                  onChange={setGuestPlayback}
-                  label="Guest playback controls"
-                  description="Off by default. Only you can pause or resume playback."
-                  disabled={busy !== null}
-                />
-                <div className="h-px bg-line" aria-hidden="true" />
-                <Toggle
-                  checked={requireApproval}
-                  onChange={setRequireApproval}
-                  label="Approve each guest"
-                  description="New guests wait at the door until you let them in. You can close the room later from settings."
-                  disabled={busy !== null}
-                />
-              </div>
-              <div className="mt-4 flex items-center gap-2 rounded-media border border-line px-3.5 py-2.5">
-                <KeyIcon size={14} className="text-ink-2" aria-hidden="true" />
-                <p className="text-[0.6875rem] text-ink-2">Skip, remove and reorder are always host-only.</p>
-              </div>
+            <div className="mt-6 flex items-start gap-2 rounded-media border border-line px-3.5 py-2.5">
+              <KeyIcon size={14} className="mt-0.5 shrink-0 text-ink-2" aria-hidden="true" />
+              <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
+                Guests can add songs. Skip, remove and reorder stay host-only, and every new guest waits for your approval.
+                Both are in room settings once the room exists.
+              </p>
             </div>
 
             <Button

@@ -122,6 +122,7 @@ describe('room api', () => {
       roomName: 'After Hours',
       guestsCanAdd: false,
       guestsCanControlPlayback: true,
+      requireApproval: false,
     });
 
     expect(calls[0].name).toBe('create-room');
@@ -315,5 +316,28 @@ describe('room api', () => {
     } catch (error) {
       expect(String(error)).not.toContain('secret-guest-value');
     }
+  });
+});
+
+describe('room defaults', () => {
+  it('moderates new rooms unless the caller explicitly says otherwise', async () => {
+    const { api, calls } = fakeApi({
+      roomId: '550e8400-e29b-41d4-a716-446655440000',
+      roomCode: 'ABCDEFGHJKMNPQRS',
+      roomName: 'After Hours',
+      memberId: '3a1ee27f-a539-4190-9250-bdc14ff631e0',
+      displayName: 'Ana',
+      role: 'host',
+      guestToken: 'guest-token-value',
+      hostToken: 'host-token-value',
+    });
+
+    await createRoom({ api, randomGuestNumber: () => 3 }, 'Ana', { roomName: 'After Hours' });
+
+    expect(calls[0].body).toMatchObject({
+      guestsCanAdd: true,
+      guestsCanControlPlayback: false,
+      requireApproval: true,
+    });
   });
 });
