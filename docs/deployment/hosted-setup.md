@@ -751,6 +751,19 @@ the bars keep `shrink-0`, and header-specific classes land on the text only. Red
 the pre-fix `Logo.tsx` — four assertions fail, and the fifth (the stage header's own class) does not,
 which is the shape of the bug.
 
+**Tap targets: the guest remote is clean, the host screen is not, and that is a decision rather than
+a defect.** Measured at 390x844 on 2026-10-27 by listing every control under 44px in the rendered
+page. The guest remote returns **zero** undersized targets on queue, songbook and search, and the
+suite enforces that (`guest remote keeps 44px targets and fits a phone`). The host queue page at the
+same width returns sixteen, none of them new: the logo 21x24, "Party view" and "Room settings" 36px
+tall, "Back to home" 32x32, the reorder arrows and row remove 32x32, and two inline links --
+"Add more songs" and "Full queue" -- at **17px**. The recorded convention is "guest-facing controls
+keep a 44px minimum target; host big-screen controls may stay compact", so the 32-36px items are the
+design, and the vote control added with `0ac6a64` (41x32) is larger than the row controls beside it.
+The 17px links are the one part that is not covered by that wording: they are prose links, not dock
+controls, and nothing gates them. No test covers host-screen targets at phone width in either
+direction, so if the compact rule is meant to stop at some size, that boundary is unwritten.
+
 ## Landing identity and the roomless nav (shipped 2026-10-26)
 
 **No name until one is typed.** `karaoke.profile.name` survived the blank field: the landing
