@@ -597,7 +597,7 @@ export default function HostRoomPage() {
           <header className="relative z-30 border-b border-line bg-graphite/95 backdrop-blur">
             <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
-                <Link to="/" className="lg:hidden" aria-label="kara-echo home">
+                <Link to="/" className="inline-flex min-h-6 min-w-6 items-center justify-center lg:hidden" aria-label="kara-echo home">
                   <Logo size="sm" withWordmark={false} />
                 </Link>
                 <div className="min-w-0">

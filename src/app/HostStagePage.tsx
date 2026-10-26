@@ -175,7 +175,7 @@ export default function HostStagePage() {
             </div>
             <div className="flex items-center gap-2">
               <Chip tone="default">{upNext.length} up next</Chip>
-              <Link to={queueHref} className="inline-flex items-center gap-1.5 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink">
+              <Link to={queueHref} className="inline-flex min-h-6 items-center gap-1.5 px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink">
                 <QueueIcon size={14} aria-hidden="true" />
                 Queue
               </Link>
@@ -238,7 +238,7 @@ export default function HostStagePage() {
                   onClick={favorite}
                   disabled={nowPlaying === null}
                   aria-pressed={saved}
-                  className={['inline-flex items-center gap-1.5 text-[0.6875rem] transition-colors', saved ? 'text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
+                  className={['inline-flex min-h-6 items-center gap-1.5 px-1 text-[0.6875rem] transition-colors', saved ? 'text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
                 >
                   <HeartIcon size={15} weight={saved ? 'fill' : 'regular'} aria-hidden="true" />
                   {saved ? 'Saved' : 'Save'}
@@ -336,7 +336,7 @@ export default function HostStagePage() {
                 emptyDescription="Search from this screen or any phone to keep the set going."
               />
             </div>
-            <Link to={'/room/' + roomId + '/host'} className="mt-3 inline-block text-[0.6875rem] font-semibold text-signal hover:underline">
+            <Link to={'/room/' + roomId + '/host'} className="mt-3 inline-flex min-h-6 items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
               Add more songs
             </Link>
           </section>

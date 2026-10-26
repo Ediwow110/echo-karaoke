@@ -760,9 +760,13 @@ tall, "Back to home" 32x32, the reorder arrows and row remove 32x32, and two inl
 "Add more songs" and "Full queue" -- at **17px**. The recorded convention is "guest-facing controls
 keep a 44px minimum target; host big-screen controls may stay compact", so the 32-36px items are the
 design, and the vote control added with `0ac6a64` (41x32) is larger than the row controls beside it.
-The 17px links are the one part that is not covered by that wording: they are prose links, not dock
-controls, and nothing gates them. No test covers host-screen targets at phone width in either
-direction, so if the compact rule is meant to stop at some size, that boundary is unwritten.
+The 17px links were the one part that wording does not cover: a prose link is not a dock control, and
+17px is below even WCAG 2.5.8's 24x24 floor. **Fixed on 2026-10-27**: seven controls were raised to a
+24px minimum across the four host screens (the prose links, the stage's Queue link and Save toggle,
+and the phone-width logo), and `no host link or button is smaller than the 24px target floor` now
+walks discover, queue, stage and settings at 390px so a new one cannot slip in. The stage's seek
+slider is deliberately outside that gate -- it is a range input with a different shape, and nothing
+here claims it was changed.
 
 ## Landing identity and the roomless nav (shipped 2026-10-26)
 

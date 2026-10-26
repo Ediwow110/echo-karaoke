@@ -168,7 +168,7 @@ export default function HostQueuePage() {
                 </p>
                 <Link
                   to={'/room/' + roomId + '/host'}
-                  className="inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-signal hover:underline"
+                  className="inline-flex min-h-6 items-center gap-1 px-1 text-[0.6875rem] font-semibold text-signal hover:underline"
                 >
                   <PlusIcon size={13} weight="bold" aria-hidden="true" />
                   Add more songs

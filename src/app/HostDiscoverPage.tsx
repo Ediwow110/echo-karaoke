@@ -153,7 +153,7 @@ export default function HostDiscoverPage() {
                     {upNext.length === 0 ? 'Nothing waiting.' : queueSummary(upNext)}
                   </p>
                 </div>
-                <Link to={queueHref} className="text-[0.6875rem] font-semibold text-signal hover:underline">
+                <Link to={queueHref} className="inline-flex min-h-6 items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
                   Full queue
                 </Link>
               </div>
@@ -168,7 +168,7 @@ export default function HostDiscoverPage() {
               </div>
               <Link
                 to={queueHref}
-                className="mt-3 inline-flex items-center gap-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink"
+                className="mt-3 inline-flex min-h-6 items-center gap-1 px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink"
               >
                 <QueueIcon size={14} aria-hidden="true" />
                 Manage the running order

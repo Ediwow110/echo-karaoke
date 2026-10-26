@@ -465,6 +465,35 @@ test('the host header counts only the people still here', async ({ page }) => {
   await expect(page.getByText('2 people')).toHaveCount(0);
 });
 
+// WCAG 2.5.8 sets the floor for a pointer target at 24x24 CSS px. The host
+// screen's "compact is fine" convention was written for a big screen, but four
+// prose links measured 17px tall at every width, including on a phone where a
+// host opens their own room. Links and buttons only: the stage's seek slider is
+// a different shape and is not being claimed as fixed here.
+test('no host link or button is smaller than the 24px target floor', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+
+  for (const path of [
+    '/room/' + ROOM + '/host',
+    '/room/' + ROOM + '/host/queue',
+    '/room/' + ROOM + '/host/stage',
+    '/room/' + ROOM + '/host/settings',
+  ]) {
+    await page.goto(path, { waitUntil: 'networkidle' });
+    const tiny = await page.evaluate(() => [...document.querySelectorAll('a[href], button')]
+      .map((el) => ({
+        label: (el.getAttribute('aria-label') || el.textContent || el.tagName).trim().replace(/\s+/g, ' ').slice(0, 30),
+        rect: el.getBoundingClientRect(),
+      }))
+      .filter(({ label, rect }) => label.length > 0
+        && rect.width > 0 && rect.height > 0
+        && (rect.width < 24 || rect.height < 24))
+      .map(({ label, rect }) => label + ' ' + Math.round(rect.width) + 'x' + Math.round(rect.height)));
+    expect(tiny, path + ' has targets under 24px').toEqual([]);
+  }
+});
+
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
   await mockApi(page);
   await openGuestSearch(page);
