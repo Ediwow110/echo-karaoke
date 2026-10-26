@@ -820,6 +820,16 @@ again be projected without saying whose view it is. Apply it with this build: th
 answer the currently deployed build exactly as before plus one field per row, so either order is
 safe -- but a build shipped without the migration shows counts that never fill.
 
+**Three facts about that path, measured on production `main` on 2026-10-27 rather than assumed.**
+`vote_toggle(uuid, text, text, uuid)` is executable by `echo_service` and denied to `anon`, so the
+feature will not meet the 42501 that caught the songbook before 0034 -- and CI's own grant gate
+(`tests/integration/operations.test.ts`) enumerates the operation names from source, so it covers
+this call without a list being edited. `members_room_user_key UNIQUE (room_id, user_id)` holds, which
+is what lets `0039`'s host read resolve the viewer's member row by user id with a `limit 1` safely.
+And production already has the `0037`/`0038` columns (`require_approval`, `admissions_locked`,
+`members.status`), so the unchecked "apply 0037 to production" box in the moderated-entry plan is a
+stale checkbox, not a live breakage.
+
 **Not verified:** a second human on a real phone, and screen-reader announcement of the waiting status
 (the unit test asserts the role, not that it is announced).
 
