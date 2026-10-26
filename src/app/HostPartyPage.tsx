@@ -129,7 +129,13 @@ export default function HostPartyPage() {
 
       <main className="relative min-h-0 flex-1">
         {hasVideo ? (
-          <div ref={attachSlot} className="absolute inset-0" data-party-slot />
+          <>
+            {/* The video fills this screen, so the song title is the only name
+                it has. RouteFocus announces a route by the heading inside
+                main, and with none here the party view went unannounced. */}
+            <h1 className="sr-only">{nowPlaying?.title ?? 'Nothing playing'}</h1>
+            <div ref={attachSlot} className="absolute inset-0" data-party-slot />
+          </>
         ) : (
           <div className="absolute inset-0 overflow-hidden">
             <img src="/images/stage-spotlight.jpg" alt="" className="stage-pan h-full w-full object-cover opacity-70" />

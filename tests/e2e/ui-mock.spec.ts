@@ -332,6 +332,19 @@ test('every host sidebar destination lands where its label says', async ({ page 
   expect(noise).toEqual([]);
 });
 
+// The party view is the screen a room actually watches, and RouteFocus only
+// announces a screen that has a heading inside <main>. A playing song used to
+// leave the view with none, so the route change announced nothing at all.
+test('the party view names the playing song as its heading', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/party', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('button', { name: 'Leave party view' })).toBeVisible();
+  await expect(page.locator('main h1')).toContainText('Afterglow');
+  // The transport still shows the same song; the heading must not replace it.
+  await expect(page.getByText('Afterglow', { exact: true })).toHaveCount(2);
+});
+
 test('guest search keeps 44px controls and reflows at 200% text', async ({ page }) => {
   await mockApi(page);
   await openGuestSearch(page);
