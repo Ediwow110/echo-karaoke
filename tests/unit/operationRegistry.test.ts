@@ -28,4 +28,12 @@ describe('operation registry', () => {
     expect(listed).toContain('transfer-host');
     expect(listed).toContain('claim-host');
   });
+
+  it('budgets every operation per session before dispatch', () => {
+    // A browser console holds the page's own session, so the ceiling has to sit in
+    // the shared path: an operation added later inherits it instead of opting in.
+    const budget = source.indexOf('enforceApiRequestLimit(caller.userId)');
+    expect(budget).toBeGreaterThan(-1);
+    expect(budget).toBeLessThan(source.indexOf('switch (name)'));
+  });
 });

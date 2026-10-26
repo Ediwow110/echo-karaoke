@@ -1,4 +1,5 @@
 import { requireAnonymousCaller } from '../auth/identity.js';
+import { enforceApiRequestLimit } from './apiThrottle.js';
 import { approveMember, rejectMember, setAdmissions } from './admission.js';
 import { catalogPage } from './catalogBrowse.js';
 import { catalogSync } from './catalogSync.js';
@@ -61,6 +62,10 @@ export async function handleOperation(request: Request): Promise<Response> {
     }
 
     const caller = await requireAnonymousCaller(request);
+    // One budget for the session, applied here so an operation added later cannot
+    // skip it. It runs after identity so an unauthenticated flood never reaches
+    // the counter, and before dispatch so no handler has to remember.
+    await enforceApiRequestLimit(caller.userId);
     switch (name) {
       case 'create-room':
         return await createRoom(request, caller);
