@@ -872,7 +872,13 @@ Network panel — that is the session, by definition — it does not replace a W
 sessions at once (anonymous sign-in is capped per network), and a local dev server pointed at the
 production database is still a mistake the code cannot detect.
 
-## The create action opens the create form (shipped 2026-10-26)
+## The create action opens the create form (committed 2026-10-26, NOT DEPLOYED as of 2026-10-27)
+
+**Status correction, measured not remembered.** This section's heading used to say "shipped", and it
+was wrong: production still serves `862e747`, whose sidebar still links "Create room" to `/`. Proven
+twice on 2026-10-27 by fetching the live origin and grepping every served chunk for `/create` and
+`Back to the room` -- zero hits in all 35, while the positive controls "Create room" and "Join the
+room" both match. Everything below is committed on `feature/songbook` and waits on the push.
 
 **What was wrong.** The sidebar's "Create room" was a plain link to `/`, so a host who clicked it
 while hosting a room landed on the landing page. On a wide screen that page happens to be the create
@@ -912,6 +918,37 @@ When the same room was answered as ended, the offer was gone. Red-proved by rest
 only the path changes, so the landing page and the create route are keyed separately. Without the
 keys the landing page's join-first mode followed the host to `/create`, and the create route
 answered with the phone join screen again — the same bug, one navigation deeper.
+
+## Shipping the held work (rehearsed 2026-10-27, awaiting approval)
+
+Nineteen commits sit between the deployed `862e747` and this tree: the create-route fix, the
+navigation and party-heading honesty fixes, the songbook and queue wording fixes, voting with
+migration `0039`, the clear-queue control, and the browser gates. Nothing is pushed -- the owner
+answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
+order.
+
+**Order, and why either direction is safe.**
+
+1. `supabase db push --dry-run` against `main` must list exactly `0039_vote_viewer_flag.sql`, then
+   `supabase db push`. Applying first is safe under the build that is running: `git grep room_queue
+   origin/master -- server/` returns nothing, so the deployed Function only calls
+   `read_room_guest` / `read_room_host`, whose signatures `0039` preserves. The old build ignores the
+   extra field on each queue row.
+2. `git push origin HEAD:master`. Rehearsed with `--dry-run`, which printed
+   `862e747..d21b6d9  HEAD -> master` -- a clean fast-forward, no force, no merge.
+3. Watch the CI jobs and the Vercel build, then prove the bundle actually changed rather than
+   assuming it: `curl -s https://echo-karaoke-mocha.vercel.app/ | grep -o 'assets/index-[^"]*\.js'`
+   must name a hash other than `index-CMmJCzWH.js`, and the served chunks must now contain `/create`,
+   `Back to the room` and `vote-command`.
+
+**Rollback is code-only.** Promote the previous Vercel deployment. `0039` needs no unwinding, because
+the build being rolled back to was proven above to tolerate its output -- and do not re-apply it
+afterwards either, since migrations here are forward-only and never edited once applied anywhere.
+
+**Already settled, so nobody re-derives it under ship pressure:** `echo_service` may execute
+`vote_toggle` and `anon` may not (measured on `main`); `members_room_user_key UNIQUE (room_id,
+user_id)` holds, which is what makes the host read's member lookup safe; the whole `0001→0039` chain
+replays from scratch locally with pgTAP 409/409.
 
 ## Verification checklist
 
