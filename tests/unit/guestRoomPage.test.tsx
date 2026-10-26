@@ -4,7 +4,7 @@ import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import { createElement } from 'react';
 import GuestRoomPage from '../../src/app/GuestRoomPage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
-import type { EdgeApi } from '../../src/lib/edgeApi';
+import { RoomApiError, type EdgeApi } from '../../src/lib/edgeApi';
 import '@testing-library/jest-dom/vitest';
 
 const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
@@ -190,6 +190,43 @@ describe('guest phone remote', () => {
       expect(screen.getByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
       expect(reads).toBeGreaterThanOrEqual(2);
       expect(screen.queryByText(/rafa needs to let you in/i)).toBeNull();
+    } finally {
+      view.unmount();
+      vi.useRealTimers();
+    }
+  });
+
+  it('treats a rate-limited poll as a wait, not as a revoked pass', async () => {
+    // The per-session budget is a temporary ceiling. If it were classified like
+    // UNAUTHORIZED the tab would stop polling for good, which turns a busy minute
+    // into a dead room.
+    vi.useFakeTimers();
+    let reads = 0;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'touch-member') return {};
+        if (name === 'guest-room-read') {
+          reads += 1;
+          if (reads === 2) {
+            throw new RoomApiError('RATE_LIMITED', 429, 'Slow down: too many requests from this session');
+          }
+          return liveRoom();
+        }
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    const view = renderGuest(api);
+    try {
+      await act(async () => { await vi.advanceTimersByTimeAsync(0); });
+      expect(screen.getByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+      expect(screen.getByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+      expect(screen.queryByText(/room pass is no longer valid/i)).toBeNull();
+
+      await act(async () => { await vi.advanceTimersByTimeAsync(4_000); });
+      expect(reads).toBeGreaterThanOrEqual(3);
+      expect(screen.getByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
     } finally {
       view.unmount();
       vi.useRealTimers();
