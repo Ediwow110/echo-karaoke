@@ -674,7 +674,7 @@ reason: four failures, all of them the fixtures meeting real data they never exp
 
 ### The guest-to-handoff chain, proven on production (2026-10-26)
 
-The last two unverified behaviors closed in one room ("Handoff Proof", `a8485335`), with the host in
+The last two unverified behaviors closed in one room ("Handoff Proof"), with the host in
 one browser and the guest in a second, isolated one:
 
 ```
