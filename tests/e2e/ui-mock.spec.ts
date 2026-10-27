@@ -149,6 +149,48 @@ async function openGuestSearch(page: Page): Promise<void> {
   await page.waitForSelector('ul[aria-label="Songs"] li');
 }
 
+test('a refused start leaves the host on the page that can retry it', async ({ page }) => {
+  // Both the auto-play effect and the Start button used to navigate as soon as
+  // the command was sent, so a refused play put the host in front of a silent
+  // room with nothing to press. The command must be attempted, and the page
+  // that offers the retry must still be the one on screen.
+  await mockApi(page);
+  const stopped = {
+    ...room(false),
+    queue: queue.map((song) => ({ ...song, status: 'queued' })),
+    playback: {
+      currentSongId: null,
+      currentVideoId: null,
+      positionSeconds: 0,
+      durationSeconds: null,
+      isPlaying: false,
+      updatedAt: null,
+    },
+  };
+  const answer = (body: unknown) => async (route: import('@playwright/test').Route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(body) });
+  };
+  await page.route('**/api/guest-room-read', answer(stopped));
+  await page.route('**/api/host-room-read', answer(stopped));
+  let attempts = 0;
+  await page.route('**/api/playback-command', async (route) => {
+    attempts += 1;
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'SEARCH_UNAVAILABLE', message: 'Playback is unavailable right now' } }),
+    });
+  });
+
+  await page.goto('/room/' + ROOM + '/host', { waitUntil: 'networkidle' });
+
+  await expect(page.getByText('kara-echo song search')).toBeVisible();
+  const before = attempts;
+  await page.getByRole('button', { name: 'Start the session' }).click();
+  await expect.poll(() => attempts).toBeGreaterThan(before);
+  await expect(page.getByText('kara-echo song search')).toBeVisible();
+});
+
 test('a failed handover keeps the confirmation open', async ({ page }) => {
   // transferRoom swallows its own error, so the dialog must be closed by the
   // reported outcome rather than by the await returning. Closing it anyway
