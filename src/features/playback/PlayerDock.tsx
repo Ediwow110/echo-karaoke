@@ -24,7 +24,7 @@ type Props = {
 };
 
 export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay, onNext }: Props) {
-  const { currentTime, duration, volume, setVolume, seekBy, needsTap, playerError, advanceStalled, requestPlay } = useHostPlayer();
+  const { currentTime, duration, volume, setVolume, seekBy, needsTap, playerError, advanceStalled, requestPlay, playbackSurfaceReady } = useHostPlayer();
   const [busy, setBusy] = useState<'play' | 'next' | null>(null);
   const videoId = nowPlaying?.videoId ?? null;
   const [saved, setSaved] = useState(() => videoId !== null && isFavorite(videoId));
@@ -40,6 +40,10 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
   const currentSafe = Number.isFinite(currentTime) ? Math.max(0, currentTime) : 0;
   const progress = durationSafe > 0 ? Math.min(100, (currentSafe / durationSafe) * 100) : 0;
   const canControl = nowPlaying !== null;
+  // The player pauses itself again when there is no video surface on this
+  // screen (below 1024px outside the stage or party view). Offering Play there
+  // set the room to playing while this device stayed silent.
+  const canPlayback = canControl && playbackSurfaceReady;
   const volumeSafe = Number.isFinite(volume) ? volume : 100;
 
   async function toggle(): Promise<void> {
@@ -81,7 +85,9 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
             <p className="mt-0.5 truncate text-[0.625rem] text-ink-2">
               {nowPlaying === null
                 ? 'Add a song, then start playback on this host screen.'
-                : (nowPlaying.channelTitle ?? 'YouTube') + ' · ' + formatTime(currentTime) + ' / ' + (duration > 0 ? formatTime(duration) : '—:—')}
+                : !playbackSurfaceReady
+                  ? 'Open the stage view to control playback on this screen.'
+                  : (nowPlaying.channelTitle ?? 'YouTube') + ' · ' + formatTime(currentTime) + ' / ' + (duration > 0 ? formatTime(duration) : '—:—')}
             </p>
           </div>
 
@@ -93,7 +99,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
               value={Math.min(Math.floor(currentSafe), Math.max(1, Math.floor(durationSafe)))}
               onChange={(event) => seekBy(Number(event.target.value) - currentSafe)}
               aria-label="Playback position"
-              disabled={!canControl || durationSafe <= 0}
+              disabled={!canPlayback || durationSafe <= 0}
               className="h-1 w-full cursor-pointer appearance-none rounded-full bg-line accent-signal disabled:cursor-default"
               style={{ background: 'linear-gradient(to right, var(--color-signal) ' + progress + '%, var(--color-line) ' + progress + '%)' }}
             />
@@ -107,10 +113,10 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
                 tone="ghost"
                 size="sm"
                 onClick={() => seekBy(-10)}
-                disabled={!canControl}
+                disabled={!canPlayback}
               />
             </div>
-            {needsTap && playerError === null ? (
+            {needsTap && playerError === null && playbackSurfaceReady ? (
               <button
                 type="button"
                 onClick={requestPlay}
@@ -123,7 +129,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
               <button
                 type="button"
                 onClick={() => void toggle()}
-                disabled={!canControl || busy !== null || playerError !== null}
+                disabled={!canPlayback || busy !== null || playerError !== null}
                 aria-label={playing ? 'Pause' : 'Play'}
                 className="grid size-11 place-items-center rounded-full bg-signal-fill text-signal-ink transition-colors hover:bg-signal-fill-hover disabled:pointer-events-none disabled:bg-surface-2 disabled:text-ink-3 disabled:opacity-70"
               >
