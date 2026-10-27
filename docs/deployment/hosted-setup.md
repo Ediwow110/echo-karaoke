@@ -965,11 +965,11 @@ afterwards either, since migrations here are forward-only and never edited once 
 **Already settled, so nobody re-derives it under ship pressure:** `echo_service` may execute
 `vote_toggle` and `anon` may not (measured on `main`); `members_room_user_key UNIQUE (room_id,
 user_id)` holds, which is what makes the host read's member lookup safe; the whole `0001→0039` chain
-replays from scratch locally with pgTAP 409/409.
+replays from scratch locally with pgTAP 411/411.
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, and the local stack reports 409/409 with the full `0001→0039` chain replayed from scratch. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, two more pin the host's own vote, and the local stack reports 411/411 with the full `0001→0039` chain replayed from scratch. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
 - [x] `npm test` reports 527 passing tests on the current tree (measured 2026-10-27 at `93e08b1`).
 - [x] `npm run build` passes on the current tree.
