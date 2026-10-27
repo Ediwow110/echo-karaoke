@@ -476,6 +476,11 @@ export default function HostPlayer({
     const target = Number.isFinite(seconds) ? Math.max(0, seconds) : 0;
     player.seekTo(target);
     setCurrentTime(target);
+    // A player that has not started cannot confirm the seek, and reporting one
+    // it never made would move every phone to a place this video never reached.
+    if (reportablePosition(player) === null) {
+      return;
+    }
     onReportRef.current(
       Math.floor(target),
       Math.floor(player.getDuration()),

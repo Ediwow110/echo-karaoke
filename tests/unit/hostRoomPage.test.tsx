@@ -659,6 +659,57 @@ describe('host room workspace', () => {
     expect(await reportsFromPlayingHost(3, 0, 13_000)).toEqual([]);
   });
 
+  async function reportsFromSeek(
+    state: number,
+    currentTime: number,
+    duration: number,
+  ): Promise<Array<{ positionSeconds?: unknown }>> {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    const reports: Array<{ positionSeconds?: unknown }> = [];
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true, positionSeconds: 100 },
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        if (name === 'playback-report') {
+          reports.push(body as { positionSeconds?: unknown });
+          return playingRoom.playback;
+        }
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return playingRoom;
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    playerClock.state = state;
+    playerClock.currentTime = currentTime;
+    playerClock.duration = duration;
+
+    renderHost(api);
+    await screen.findByLabelText('Back 10 seconds');
+    await act(async () => {
+      fireEvent.click(screen.getByLabelText('Back 10 seconds'));
+    });
+    return reports;
+  }
+
+  it('does not tell the room about a seek the player could not make', async () => {
+    // A player that never handed over its controls reads 0 and drops the seek,
+    // so reporting one moves every phone to a place the video never reached.
+    expect(await reportsFromSeek(-1, 0, 0)).toEqual([]);
+  });
+
+  it('still tells the room where a real seek landed', async () => {
+    const reports = await reportsFromSeek(1, 100, 222);
+    expect(reports.some((report) => report.positionSeconds === 90)).toBe(true);
+  });
+
   it('coalesces repeated YouTube end events into one automatic next request', async () => {
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
       matches: query.includes('min-width: 1024px'),
