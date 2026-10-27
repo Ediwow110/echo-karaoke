@@ -191,6 +191,74 @@ test('a refused start leaves the host on the page that can retry it', async ({ p
   await expect(page.getByText('kara-echo song search')).toBeVisible();
 });
 
+async function stubYouTube(page: Page, state: number, currentTime: number): Promise<void> {
+  await page.addInitScript(([playerState, clock]) => {
+    (window as unknown as { YT: unknown }).YT = {
+      PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
+      Player: function StubPlayer(_mount: HTMLElement, options: { events?: { onReady?: () => void } }) {
+        const stub = {
+          loadVideoById: () => undefined,
+          playVideo: () => undefined,
+          pauseVideo: () => undefined,
+          seekTo: () => undefined,
+          getCurrentTime: () => clock,
+          getDuration: () => 222,
+          getPlayerState: () => playerState,
+          setVolume: () => undefined,
+          getVolume: () => 100,
+          destroy: () => undefined,
+        };
+        window.setTimeout(() => options.events?.onReady?.(), 0);
+        return stub;
+      },
+    };
+  }, [state, currentTime]);
+}
+
+async function collectReports(page: Page): Promise<Array<{ positionSeconds?: number }>> {
+  const reports: Array<{ positionSeconds?: number }> = [];
+  await page.route('**/api/playback-report', async (route) => {
+    reports.push(route.request().postDataJSON() as { positionSeconds?: number });
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify(room(true).playback),
+    });
+  });
+  return reports;
+}
+
+test('a playing video still reports its position', async ({ page }) => {
+  // The control for the gate below: it proves the stubbed player is wired and
+  // that reports flow at all, so an empty result there means the guard worked.
+  await mockApi(page);
+  await stubYouTube(page, 1, 100);
+  const reports = await collectReports(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+  await expect.poll(
+    () => reports.filter((report) => report.positionSeconds === 100).length,
+    { timeout: 6000 },
+  ).toBeGreaterThan(0);
+});
+
+test('a buffering video never reports a position the room has not reached', async ({ page }) => {
+  // YouTube answers 0 for the clock until the video starts, while already
+  // knowing its duration, and the server stores whatever position it is given.
+  // Reporting that 0 would rewind every phone to the start of the song.
+  await mockApi(page);
+  await stubYouTube(page, 3, 0);
+  const reports = await collectReports(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+  // Past the 2.6 s early report and the first 1 s ticks, before the 12 s one.
+  await page.waitForTimeout(4000);
+
+  expect(reports.filter((report) => report.positionSeconds === 0)).toEqual([]);
+});
+
 test('a promoted guest keeps claiming the host pass until it lands', async ({ page }) => {
   // The transfer revokes the outgoing host's pass, so a claim that fails once
   // leaves the room with no host pass at all. The poll never changes this
