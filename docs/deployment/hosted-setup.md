@@ -946,9 +946,10 @@ answered with the phone join screen again — the same bug, one navigation deepe
 
 ## Shipping the held work (rehearsed 2026-10-27, awaiting approval)
 
-Twenty-seven commits sit between the deployed `862e747` and this tree: the create-route fix, the
+Thirty commits sit between the deployed `862e747` and this tree: the create-route fix, the
 navigation and party-heading honesty fixes, the songbook and queue wording fixes, voting with
-migration `0039`, the clear-queue control, and the browser gates. Nothing is pushed -- the owner
+migration `0039`, the clear-queue control, the browser gates, and the playback-position fix that
+stops a buffering video from rewinding the room. Nothing is pushed -- the owner
 answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
 order.
 
@@ -959,8 +960,8 @@ order.
    origin/master -- server/` returns nothing, so the deployed Function only calls
    `read_room_guest` / `read_room_host`, whose signatures `0039` preserves. The old build ignores the
    extra field on each queue row.
-2. `git push origin HEAD:master`. Rehearsed with `--dry-run`, which printed
-   `862e747..d21b6d9  HEAD -> master` -- a clean fast-forward, no force, no merge.
+2. `git push origin HEAD:master`. Rehearsed with `--dry-run` at `47cdcb6`, which printed
+   `862e747..47cdcb6  HEAD -> master` -- a clean fast-forward, no force, no merge.
 3. Watch the CI jobs and the Vercel build, then prove the bundle actually changed rather than
    assuming it: `curl -s https://echo-karaoke-mocha.vercel.app/ | grep -o 'assets/index-[^"]*\.js'`
    must name a hash other than `index-CMmJCzWH.js`, and the served chunks must now contain `/create`,
@@ -979,16 +980,16 @@ A later migration can retire the delegate once no deployed build calls it.
 
 **Already settled, so nobody re-derives it under ship pressure:** `echo_service` may execute
 `vote_toggle` and `anon` may not (measured on `main`); `members_room_user_key UNIQUE (room_id,
-user_id)` holds, which is what makes the host read's member lookup safe; the whole `0001→0039` chain
+user_id)` holds, which is what makes the host read's member lookup safe; the whole `0001→0040` chain
 replays from scratch locally with pgTAP 414/414.
 
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, `0040` adds five (two of them pinning the host's own vote and its survival of an identity replacement), and the local stack reports 414/414 with the full `0001→0040` chain replayed from scratch. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 527 passing tests on the current tree (measured 2026-10-27 at `93e08b1`).
+- [x] `npm test` reports 535 passing tests on the current tree (measured 2026-10-27 at `47cdcb6`).
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 44 passing tests on the current tree (measured 2026-10-27 at `dbcfc25`; the suite is now two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`).
+- [x] `npm run test:e2e:ui` reports 45 passing tests on the current tree (measured 2026-10-27 at `47cdcb6`; the suite is two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`).
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is
