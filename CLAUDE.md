@@ -6,11 +6,8 @@ and deployment contract.
 ## Commands
 
 - `npm run dev`: Vite only — `/api` is not served. Vite proxies `/api` to
-  `http://127.0.0.1:3001`, but nothing in this repo listens there: `scripts/backend-server.ts`
-  imports `.js` specifiers that plain Node cannot resolve, so it exits with `ERR_MODULE_NOT_FOUND`.
-  It is not wired into any npm script. Neither is its near-duplicate
-  `scripts/.local-backend.ts` (ports 5180/3002, a leftover from another project's worktree), which
-  fails the same way — do not try that one instead.
+  `http://127.0.0.1:3002`, but nothing in this repo listens there. Use
+  `npx vercel dev` below for the full stack.
 - `npx vercel dev`: the only working full-stack local path, on port 3000.
   **Caution:** `.env.local`'s `DATABASE_URL`, `AUTH_DATABASE_URL`, and
   `NEON_DATABASE_URL` all name production Neon `main`, so this command writes real

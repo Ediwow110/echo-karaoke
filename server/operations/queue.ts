@@ -1,6 +1,6 @@
 import { readJsonObject } from './tokens.js';
 import { callOperation, requireRoomId, requireSongId, type Caller } from './room.js';
-import { HttpError, jsonResponse, UNAUTHORIZED_MESSAGE } from './errors.js';
+import { HttpError, jsonResponse, logFailure, UNAUTHORIZED_MESSAGE } from './errors.js';
 import { fetchVideoMetadata, isValidVideoId } from './metadata.js';
 
 const ACTIONS = new Set(['add', 'remove', 'reorder']);
@@ -24,17 +24,6 @@ function readCapability(request: Request): { guestToken: string | null; hostToke
 }
 
 async function enforceLimit(
-  name: string,
-  params: unknown[],
-  message: string,
-): Promise<void> {
-  const result = (await callOperation(name, params)) as { allowed?: boolean };
-  if (result.allowed !== true) {
-    throw new HttpError('LOOKUP_RATE_LIMITED', 429, message);
-  }
-}
-
-async function enforceDaily(
   name: string,
   params: unknown[],
   message: string,
@@ -75,17 +64,44 @@ export async function queueCommand(request: Request, caller: Caller): Promise<Re
       [caller.userId, 'queue-metadata', 10, 60],
       'Too many song lookups. Give it a moment.',
     );
-    await enforceDaily(
-      'consume_daily_rate_limit',
+
+    const roomSubject = 'room:' + roomId;
+
+    // A failed lookup spent no YouTube cost and added no song, so both shared
+    // budgets must be given back. Otherwise looped dead links exhaust the room
+    // for every guest until the next Pacific midnight.
+    const charged: string[] = [];
+    const refundCharged = async (): Promise<void> => {
+      if (charged.length === 0) return;
+      const results = await Promise.allSettled(charged.map((subject) => (
+        callOperation('refund_daily_rate_limit', [subject, 'queue-metadata-day'])
+      )));
+      for (const result of results) {
+        if (result.status === 'rejected') {
+          logFailure('queue-command/refund', result.reason, 500, request);
+        }
+      }
+    };
+    const chargeDaily = async (subject: string, params: unknown[], message: string): Promise<void> => {
+      const result = (await callOperation('consume_daily_rate_limit', params)) as { allowed?: boolean };
+      charged.push(subject);
+      if (result.allowed !== true) {
+        await refundCharged();
+        throw new HttpError('LOOKUP_RATE_LIMITED', 429, message);
+      }
+    };
+
+    await chargeDaily(
+      roomSubject,
       [
-        'room:' + roomId,
+        roomSubject,
         'queue-metadata-day',
         dailyBudget('YOUTUBE_ROOM_METADATA_BUDGET', DEFAULT_METADATA_ROOM_BUDGET),
       ],
       "This room has reached today's song lookup limit. Try again tomorrow.",
     );
-    await enforceDaily(
-      'consume_daily_rate_limit',
+    await chargeDaily(
+      'global',
       [
         'global',
         'queue-metadata-day',
@@ -96,6 +112,7 @@ export async function queueCommand(request: Request, caller: Caller): Promise<Re
 
     const metadata = await fetchVideoMetadata(videoId);
     if (metadata === null) {
+      await refundCharged();
       throw new HttpError(
         'METADATA_UNAVAILABLE',
         422,

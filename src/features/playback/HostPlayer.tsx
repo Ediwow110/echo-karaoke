@@ -468,7 +468,23 @@ export default function HostPlayer({
     }, 1600);
   }, []);
 
-  const seekTo = useCallback((seconds: number) => {
+  const reportPosition = useCallback(() => {
+    const player = playerRef.current;
+    if (player === null) {
+      return;
+    }
+    const seconds = reportablePosition(player);
+    if (seconds === null) {
+      return;
+    }
+    onReportRef.current(
+      Math.floor(seconds),
+      Math.floor(player.getDuration()),
+      playbackRef.current?.currentSongId ?? null,
+    );
+  }, []);
+
+  const seekToPosition = useCallback((seconds: number, report: boolean) => {
     const player = playerRef.current;
     if (player === null) {
       return;
@@ -478,7 +494,7 @@ export default function HostPlayer({
     setCurrentTime(target);
     // A player that has not started cannot confirm the seek, and reporting one
     // it never made would move every phone to a place this video never reached.
-    if (reportablePosition(player) === null) {
+    if (!report || reportablePosition(player) === null) {
       return;
     }
     onReportRef.current(
@@ -487,6 +503,11 @@ export default function HostPlayer({
       playbackRef.current?.currentSongId ?? null,
     );
   }, []);
+
+  const seekTo = useCallback((seconds: number) => seekToPosition(seconds, true), [seekToPosition]);
+  // A dragged slider fires an input event per pixel; only the release reports.
+  const previewSeek = useCallback((seconds: number) => seekToPosition(seconds, false), [seekToPosition]);
+  const commitSeek = reportPosition;
 
   const seekBy = useCallback((seconds: number) => {
     const player = playerRef.current;
@@ -559,10 +580,13 @@ export default function HostPlayer({
     volume,
     fullscreen,
     stageActive: slot !== null,
+    playbackSurfaceReady: playerVisible,
     registerStageSlot,
     requestPlay,
     seekBy,
     seekTo,
+    previewSeek,
+    commitSeek,
     setVolume: changeVolume,
     toggleFullscreen,
     skipFailed,
@@ -571,6 +595,7 @@ export default function HostPlayer({
   }), [
     advanceStalled,
     changeVolume,
+    commitSeek,
     currentTime,
     effectiveDuration,
     findAlternative,
@@ -578,6 +603,8 @@ export default function HostPlayer({
     loading,
     needsTap,
     playerError,
+    playerVisible,
+    previewSeek,
     registerStageSlot,
     requestPlay,
     retryAdvance,

@@ -24,7 +24,7 @@ type Props = {
 };
 
 export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay, onNext }: Props) {
-  const { currentTime, duration, volume, setVolume, seekBy, needsTap, playerError, advanceStalled, requestPlay } = useHostPlayer();
+  const { currentTime, duration, volume, setVolume, seekBy, previewSeek, commitSeek, needsTap, playerError, advanceStalled, requestPlay, playbackSurfaceReady } = useHostPlayer();
   const [busy, setBusy] = useState<'play' | 'next' | null>(null);
   const videoId = nowPlaying?.videoId ?? null;
   const [saved, setSaved] = useState(() => videoId !== null && isFavorite(videoId));
@@ -40,6 +40,10 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
   const currentSafe = Number.isFinite(currentTime) ? Math.max(0, currentTime) : 0;
   const progress = durationSafe > 0 ? Math.min(100, (currentSafe / durationSafe) * 100) : 0;
   const canControl = nowPlaying !== null;
+  // The player pauses itself again when there is no video surface on this
+  // screen (below 1024px outside the stage or party view). Offering Play there
+  // set the room to playing while this device stayed silent.
+  const canPlayback = canControl && playbackSurfaceReady;
   const volumeSafe = Number.isFinite(volume) ? volume : 100;
 
   async function toggle(): Promise<void> {
@@ -81,7 +85,9 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
             <p className="mt-0.5 truncate text-[0.625rem] text-ink-2">
               {nowPlaying === null
                 ? 'Add a song, then start playback on this host screen.'
-                : (nowPlaying.channelTitle ?? 'YouTube') + ' · ' + formatTime(currentTime) + ' / ' + (duration > 0 ? formatTime(duration) : '—:—')}
+                : !playbackSurfaceReady
+                  ? 'Open the stage view to control playback on this screen.'
+                  : (nowPlaying.channelTitle ?? 'YouTube') + ' · ' + formatTime(currentTime) + ' / ' + (duration > 0 ? formatTime(duration) : '—:—')}
             </p>
           </div>
 
@@ -91,9 +97,11 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
               min={0}
               max={Math.max(1, Math.floor(durationSafe))}
               value={Math.min(Math.floor(currentSafe), Math.max(1, Math.floor(durationSafe)))}
-              onChange={(event) => seekBy(Number(event.target.value) - currentSafe)}
+              onChange={(event) => previewSeek(Number(event.target.value))}
+              onPointerUp={commitSeek}
+              onKeyUp={commitSeek}
               aria-label="Playback position"
-              disabled={!canControl || durationSafe <= 0}
+              disabled={!canPlayback || durationSafe <= 0}
               className="h-1 w-full cursor-pointer appearance-none rounded-full bg-line accent-signal disabled:cursor-default"
               style={{ background: 'linear-gradient(to right, var(--color-signal) ' + progress + '%, var(--color-line) ' + progress + '%)' }}
             />
@@ -107,10 +115,10 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
                 tone="ghost"
                 size="sm"
                 onClick={() => seekBy(-10)}
-                disabled={!canControl}
+                disabled={!canPlayback}
               />
             </div>
-            {needsTap && playerError === null ? (
+            {needsTap && playerError === null && playbackSurfaceReady ? (
               <button
                 type="button"
                 onClick={requestPlay}
@@ -123,7 +131,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
               <button
                 type="button"
                 onClick={() => void toggle()}
-                disabled={!canControl || busy !== null || playerError !== null}
+                disabled={!canPlayback || busy !== null || playerError !== null}
                 aria-label={playing ? 'Pause' : 'Play'}
                 className="grid size-11 place-items-center rounded-full bg-signal-fill text-signal-ink transition-colors hover:bg-signal-fill-hover disabled:pointer-events-none disabled:bg-surface-2 disabled:text-ink-3 disabled:opacity-70"
               >
@@ -141,7 +149,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
               onClick={() => void next()}
               disabled={!canControl || busy !== null}
               aria-label="Skip song"
-              className="grid size-10 place-items-center rounded-full border border-line bg-surface-2 text-ink transition-colors hover:border-line-strong hover:bg-surface-3 disabled:pointer-events-none disabled:opacity-35"
+              className="grid size-11 place-items-center rounded-full border border-line bg-surface-2 text-ink transition-colors hover:border-line-strong hover:bg-surface-3 disabled:pointer-events-none disabled:opacity-35"
             >
               {busy === 'next' ? <ArrowClockwiseIcon size={16} className="animate-spin" aria-hidden="true" /> : <SkipForwardIcon size={16} weight="fill" aria-hidden="true" />}
             </button>
@@ -151,7 +159,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
                 aria-label="Open stage"
                 className="tooltip inline-flex" data-tooltip="Open stage"
               >
-                <span className="grid size-8 place-items-center rounded-full border border-transparent text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink">
+                <span className="grid size-11 place-items-center rounded-full border border-transparent text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink">
                   <ArrowsOutIcon size={17} weight="regular" aria-hidden="true" />
                 </span>
               </Link>
@@ -180,7 +188,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
             </div>
             <Link
               to={'/room/' + roomId + '/host/stage'}
-              className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-line bg-surface px-2.5 text-[0.6875rem] font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
+              className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface px-2.5 text-[0.6875rem] font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
             >
               Stage
             </Link>
@@ -193,7 +201,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
               disabled={nowPlaying === null}
               aria-label={saved ? 'Remove from favorites' : 'Save to favorites'}
               aria-pressed={saved}
-              className={['grid size-8 place-items-center rounded-full transition-colors', saved ? 'text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
+              className={['grid size-11 place-items-center rounded-full transition-colors', saved ? 'text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
             >
               <HeartIcon size={17} weight={saved ? 'fill' : 'regular'} aria-hidden="true" />
             </button>

@@ -629,14 +629,14 @@ export default function HostRoomPage() {
                 )}
                 <Link
                   to={'/room/' + roomId + '/host/party'}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
                 >
                   <ArrowsOutIcon size={14} aria-hidden="true" />
                   Party view
                 </Link>
                 <Link
                   to={'/room/' + roomId + '/host/settings'}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
+                  className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
                 >
                   <SlidersHorizontalIcon size={14} aria-hidden="true" />
                   Room settings
@@ -667,7 +667,7 @@ export default function HostRoomPage() {
                       to={link.href}
                       aria-current={isActive ? 'page' : undefined}
                       className={[
-                        'flex min-h-9 shrink-0 items-center rounded-media px-3 text-[0.6875rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
+                        'flex min-h-11 shrink-0 items-center rounded-media px-3 text-[0.6875rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
                         isActive ? 'bg-surface text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
                       ].join(' ')}
                     >

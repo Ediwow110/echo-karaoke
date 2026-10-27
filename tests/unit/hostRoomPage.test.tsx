@@ -1010,4 +1010,86 @@ describe('host room workspace', () => {
       expect.objectContaining({ name: 'playback-command', body: expect.objectContaining({ action: 'play' }) })
     );
   });
+
+  it('reports a slider seek once when it is released, not on every input event', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    const reports: Array<{ positionSeconds?: unknown }> = [];
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true, positionSeconds: 100 },
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        if (name === 'playback-report') {
+          reports.push(body as { positionSeconds?: unknown });
+          return playingRoom.playback;
+        }
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return playingRoom;
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    playerClock.state = 1;
+    playerClock.currentTime = 100;
+    playerClock.duration = 222;
+
+    renderHost(api);
+    const back = await screen.findByLabelText('Back 10 seconds');
+    await waitFor(() => expect(back).toBeEnabled());
+    const slider = screen.getByRole('slider', { name: 'Playback position' });
+
+    await act(async () => {
+      fireEvent.change(slider, { target: { value: '150' } });
+    });
+    expect(reports).toEqual([]);
+
+    await act(async () => {
+      fireEvent.pointerUp(slider);
+    });
+    await waitFor(() => expect(reports).toHaveLength(1));
+  });
+
+  it('takes the settings invite card offline when the connection drops', async () => {
+    vi.useFakeTimers();
+    let failReads = false;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'host-room-read') {
+          if (failReads) throw new Error('The room service could not be reached');
+          return liveRoom;
+        }
+        if (name === 'guest-room-read' || name === 'touch-member') {
+          return liveRoom;
+        }
+        if (name === 'youtube-popular') {
+          return { available: false, results: [], message: 'not configured' };
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+
+    renderHost(api, '/room/' + roomId + '/host/settings');
+    for (let step = 0; step < 5; step += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(0);
+      });
+    }
+    expect(screen.getByRole('button', { name: /copy join link/i })).toBeInTheDocument();
+
+    failReads = true;
+    for (let step = 0; step < 12; step += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(1000);
+      });
+    }
+
+    expect(screen.queryByRole('button', { name: /copy join link/i })).toBeNull();
+    expect(screen.getByText(/cannot verify this room while the connection is offline/i)).toBeInTheDocument();
+  });
 });

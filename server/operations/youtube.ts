@@ -383,7 +383,12 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
   }
 
   const results = mapSearchResponse(payload);
-  await writeSearchCache(cacheKey, results);
+  // An unrecognized 200 maps to an empty list; caching that would show "no
+  // matches" to every room for the next ten minutes. The popular path already
+  // refuses to cache an empty pool.
+  if (results.length > 0) {
+    await writeSearchCache(cacheKey, results);
+  }
   return jsonResponse({ available: true, results });
 }
 

@@ -142,6 +142,10 @@ export async function voteCommand(request: Request, caller: Caller): Promise<Res
     throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
   }
   const body = await readJsonObject(request);
+  // Validate the identifiers before charging the bucket: a garbage body must
+  // not cost a vote slot, and every charge should belong to a real attempt.
+  const roomId = requireRoomId(body.roomId);
+  const songId = requireSongId(body.songId);
   const limit = await callOperation('consume_rate_limit', [
     caller.userId,
     'vote',
@@ -152,11 +156,11 @@ export async function voteCommand(request: Request, caller: Caller): Promise<Res
     throw new HttpError('RATE_LIMITED', 429, 'Too many votes. Give it a moment.');
   }
   const result = await callOperation('vote_toggle', [
-    requireRoomId(body.roomId),
+    roomId,
     caller.userId,
     guestToken,
     hostToken,
-    requireSongId(body.songId),
+    songId,
   ]);
   return jsonResponse(result);
 }

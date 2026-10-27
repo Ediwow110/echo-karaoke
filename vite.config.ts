@@ -12,10 +12,10 @@ const allowedHosts = (process.env.VITE_DEV_ALLOWED_HOSTS ?? '')
   .map((host) => host.trim())
   .filter((host) => host.length > 0);
 
-// The dev server proxies /api to the local function runtime. Port 3001 belongs to
-// this machine's POS server, so it must never be the default — a stray dev request
-// would be handed to an unrelated service. Override with VITE_API_DEV_ORIGIN when
-// the API runs somewhere else.
+// The dev server proxies /api to the local function runtime. Port 3001 is
+// reserved for an unrelated local service, so it must never be the default — a
+// stray dev request would be handed to that service. Override with
+// VITE_API_DEV_ORIGIN when the API runs somewhere else.
 const apiOrigin = process.env.VITE_API_DEV_ORIGIN ?? 'http://127.0.0.1:3002';
 
 export default defineConfig({
