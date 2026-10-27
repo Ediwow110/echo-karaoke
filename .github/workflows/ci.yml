@@ -83,6 +83,11 @@ jobs:
           NEON_DATABASE_URL: ${{ steps.branch.outputs.neon_database_url }}
         run: npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
 
+      - name: Require the runtime role
+        env:
+          DATABASE_URL: ${{ steps.branch.outputs.neon_database_url }}
+        run: node scripts/require-runtime-role.mjs
+
       - name: Run the database suite
         env:
           NEON_DATABASE_URL: ${{ steps.branch.outputs.neon_database_url }}
