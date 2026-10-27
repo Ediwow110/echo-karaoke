@@ -142,6 +142,45 @@ select is(
   'true',
   'the host read marks the host own vote');
 
+-- The anonymous identity behind a host tab can be replaced (an expired cookie
+-- signs in a new anonymous user) while its host pass keeps working. Votes were
+-- read from the guest identity alone, so every vote then answered 401 while the
+-- rest of the host screen looked healthy.
+select is(
+  public.vote_toggle(
+    (select room_id from vctx),
+    '99999999-9999-9999-9999-999999999999'::text,
+    null,
+    (select host_token from vctx),
+    (select song_id from song)
+  ) ->> 'voteCount',
+  '1',
+  'the host pass takes back its own vote after the anonymous identity changed');
+
+select is(
+  public.vote_toggle(
+    (select room_id from vctx),
+    '99999999-9999-9999-9999-999999999999'::text,
+    null,
+    (select host_token from vctx),
+    (select song_id from song)
+  ) ->> 'voteCount',
+  '2',
+  'the host pass casts the vote again, so the identity replacement is no obstacle');
+
+select is(
+  (select (q -> 'votedByViewer')::text from (
+     select jsonb_array_elements(
+       (public.read_room_host(
+         (select room_id from vctx),
+         '99999999-9999-9999-9999-999999999999'::text,
+         (select host_token from vctx)
+       ) -> 'queue')
+     ) as q
+   ) s where (q ->> 'songId') = (select song_id::text from song)),
+  'true',
+  'the host read marks the vote cast under a replaced identity');
+
 
 select throws_ok(
   format('select public.vote_toggle(%L::uuid, %L::text, %L, %L::uuid)', (select room_id from vctx), '22222222-2222-2222-2222-222222222222', repeat('z', 40), (select song_id from song)),

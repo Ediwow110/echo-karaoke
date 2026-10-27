@@ -938,7 +938,7 @@ answered with the phone join screen again — the same bug, one navigation deepe
 
 ## Shipping the held work (rehearsed 2026-10-27, awaiting approval)
 
-Nineteen commits sit between the deployed `862e747` and this tree: the create-route fix, the
+Twenty-seven commits sit between the deployed `862e747` and this tree: the create-route fix, the
 navigation and party-heading honesty fixes, the songbook and queue wording fixes, voting with
 migration `0039`, the clear-queue control, and the browser gates. Nothing is pushed -- the owner
 answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
@@ -946,8 +946,8 @@ order.
 
 **Order, and why either direction is safe.**
 
-1. `supabase db push --dry-run` against `main` must list exactly `0039_vote_viewer_flag.sql`, then
-   `supabase db push`. Applying first is safe under the build that is running: `git grep room_queue
+1. `supabase db push --dry-run` against `main` must list exactly `0039_vote_viewer_flag.sql` and
+   `0040_vote_host_identity.sql`, then `supabase db push`. Applying first is safe under the build that is running: `git grep room_queue
    origin/master -- server/` returns nothing, so the deployed Function only calls
    `read_room_guest` / `read_room_host`, whose signatures `0039` preserves. The old build ignores the
    extra field on each queue row.
@@ -962,14 +962,21 @@ order.
 the build being rolled back to was proven above to tolerate its output -- and do not re-apply it
 afterwards either, since migrations here are forward-only and never edited once applied anywhere.
 
+**`0040` is safe in either order too, for a different reason.** It adds a five-argument `vote_toggle`
+that accepts a host pass and keeps the four-argument form as a delegate that passes `null`, so the
+build still serving during the migration window keeps voting while the new build sends its host pass.
+The same migration makes `read_room_host` resolve the viewer's member row by role instead of by user
+id, which is what lets a host whose anonymous identity was replaced still see its own vote marked.
+A later migration can retire the delegate once no deployed build calls it.
+
 **Already settled, so nobody re-derives it under ship pressure:** `echo_service` may execute
 `vote_toggle` and `anon` may not (measured on `main`); `members_room_user_key UNIQUE (room_id,
 user_id)` holds, which is what makes the host read's member lookup safe; the whole `0001→0039` chain
-replays from scratch locally with pgTAP 411/411.
+replays from scratch locally with pgTAP 414/414.
 
 ## Verification checklist
 
-- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, two more pin the host's own vote, and the local stack reports 411/411 with the full `0001→0039` chain replayed from scratch. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
+- [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, `0040` adds five (two of them pinning the host's own vote and its survival of an identity replacement), and the local stack reports 414/414 with the full `0001→0040` chain replayed from scratch. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
 - [x] `npm test` reports 527 passing tests on the current tree (measured 2026-10-27 at `93e08b1`).
 - [x] `npm run build` passes on the current tree.

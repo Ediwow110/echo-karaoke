@@ -88,10 +88,14 @@ export type VoteResult = { songId: string; voteCount: number; votedByViewer: boo
  * and a host tab holds both passes, so the guest one is the identity that votes.
  */
 export async function voteSong(api: EdgeApi, roomId: string, songId: string): Promise<VoteResult> {
+  // A host tab sends its host pass: the guest pass is pinned to the anonymous
+  // identity that created it, and that identity can be replaced while the host
+  // pass keeps working. A phone sends the guest pass it joined with.
+  const hostToken = loadHostToken(roomId);
   return api.invoke<VoteResult>(
     'vote-command',
     { roomId, songId },
-    { guestToken: requireGuestPass(roomId) },
+    hostToken !== null ? { hostToken } : { guestToken: requireGuestPass(roomId) },
   );
 }
 

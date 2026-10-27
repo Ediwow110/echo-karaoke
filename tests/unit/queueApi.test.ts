@@ -1,6 +1,6 @@
 import { beforeEach, describe, expect, it } from 'vitest';
 import type { EdgeApi } from '../../src/lib/edgeApi';
-import { addSong, removeSong, reorderSong } from '../../src/features/queue/queueApi';
+import { addSong, removeSong, reorderSong, voteSong } from '../../src/features/queue/queueApi';
 
 type Call = { name: string; body: Record<string, unknown>; tokens: Record<string, string> };
 
@@ -30,6 +30,31 @@ describe('queue api', () => {
     expect(calls[0].name).toBe('queue-command');
     expect(calls[0].body).toEqual({ roomId: 'room-1', action: 'add', kind: 'add', videoId: 'dQw4w9WgXcQ' });
     expect(calls[0].tokens).toEqual({ hostToken: 'host-pass' });
+  });
+
+  it('votes with the host pass so a replaced identity cannot break the host screen', async () => {
+    // The guest pass is pinned to the anonymous user that created it; that
+    // identity can be replaced while the host pass keeps working, and the vote
+    // then answered 401 with the rest of the host screen healthy.
+    localStorage.setItem('karaoke.host.room-1', 'host-pass');
+    localStorage.setItem('karaoke.guest.room-1', 'guest-pass');
+    const { api, calls } = recorder();
+
+    await voteSong(api, 'room-1', 'song-7');
+
+    expect(calls[0].name).toBe('vote-command');
+    expect(calls[0].body).toEqual({ roomId: 'room-1', songId: 'song-7' });
+    expect(calls[0].tokens).toEqual({ hostToken: 'host-pass' });
+  });
+
+  it('votes with the guest pass on a phone', async () => {
+    localStorage.setItem('karaoke.guest.room-2', 'guest-pass');
+    const { api, calls } = recorder();
+
+    await voteSong(api, 'room-2', 'song-7');
+
+    expect(calls[0].name).toBe('vote-command');
+    expect(calls[0].tokens).toEqual({ guestToken: 'guest-pass' });
   });
 
   it('uses the guest pass when this browser is a guest', async () => {

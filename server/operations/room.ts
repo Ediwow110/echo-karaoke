@@ -134,7 +134,13 @@ export async function touchMember(request: Request, caller: Caller): Promise<Res
 }
 
 export async function voteCommand(request: Request, caller: Caller): Promise<Response> {
-  const guestToken = requireTokenHeader(request, 'x-room-guest-token');
+  // Either pass identifies the voter: the guest one for a phone, the host one for
+  // a host tab, whose anonymous identity can be replaced while its host pass lives.
+  const hostToken = optionalTokenHeader(request, 'x-room-host-token');
+  const guestToken = optionalTokenHeader(request, 'x-room-guest-token');
+  if (hostToken === null && guestToken === null) {
+    throw new HttpError('UNAUTHORIZED', 401, UNAUTHORIZED_MESSAGE);
+  }
   const body = await readJsonObject(request);
   const limit = await callOperation('consume_rate_limit', [
     caller.userId,
@@ -149,6 +155,7 @@ export async function voteCommand(request: Request, caller: Caller): Promise<Res
     requireRoomId(body.roomId),
     caller.userId,
     guestToken,
+    hostToken,
     requireSongId(body.songId),
   ]);
   return jsonResponse(result);
