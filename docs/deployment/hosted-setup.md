@@ -1,16 +1,17 @@
 # Hosted Setup Runbook
 
 Date: 2026-10-24
-Status: `https://echo-karaoke-mocha.vercel.app` was verified on the 2026-10-23 tree.
-The current working tree is uncommitted and includes quota, membership, player, and
-accessibility changes; do not treat the live alias as proof of this tree. Every hosted
-value below is named, never printed.
+Status: production `https://echo-karaoke-mocha.vercel.app` serves the 2026-10-26 songbook ship
+(`862e747`). Every change committed since then is held locally, unpushed, and listed under
+"Shipping the held work"; never treat the live alias as proof of this tree. Every hosted value
+below is named, never printed.
 
-This runbook takes ECHO from the repository to a deployed, verified site. On the
-current tree, typecheck, the production build, 264 unit tests, and 6 UI Playwright
-tests pass locally. The pgTAP suite (328 assertions) and the operation integration
-suite (7 tests) pass on a disposable Neon branch. This document covers only what a
-hosted account makes possible.
+This runbook takes ECHO from the repository to a deployed, verified site. The test counts drift
+with every commit, so the verification checklist near the end carries the measured numbers and the
+commit they were measured at; do not copy a count into this paragraph. The database suites run on a
+disposable Neon branch, and the operation integration suite requires one (the serverless driver
+speaks Neon's protocol, not plain Postgres). This document covers only what a hosted account makes
+possible.
 
 ## What this procedure produces
 
