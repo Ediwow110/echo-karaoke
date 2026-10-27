@@ -31,6 +31,11 @@ import { Avatar, Button, IconButton, Logo, SongArtwork, Toast } from '../ui';
 
 type GuestTab = 'search' | 'queue' | 'songbook';
 
+// The transfer already revoked the outgoing host's pass, so until a promoted
+// guest mints theirs nobody can pause, skip, lock or end the room. Retrying on
+// the poll's own cadence keeps that window as short as the outage.
+const CLAIM_RETRY_MS = 5000;
+
 function useGuestTab(): GuestTab {
   const location = useLocation();
   return location.pathname.endsWith('/search') ? 'search' : 'queue';
@@ -117,15 +122,31 @@ export default function GuestRoomPage() {
       return;
     }
     hostPassClaimed.current = roomId;
-    void claimHostPass(api, roomId)
-      .then((claimed) => {
-        if (claimed) {
+    let cancelled = false;
+    let timer = 0;
+    const attempt = (): void => {
+      void claimHostPass(api, roomId)
+        .then((done) => {
+          if (cancelled || !done) {
+            return;
+          }
           setTookOver(true);
-        }
-      })
-      .catch(() => {
-        hostPassClaimed.current = null;
-      });
+        })
+        .catch(() => {
+          if (cancelled) {
+            return;
+          }
+          // Nothing else can re-run this effect: the poll returns the same
+          // viewer role, so its inputs never change and a single failure used
+          // to strand the room with no host pass until a full reload.
+          timer = window.setTimeout(attempt, CLAIM_RETRY_MS);
+        });
+    };
+    attempt();
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
   }, [api, roomId, viewer?.role]);
 
   useEffect(() => {

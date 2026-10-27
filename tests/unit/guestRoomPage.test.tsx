@@ -5,6 +5,7 @@ import { createElement } from 'react';
 import GuestRoomPage from '../../src/app/GuestRoomPage';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import { RoomApiError, type EdgeApi } from '../../src/lib/edgeApi';
+import { clearRoomTokens } from '../../src/features/rooms/tokenStore';
 import '@testing-library/jest-dom/vitest';
 
 const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
@@ -12,6 +13,7 @@ const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.useRealTimers();
 });
 
 function liveRoom(locked = false) {
@@ -118,6 +120,41 @@ describe('guest phone remote', () => {
     await screen.findByText(/the room queue/i);
     expect(calls.filter((n) => n === 'claim-host')).toHaveLength(1);
   });
+
+  it('keeps claiming the host pass until the room has one', async () => {
+    // The outgoing host's pass is revoked by the transfer itself, so a claim
+    // that fails leaves a room nobody can control. The four-second poll never
+    // changes this effect's inputs, so without a retry the promoted guest waits
+    // for a reload that nothing on screen ever asks for.
+    const calls: string[] = [];
+    let attempts = 0;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        calls.push(name);
+        if (name === 'claim-host') {
+          attempts += 1;
+          if (attempts === 1) {
+            throw new RoomApiError('NETWORK_ERROR', 0, 'The room service could not be reached');
+          }
+          return { roomId, memberId: 'm2', hostToken: 'c'.repeat(40) };
+        }
+        if (name === 'touch-member') return {};
+        return { ...liveRoom(), viewer: { memberId: 'm2', displayName: 'Sam', role: 'host' } };
+      }) as unknown as EdgeApi['invoke'],
+    };
+
+    // tokenStore also caches passes in module memory, which localStorage.clear
+    // in afterEach does not reach: a host pass left by an earlier test would
+    // make this guest look like a device that already claimed.
+    clearRoomTokens(roomId);
+    renderGuest(api);
+
+    await waitFor(() => {
+      expect(calls.filter((name) => name === 'claim-host').length).toBeGreaterThan(1);
+    }, { timeout: 9000 });
+    expect(await screen.findByText(/you are the host now/i)).toBeInTheDocument();
+    expect(localStorage.getItem('karaoke.host.' + roomId)).toContain('cccc');
+  }, 20000);
 
   it('announces the loading state before room data arrives', async () => {
     const pendingApi: EdgeApi = {
