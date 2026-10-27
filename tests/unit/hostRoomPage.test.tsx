@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter, Route, Routes } from 'react-router-dom';
 import HostRoomPage from '../../src/app/HostRoomPage';
@@ -18,6 +18,7 @@ import '@testing-library/jest-dom/vitest';
 const playerClock = vi.hoisted(() => ({
   currentTime: 0,
   duration: 0,
+  state: -1,
   loadCalls: 0,
   playCalls: 0,
   pauseCalls: 0,
@@ -36,7 +37,7 @@ vi.mock('../../src/features/playback/youtubeIframe', () => ({
     getDuration: () => playerClock.duration,
     setVolume: () => undefined,
     getVolume: () => 100,
-    getState: () => -1,
+    getState: () => playerClock.state,
     destroy: () => undefined,
     });
   },
@@ -47,6 +48,7 @@ const roomId = '3a1ee27f-a539-4190-9250-bdc14ff631e0';
 beforeEach(() => {
   playerClock.currentTime = 0;
   playerClock.duration = 0;
+  playerClock.state = -1;
   playerClock.loadCalls = 0;
   playerClock.playCalls = 0;
   playerClock.pauseCalls = 0;
@@ -69,6 +71,7 @@ afterEach(() => {
   cleanup();
   localStorage.clear();
   vi.unstubAllGlobals();
+  vi.useRealTimers();
 });
 
 const liveRoom = {
@@ -592,6 +595,68 @@ describe('host room workspace', () => {
     await waitFor(() => {
       expect(actions).toContain('next');
     }, { timeout: 5000 });
+  });
+
+  async function reportsFromPlayingHost(
+    state: number,
+    currentTime: number,
+    elapsedMs = 2800,
+  ): Promise<Array<{ positionSeconds?: unknown }>> {
+    // Desktop has a visible floating player while the host is on this route.
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    vi.useFakeTimers();
+    const reports: Array<{ positionSeconds?: unknown }> = [];
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true, positionSeconds: 100 },
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        if (name === 'playback-report') {
+          reports.push(body as { positionSeconds?: unknown });
+          return playingRoom.playback;
+        }
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return playingRoom;
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    playerClock.state = state;
+    playerClock.currentTime = currentTime;
+    playerClock.duration = 222;
+
+    renderHost(api);
+    // Stepped so the report timer is scheduled before the clock passes it.
+    for (let step = 0; step < Math.ceil(elapsedMs / 200); step += 1) {
+      await act(async () => {
+        await vi.advanceTimersByTimeAsync(200);
+      });
+    }
+    return reports;
+  }
+
+  it('does not report a position the video has not reached yet', async () => {
+    // YouTube publishes the duration as soon as a video is cued, well before it
+    // starts, while getCurrentTime() is still 0. The server writes a reported
+    // position unconditionally, so that 0 rewinds the room for every phone.
+    expect(await reportsFromPlayingHost(3, 0)).toEqual([]);
+  });
+
+  it('keeps reporting the real position once the video is playing', async () => {
+    const reports = await reportsFromPlayingHost(1, 102);
+    expect(reports.some((report) => report.positionSeconds === 102)).toBe(true);
+  });
+
+  it('stays quiet through a long buffering stall', async () => {
+    // The twelve-second heartbeat is the report that repeats, so a video that
+    // never starts would otherwise rewrite the position over and over.
+    expect(await reportsFromPlayingHost(3, 0, 13_000)).toEqual([]);
   });
 
   it('coalesces repeated YouTube end events into one automatic next request', async () => {

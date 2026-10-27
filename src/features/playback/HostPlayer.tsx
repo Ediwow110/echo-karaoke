@@ -28,6 +28,14 @@ type Props = {
 
 const VOLUME_KEY = 'karaoke.volume';
 const PLAYER_STATE = { unstarted: -1, ended: 0, playing: 1, paused: 2, buffering: 3, cued: 5 } as const;
+// A video that has not started yet reports a position of 0 while already
+// knowing its real duration, and the server stores whatever position it is
+// given. Outside these states the clock is not a position, so it is not reported.
+const REPORTABLE_STATES: ReadonlySet<number> = new Set<number>([
+  PLAYER_STATE.ended,
+  PLAYER_STATE.playing,
+  PLAYER_STATE.paused,
+]);
 // Karaoke videos usually end on an outro card; finishing this early keeps the
 // set moving instead of waiting out the tail.
 const EARLY_END_SECONDS = 5;
@@ -59,6 +67,14 @@ function saveVolume(volume: number): void {
   } catch {
     // The slider still works for this session.
   }
+}
+
+function reportablePosition(player: PlayerHandle): number | null {
+  if (!REPORTABLE_STATES.has(player.getState())) {
+    return null;
+  }
+  const seconds = player.getCurrentTime();
+  return Number.isFinite(seconds) && seconds >= 0 ? seconds : null;
 }
 
 export default function HostPlayer({
@@ -279,8 +295,9 @@ export default function HostPlayer({
     wasPlaying.current = isPlaying;
     if (previous && !isPlaying && videoId !== null) {
       const player = playerRef.current;
-      if (player !== null) {
-        onReportRef.current(Math.floor(player.getCurrentTime()), Math.floor(player.getDuration()), currentSongId);
+      const seconds = player === null ? null : reportablePosition(player);
+      if (player !== null && seconds !== null) {
+        onReportRef.current(Math.floor(seconds), Math.floor(player.getDuration()), currentSongId);
       }
     }
   }, [currentSongId, isPlaying, videoId]);
@@ -294,9 +311,10 @@ export default function HostPlayer({
     const early = window.setTimeout(() => {
       const player = playerRef.current;
       if (player === null) return;
+      const seconds = reportablePosition(player);
       const total = player.getDuration();
-      if (Number.isFinite(total) && total > 0) {
-        onReportRef.current(Math.floor(player.getCurrentTime()), Math.floor(total), currentSongId);
+      if (seconds !== null && total > 0) {
+        onReportRef.current(Math.floor(seconds), Math.floor(total), currentSongId);
       }
     }, 2600);
     const timer = window.setInterval(() => {
@@ -304,11 +322,11 @@ export default function HostPlayer({
       if (player === null) {
         return;
       }
-      try {
-        onReportRef.current(Math.floor(player.getCurrentTime()), Math.floor(player.getDuration()), currentSongId);
-      } catch {
-        // A player that is still loading reports on the next tick.
+      const seconds = reportablePosition(player);
+      if (seconds === null) {
+        return;
       }
+      onReportRef.current(Math.floor(seconds), Math.floor(player.getDuration()), currentSongId);
     }, 12000);
     return () => {
       window.clearTimeout(early);
