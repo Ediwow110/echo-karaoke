@@ -1,10 +1,9 @@
 # Hosted Setup Runbook
 
 Date: 2026-10-24
-Status: production `https://echo-karaoke-mocha.vercel.app` serves the 2026-10-26 songbook ship
-(`862e747`). Every change committed since then is held locally, unpushed, and listed under
-"Shipping the held work"; never treat the live alias as proof of this tree. Every hosted value
-below is named, never printed.
+Status: production `https://echo-karaoke-mocha.vercel.app` serves the 2026-10-27 ship (`6518b3f`,
+entry bundle `assets/index-CvceFMWW.js`), with migrations `0039` and `0040` applied to `main`.
+Every hosted value below is named, never printed.
 
 This runbook takes ECHO from the repository to a deployed, verified site. The test counts drift
 with every commit, so the verification checklist near the end carries the measured numbers and the
@@ -945,11 +944,10 @@ only the path changes, so the landing page and the create route are keyed separa
 keys the landing page's join-first mode followed the host to `/create`, and the create route
 answered with the phone join screen again — the same bug, one navigation deeper.
 
-## Shipping the held work (rehearsed 2026-10-27, awaiting approval)
+## Shipping the held work (shipped 2026-10-27)
 
-Every commit between the deployed `862e747` and this tree is held locally -- count them with
-`git rev-list --count origin/master..HEAD`, since a number written here is stale the moment it is
-committed. They carry: the create-route fix, the
+The 109 commits between the previously deployed `862e747` and the shipped `6518b3f` carried:
+the create-route fix, the
 navigation and party-heading honesty fixes, the songbook and queue wording fixes, voting with
 migration `0039`, the clear-queue control, the browser gates, and the two playback-position fixes that
 stop a video which has not started from rewinding the room, the stage status light that no longer
@@ -968,9 +966,13 @@ the search box that drops a failed search's banner once its text becomes a video
 banner's Retry button added that link rather than repeating a search), and the two room-lifetime
 notes that no longer promise a room outlives every closed tab (the sweep deletes it after 30 minutes
 with nobody online).
-Nothing is pushed -- the owner
-answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
-order.
+**The owner authorized this ship on 2026-10-27 and the order below was followed exactly.** The
+dry-run listed precisely the two migrations; `db push` applied them and the tracker reads `0040`.
+`git push origin HEAD:master` fast-forwarded `862e747..6518b3f`. The alias now serves
+`assets/index-CvceFMWW.js`; all 26 chunks it references contain `/create`, `Back to the room`,
+`vote-command` and `votedByViewer` beside the "Create room" / "Join the room" controls; the
+unauthenticated POSTs to `/api/catalog-page` and `/api/guest-room-read` answer 401 (not 500), the
+cron answers 401, and `npm run verify:preview` reports all checks passing.
 
 **Order, and why either direction is safe.**
 
@@ -1067,7 +1069,8 @@ reaches what production has.
 - [x] `npx vercel build --prod` completes locally with the guard satisfied, the router packaged as a
   Function, and no credential in `.vercel/output` (2026-10-26). Fails on the missing secret alone.
 - [ ] `vercel deploy --prod` builds with the guard enabled.
-- [ ] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes.
+- [x] `npm run verify:preview -- https://echo-karaoke-mocha.vercel.app` passes (2026-10-27, after
+  shipping `6518b3f`).
 - [ ] A browser host/guest flow works with a 390px guest viewport.
 - [ ] A host heartbeat survives an auth session replacement on the live site.
 - [ ] The live sign-in limit returns 429 at the cap and the room limit returns 409.
