@@ -1,7 +1,7 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
 import { HttpError, jsonResponse, mapDatabaseError } from './errors.js';
 import { readJsonObject } from './tokens.js';
-import { requireRoomId, type Caller } from './room.js';
+import { callOperation, requireRoomId, type Caller } from './room.js';
 import { requireRoomAccess } from './catalogAccess.js';
 
 // Mirrors the clamps inside karaoke_catalog_page. Number.isInteger accepts 1e15,
@@ -24,6 +24,19 @@ export async function catalogPage(request: Request, caller: Caller): Promise<Res
   const channel = typeof body.channel === 'string' ? body.channel.slice(0, 80) : '';
   const offset = boundedInteger(body.offset, 0, 0, MAX_OFFSET);
   const limit = boundedInteger(body.limit, 30, 1, MAX_LIMIT);
+
+  // The page scan is an unindexable LIKE over the whole catalog, so the shared
+  // session ceiling alone lets one member turn the songbook into a database
+  // heater. Charge a per-member window after the cheap checks.
+  const allowance = await callOperation('consume_rate_limit', [
+    caller.userId,
+    'catalog-page',
+    60,
+    60,
+  ]) as { allowed?: boolean };
+  if (allowance.allowed !== true) {
+    throw new HttpError('RATE_LIMITED', 429, 'The songbook is busy. Try again in a moment.');
+  }
 
   try {
     const call = operationCall('karaoke_catalog_page', [query, channel, offset, limit]);
