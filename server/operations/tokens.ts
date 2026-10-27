@@ -18,11 +18,16 @@ export function generateToken(): string {
   return Buffer.from(bytes).toString('base64url');
 }
 
+// Bidi overrides and zero-width marks let a name paint over the roster and the
+// queue attribution; C0/C1 controls do the same with invisible noise. The client
+// strips them, but a direct caller never goes through the client.
+const CONTROL_AND_BIDI = /[\u0000-\u001F\u007F-\u009F\u061C\u200B-\u200F\u202A-\u202E\u2066-\u2069]/g;
+
 export function normalizeDisplayName(value: unknown): string {
   if (typeof value !== 'string') {
     throw new HttpError('VALIDATION_ERROR', 400, 'A display name is required');
   }
-  const trimmed = value.trim().replace(/\s+/g, ' ');
+  const trimmed = value.replace(CONTROL_AND_BIDI, '').trim().replace(/\s+/g, ' ');
   if (trimmed.length === 0) {
     throw new HttpError('VALIDATION_ERROR', 400, 'A display name is required');
   }
@@ -53,10 +58,51 @@ export function readOptionalBoolean(value: unknown, fallback: boolean): boolean 
   return value;
 }
 
+const BODY_CHARACTER_LIMIT = 4096;
+// UTF-8 uses at most four bytes per UTF-16 code unit, so this byte ceiling can
+// never reject text that fits the character limit, while the stream is bounded
+// before the platform has buffered the whole request.
+const BODY_BYTE_LIMIT = BODY_CHARACTER_LIMIT * 4;
+
+function bodyTooLarge(): HttpError {
+  return new HttpError('VALIDATION_ERROR', 400, 'The request body is too large');
+}
+
+async function readBoundedText(request: Request): Promise<string> {
+  const body = request.body;
+  if (body === null) {
+    return '';
+  }
+  const reader = body.getReader();
+  const decoder = new TextDecoder();
+  let text = '';
+  let bytes = 0;
+  try {
+    for (;;) {
+      const { done, value } = await reader.read();
+      if (done) {
+        return text + decoder.decode();
+      }
+      bytes += value.byteLength;
+      if (bytes > BODY_BYTE_LIMIT) {
+        await reader.cancel().catch(() => undefined);
+        throw bodyTooLarge();
+      }
+      text += decoder.decode(value, { stream: true });
+    }
+  } finally {
+    reader.releaseLock();
+  }
+}
+
 export async function readJsonObject(request: Request): Promise<Record<string, unknown>> {
-  const text = await request.text();
-  if (text.length > 4096) {
-    throw new HttpError('VALIDATION_ERROR', 400, 'The request body is too large');
+  const declared = request.headers.get('content-length');
+  if (declared !== null && Number(declared) > BODY_BYTE_LIMIT) {
+    throw bodyTooLarge();
+  }
+  const text = await readBoundedText(request);
+  if (text.length > BODY_CHARACTER_LIMIT) {
+    throw bodyTooLarge();
   }
   let parsed: unknown;
   try {
