@@ -11,6 +11,7 @@ import {
   removeRoomMember,
   sendHostCommand,
   transferRoomTo,
+  type DoorAnswer,
   type HostAction,
 } from '../features/rooms/roomApi';
 import { removeSong as removeQueueSong, reorderSong as reorderQueueSong, voteSong as castVote, describeVoteError } from '../features/queue/queueApi';
@@ -46,7 +47,7 @@ export default function HostRoomPage() {
   const location = useLocation();
   const { data, error, loading, connection, restoredAt, refresh } = useRoomData(roomId, 'host');
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone: ToastTone } | null>(null);
-  const [doorBusyId, setDoorBusyId] = useState<string | null>(null);
+  const [doorPending, setDoorPending] = useState<DoorAnswer | null>(null);
   const playbackBusy = useRef(false);
   const advanceBusy = useRef(false);
   const playbackSettled = useRef<Promise<void> | null>(null);
@@ -285,7 +286,7 @@ export default function HostRoomPage() {
   const approveGuest = useCallback(async (memberId: string): Promise<void> => {
     if (doorBusy.current) return;
     doorBusy.current = true;
-    setDoorBusyId(memberId);
+    setDoorPending({ memberId, action: 'approve' });
     try {
       await approveMember(api, roomId, memberId);
       notify('They are in.');
@@ -294,14 +295,14 @@ export default function HostRoomPage() {
       notify('That guest could not be admitted.', caught instanceof Error ? caught.message : undefined, 'error');
     } finally {
       doorBusy.current = false;
-      setDoorBusyId(null);
+      setDoorPending(null);
     }
   }, [api, notify, refresh, roomId]);
 
   const rejectGuest = useCallback(async (memberId: string): Promise<void> => {
     if (doorBusy.current) return;
     doorBusy.current = true;
-    setDoorBusyId(memberId);
+    setDoorPending({ memberId, action: 'reject' });
     try {
       await rejectMember(api, roomId, memberId);
       notify('They were turned away.');
@@ -310,7 +311,7 @@ export default function HostRoomPage() {
       notify('That guest could not be turned away.', caught instanceof Error ? caught.message : undefined, 'error');
     } finally {
       doorBusy.current = false;
-      setDoorBusyId(null);
+      setDoorPending(null);
     }
   }, [api, notify, refresh, roomId]);
 
@@ -535,7 +536,7 @@ export default function HostRoomPage() {
     joinUrl,
     roster,
     door,
-    doorBusyId,
+    doorPending,
     queue,
     nowPlaying,
     upNext,

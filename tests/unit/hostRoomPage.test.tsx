@@ -328,6 +328,40 @@ describe('host room workspace', () => {
     });
   });
 
+  it('does not mark the approve control busy while a rejection is running', async () => {
+    const withDoor = {
+      ...liveRoom,
+      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
+    };
+    let release: (value: unknown) => void = () => undefined;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return withDoor;
+        }
+        if (name === 'reject-member') {
+          return new Promise((resolve) => { release = resolve; });
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Keep Waiting Guest out' }));
+
+    const approve = screen.getByRole('button', { name: 'Let Waiting Guest in' });
+    const reject = screen.getByRole('button', { name: 'Keep Waiting Guest out' });
+    await waitFor(() => {
+      expect(reject).toHaveAttribute('aria-busy', 'true');
+    });
+    expect(approve).not.toHaveAttribute('aria-busy', 'true');
+
+    release({ ok: true });
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: 'Keep Waiting Guest out' })).toBeEnabled();
+    });
+  });
+
   it('closes the door to new guests from settings', async () => {
     const { api, calls } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/settings');

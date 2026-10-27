@@ -1,6 +1,6 @@
 import { useOutletContext } from 'react-router-dom';
 import type { QueueEntry, RoomView } from '../features/rooms/useRoomData';
-import type { DoorEntry, HostAction } from '../features/rooms/roomApi';
+import type { DoorAnswer, DoorEntry, HostAction } from '../features/rooms/roomApi';
 import type { ToastTone } from '../ui';
 
 export type HostNotify = (message: string, detail?: string, tone?: ToastTone) => void;
@@ -14,7 +14,7 @@ export type HostRoomContext = {
   joinUrl: string;
   roster: NonNullable<RoomView['roster']>;
   door: DoorEntry[];
-  doorBusyId: string | null;
+  doorPending: DoorAnswer | null;
   queue: QueueEntry[];
   nowPlaying: QueueEntry | null;
   upNext: QueueEntry[];

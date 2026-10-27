@@ -224,6 +224,9 @@ export async function removeRoomMember(
   await api.invoke('host-remove-member', { roomId, memberId }, { hostToken });
 }
 
+/** Which door answer is in flight, so the row marks the control actually running. */
+export type DoorAnswer = { memberId: string; action: 'approve' | 'reject' };
+
 export type DoorEntry = { memberId: string; displayName: string; online: boolean; joinedAt: string };
 
 export async function approveMember(api: EdgeApi, roomId: string, memberId: string): Promise<{ door: DoorEntry[] }> {

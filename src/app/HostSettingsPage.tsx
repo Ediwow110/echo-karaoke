@@ -24,7 +24,7 @@ export default function HostSettingsPage() {
     joinUrl,
     roster,
     door,
-    doorBusyId,
+    doorPending,
     room,
     connection,
     notify,
@@ -205,7 +205,7 @@ export default function HostSettingsPage() {
               </span>
             </div>
             <div className="mt-4">
-              <DoorList door={door} busyId={doorBusyId} onApprove={approveGuest} onReject={rejectGuest} />
+              <DoorList door={door} pending={doorPending} onApprove={approveGuest} onReject={rejectGuest} />
             </div>
           </section>
 
