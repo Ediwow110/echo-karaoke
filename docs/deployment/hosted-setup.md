@@ -958,8 +958,9 @@ handover dialog that stays open when a transfer fails, the songbook that no long
 catalog for a failed search, the refused start that no longer jumps to a silent party view, and the
 songbook refresh that no longer blames a channel for a spent daily budget, the search fallback that
 keeps the reason it was asked, two error screens whose copy now says only what is true whatever
-the cause, and the per-network sign-in budget that now keys on the platform's own forwarded header
-rather than one a proxy in front of the deployment can overwrite.
+the cause, the per-network sign-in budget that now keys on the platform's own forwarded header
+rather than one a proxy in front of the deployment can overwrite, and the songbook title decode that no
+longer unescapes an entity twice.
 Nothing is pushed -- the owner
 answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
 order.
@@ -1019,7 +1020,7 @@ reaches what production has.
   contains the old 55420–55429 range, so `supabase start` could no longer bind them. `supabase/config.toml`
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
-- [x] `npm test` reports 551 passing tests on the current tree (measured 2026-10-27 at `0767a12`).
+- [x] `npm test` reports 552 passing tests on the current tree (measured 2026-10-27 at `49cb2d3`).
 - [x] CI itself is healthy before relying on it: `gh run list` on 2026-10-27 shows the last five runs on
   `master` all concluded `success` (latest `2026-10-26T03:41Z`), so the push runs against a working
   workflow rather than inheriting a broken pipeline.
