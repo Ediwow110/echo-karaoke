@@ -946,7 +946,9 @@ answered with the phone join screen again — the same bug, one navigation deepe
 
 ## Shipping the held work (rehearsed 2026-10-27, awaiting approval)
 
-Thirty-two commits sit between the deployed `862e747` and this tree: the create-route fix, the
+Every commit between the deployed `862e747` and this tree is held locally -- count them with
+`git rev-list --count origin/master..HEAD`, since a number written here is stale the moment it is
+committed. They carry: the create-route fix, the
 navigation and party-heading honesty fixes, the songbook and queue wording fixes, voting with
 migration `0039`, the clear-queue control, the browser gates, and the two playback-position fixes that
 stop a video which has not started from rewinding the room. Nothing is pushed -- the owner
