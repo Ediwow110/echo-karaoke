@@ -1020,6 +1020,10 @@ reaches what production has.
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
 - [x] `npm test` reports 551 passing tests on the current tree (measured 2026-10-27 at `0767a12`).
+- [x] `npm audit --audit-level=high` reports 0 vulnerabilities (measured 2026-10-27), and
+  `package.json`/`package-lock.json` are unchanged since the deployed `862e747`, so the `verify` job's
+  audit step and the lockfile are both already validated. The `ui` job's command is the mocked-UI suite
+  above; the `database` and `integration` jobs need the Neon branch and run in CI only.
 - [x] No credential-bearing file is tracked. **Verified 2026-10-27:** `git ls-files` shows only
   `.env.example`; `.gitignore` covers `.env`, `.env.*` and `.neon`; and a `git grep` for
   `postgres://user:pass@` across tracked files returns only placeholder fixtures on `.example` hosts
