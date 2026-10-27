@@ -139,12 +139,18 @@ async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', join
     else if (op === 'youtube-search') payload = { available: true, results: [{ videoId: 'vid000000001', title: 'Halo (Karaoke)', channelTitle: 'MC', thumbnailUrl: null, durationSeconds: null }] };
     await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload) });
   });
-  await page.addInitScript(([roomId, code]) => {
+  await page.addInitScript(([roomId, code, role]) => {
     localStorage.setItem('karaoke.sessions', JSON.stringify([{ roomId, code, roomName: 'Mock Night', hostName: 'Ana', role: 'host', lastSeenAt: new Date().toISOString() }]));
     localStorage.setItem('karaoke.last-room', JSON.stringify({ roomId, role: 'host' }));
-    localStorage.setItem('karaoke.host.' + roomId, 'z'.repeat(43));
-    localStorage.setItem('karaoke.guest.' + roomId, 'z'.repeat(43));
-  }, [ROOM, CODE]);
+    // Only the pass this role would really hold. sendQueueCommand prefers the
+    // host token when both are present, so seeding both made a guest-refusal
+    // test exercise the host credential instead.
+    if (role === 'host') {
+      localStorage.setItem('karaoke.host.' + roomId, 'z'.repeat(43));
+    } else {
+      localStorage.setItem('karaoke.guest.' + roomId, 'z'.repeat(43));
+    }
+  }, [ROOM, CODE, role]);
 }
 
 test('the host admits a waiting guest from room settings and the door clears', async ({ page }) => {

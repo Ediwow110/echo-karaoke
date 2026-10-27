@@ -77,6 +77,7 @@ async function mockApi(
   failHost: () => boolean = () => false,
   popularResults: unknown[] | null = null,
   catalogQueries: string[] = [],
+  syncs: number[] = [],
 ): Promise<void> {
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
@@ -93,6 +94,10 @@ async function mockApi(
       body = popularResults === null
         ? { available: false, results: [], message: 'off' }
         : { available: true, results: popularResults };
+    }
+    else if (path.endsWith('/api/catalog-sync')) {
+      syncs.push(Date.now());
+      body = { available: true, added: 0, skipped: 4 };
     }
     else if (path.endsWith('/api/catalog-page')) {
       const query = (route.request().postDataJSON() as { query?: string }).query ?? '';
@@ -167,12 +172,16 @@ test('host player uses a visible minimum-sized desktop frame and parks it on mob
 });
 
 test('host can refresh a populated songbook without losing existing songs', async ({ page }) => {
-  await mockApi(page);
+  const syncs: number[] = [];
+  await mockApi(page, true, [], () => false, null, [], syncs);
   await page.goto('/room/' + ROOM + '/host/songbook', { waitUntil: 'networkidle' });
   await expect(page.getByText('Halo - Beyonce (Karaoke)')).toBeVisible();
   const refresh = page.getByRole('button', { name: 'Refresh the songbook' });
   await expect(refresh).toBeVisible();
   await refresh.click();
+  // Without this the test passed on a click that did nothing: the row and the
+  // button look the same whether or not a sync was ever sent.
+  await expect.poll(() => syncs.length, 'the refresh never reached the server').toBeGreaterThan(0);
   await expect(page.getByText('Halo - Beyonce (Karaoke)')).toBeVisible();
   await expect(refresh).toBeEnabled();
 });

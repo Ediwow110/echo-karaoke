@@ -116,6 +116,33 @@ select is(
   'false',
   'the host read carries the host view, not the guest who voted');
 
+-- The host votes through the guest pass its browser holds. Without this case a
+-- mutation that always answers false for the host would pass every assertion
+-- above, because only the negative was pinned.
+select is(
+  public.vote_toggle(
+    (select room_id from vctx),
+    '11111111-1111-1111-1111-111111111111'::text,
+    (select host_guest_token from vctx),
+    (select song_id from song)
+  ) ->> 'voteCount',
+  '2',
+  'the host can second a song with the guest pass its browser holds');
+
+select is(
+  (select (q -> 'votedByViewer')::text from (
+     select jsonb_array_elements(
+       (public.read_room_host(
+         (select room_id from vctx),
+         '11111111-1111-1111-1111-111111111111'::text,
+         (select host_token from vctx)
+       ) -> 'queue')
+     ) as q
+   ) s where (q ->> 'songId') = (select song_id::text from song)),
+  'true',
+  'the host read marks the host own vote');
+
+
 select throws_ok(
   format('select public.vote_toggle(%L::uuid, %L::text, %L, %L::uuid)', (select room_id from vctx), '22222222-2222-2222-2222-222222222222', repeat('z', 40), (select song_id from song)),
   '28000', 'UNAUTHORIZED',
