@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:5173';
+const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000';
 
 // Capture the ECHO look for review.
 test('capture screens', async ({ browser }) => {
