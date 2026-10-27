@@ -223,7 +223,10 @@ async function localSearchOrUnavailable(query: string, message: string): Promise
   if (results.length > 0) {
     return jsonResponse({
       available: true, results, source: 'songbook',
-      message: 'YouTube search is unavailable. Showing recent songbook entries instead.',
+      // The caller's message is the actual reason this fallback is answering --
+      // a spent room or daily budget, a missing key, an outage. Hard-coding
+      // "YouTube search is unavailable" named a cause for all of them.
+      message: message + ' Showing recent songbook entries instead.',
     });
   }
   return jsonResponse({ available: false, results: [], message });

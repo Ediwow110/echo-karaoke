@@ -64,6 +64,20 @@ describe('quota-safe local songbook search', () => {
     await expect(youtubeSearch(request(), caller)).rejects.toMatchObject({ status: 500 });
   });
 
+  it('names the room limit, not a YouTube outage, when the songbook answers instead', async () => {
+    // The fallback is right; the reason was not. A room that had spent its
+    // daily searches was told YouTube was unavailable -- a cause nothing
+    // established, and one the room would believe until tomorrow.
+    vi.stubEnv('YOUTUBE_API_KEY', 'test-key');
+
+    const response = await youtubeSearch(request(), caller);
+    const body = await response.json() as { available: boolean; source?: string; message?: string };
+
+    expect(body.source).toBe('songbook');
+    expect(body.message).toContain('search limit for today');
+    expect(body.message ?? '').not.toContain('YouTube search is unavailable');
+  });
+
   it('still answers unavailable when the catalog function has not been migrated yet', async () => {
     // SQLSTATE 42883 is the one state that is genuinely a staged rollout.
     state.catalogError = { code: '42883', message: 'function public.karaoke_catalog_page(...) does not exist' };
