@@ -27,12 +27,14 @@ const THROTTLE_MS = 6 * 60 * 60 * 1000;
 export const TIME_BUDGET_MS = 8000;
 
 function decodeEntities(value: string): string {
+  // &amp; goes last: decoding it first turns a title that literally contains
+  // "&amp;quot;" into a quote and silently changes the song's name.
   return value
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
 function paragraph(value: unknown, limit: number): string | null {

@@ -71,6 +71,27 @@ describe('catalog sync helpers', () => {
     expect(mapPlaylistItems(payload)).toHaveLength(1);
   });
 
+  it('decodes an escaped entity once, not twice', () => {
+    // A title that literally contains "&quot;" arrives double-escaped. Decoding
+    // &amp; first turns it into a quote, changing the song's name.
+    const payload = {
+      items: [{
+        contentDetails: { videoId: 'aaaaaaaaaaa' },
+        snippet: {
+          title: 'A &amp;quot; B &amp; C',
+          channelTitle: 'C &amp; D',
+          publishedAt: '2025-01-02T00:00:00Z',
+          thumbnails: {},
+        },
+      }],
+    };
+
+    const [row] = mapPlaylistItems(payload);
+
+    expect(row.title).toBe('A &quot; B & C');
+    expect(row.channelTitle).toBe('C & D');
+  });
+
   it('uses the high thumbnail when medium holds a non-string url', () => {
     const rows = mapPlaylistItems({
       items: [
