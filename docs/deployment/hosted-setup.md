@@ -998,7 +998,7 @@ replays from scratch locally with pgTAP 414/414.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
 - [x] `npm test` reports 550 passing tests on the current tree (measured 2026-10-27 at `24bd328`).
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 45 passing tests on the current tree (measured 2026-10-27 at `508798d`; the suite is two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`).
+- [x] `npm run test:e2e:ui` reports 45 passing tests on the current tree (measured 2026-10-27 at `6a0f287`; the suite is two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`).
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is
