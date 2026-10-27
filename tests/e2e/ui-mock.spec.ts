@@ -259,6 +259,42 @@ test('a buffering video never reports a position the room has not reached', asyn
   expect(reports.filter((report) => report.positionSeconds === 0)).toEqual([]);
 });
 
+test('a seek on a player that never started is still reported when it can land', async ({ page }) => {
+  // The control for the gate below: a ready player confirms the seek and the
+  // room must hear about it, so an empty result there means the guard worked.
+  await mockApi(page);
+  await stubYouTube(page, 1, 100);
+  const reports = await collectReports(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+  const back = page.getByRole('button', { name: 'Back 10 seconds' }).first();
+  await expect(back).toBeEnabled();
+  await back.click();
+
+  await expect.poll(
+    () => reports.filter((report) => report.positionSeconds === 90).length,
+    { timeout: 6000 },
+  ).toBeGreaterThan(0);
+});
+
+test('a seek the player cannot confirm is never reported', async ({ page }) => {
+  // A player that never handed over its controls drops the seek, so reporting
+  // one would move every phone to a place this video never reached.
+  await mockApi(page);
+  await stubYouTube(page, -1, 100);
+  const reports = await collectReports(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+  const back = page.getByRole('button', { name: 'Back 10 seconds' }).first();
+  await expect(back).toBeEnabled();
+  await back.click();
+  await page.waitForTimeout(1000);
+
+  expect(reports.filter((report) => report.positionSeconds === 90)).toEqual([]);
+});
+
 test('a promoted guest keeps claiming the host pass until it lands', async ({ page }) => {
   // The transfer revokes the outgoing host's pass, so a claim that fails once
   // leaves the room with no host pass at all. The poll never changes this
