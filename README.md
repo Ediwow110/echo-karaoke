@@ -91,11 +91,11 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 447 unit and component tests (jsdom)
+    npm test                 # 587 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 328 pgTAP assertions
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 440 pgTAP assertions
     npm run test:integration # 8 router/auth/operation tests against a Neon branch
-    npm run test:e2e:ui      # 16 CI-safe Playwright UI flows with a mocked API
+    npm run test:e2e:ui      # 57 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows against vercel dev on port 3000
 
 `vercel dev` reads `.env.local`, whose database URLs name production Neon, so `npm run test:e2e` with no `E2E_BASE_URL` creates real rooms in production. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
@@ -122,7 +122,7 @@ The UI suite needs no database or YouTube key. The real E2E suite creates rooms 
 
     api/router.ts           the only Vercel Function: auth routes and operations
     server/auth             Better Auth configuration, token verification, JWKS
-    server/operations       the fourteen operations, the sweep, error mapping
+    server/operations       the twenty-two operations, the sweep, error mapping
     server/db               Neon serverless client and operation calls
     src/app                 screens and routing
     src/features/rooms      create, join, passes, roster, sessions, invitations

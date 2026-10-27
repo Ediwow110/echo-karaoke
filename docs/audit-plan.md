@@ -1,6 +1,6 @@
 # Production-Readiness Audit — Task Tracker
 
-Repository: G:\Vscode\online-karaoke
+Repository: this checkout (public: github.com/Ediwow110/echo-karaoke)
 Auditor: OpenCode (senior architect / security / staff FE / BE / DB / QA / DevOps / UX)
 Status: IN PROGRESS
 Base commit: 025b4ec (branch master, pushed to https://github.com/Ediwow110/echo-karaoke)

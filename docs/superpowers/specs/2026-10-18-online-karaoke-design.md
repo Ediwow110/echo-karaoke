@@ -3,6 +3,12 @@
 Date: 2026-10-18
 Status: Draft for review
 
+> **Superseded 2026-10-23.** This document is the original design and still
+> describes Supabase Edge Functions with Realtime/Presence sync. The shipped
+> product replaced both: one Vercel Function (`api/router.ts`) behind Better
+> Auth plus room capability passes, with polling against Neon Postgres. See
+> `README.md` for the current contract. Kept for history.
+
 ## 1. Purpose
 
 A login-free, private online karaoke app powered by YouTube. A host opens a room on a
