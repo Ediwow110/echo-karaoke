@@ -10,6 +10,16 @@ const WINDOW_SECONDS = 3600;
 type LimitResult = { allowed?: unknown; retryAfterSeconds?: unknown };
 
 export function clientIp(request: Request): string {
+  // Vercel sets x-vercel-forwarded-for itself. The plain x-forwarded-for is
+  // documented as overwritable by a proxy in front of the deployment, and this
+  // value is the key the per-network sign-in budget counts against.
+  const platform = request.headers.get('x-vercel-forwarded-for');
+  if (platform !== null) {
+    const first = platform.split(',')[0]?.trim();
+    if (first !== undefined && first.length > 0) {
+      return first.slice(0, 64);
+    }
+  }
   const forwarded = request.headers.get('x-forwarded-for');
   if (forwarded !== null) {
     const first = forwarded.split(',')[0]?.trim();

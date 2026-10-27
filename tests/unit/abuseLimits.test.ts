@@ -36,6 +36,21 @@ describe('abuse limits', () => {
     expect(clientIp(missing)).toBe('unknown');
   });
 
+  it('prefers the platform header a proxy cannot overwrite', () => {
+    // Vercel sets x-vercel-forwarded-for itself, while the plain
+    // x-forwarded-for can be overwritten by a proxy in front of the deployment
+    // -- trusting that one would let a caller choose the key this limiter
+    // counts against, and the sign-in budget is per network.
+    const request = new Request('https://app.example/api/auth/sign-in/anonymous', {
+      headers: {
+        'x-vercel-forwarded-for': '192.0.2.10',
+        'x-forwarded-for': '203.0.113.5',
+      },
+    });
+
+    expect(clientIp(request)).toBe('192.0.2.10');
+  });
+
   it('accepts the app origins and refuses a cross-site sign-in', () => {
     const env = {
       BETTER_AUTH_URL: 'https://echo.example',
