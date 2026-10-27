@@ -959,8 +959,9 @@ catalog for a failed search, the refused start that no longer jumps to a silent 
 songbook refresh that no longer blames a channel for a spent daily budget, the search fallback that
 keeps the reason it was asked, two error screens whose copy now says only what is true whatever
 the cause, the per-network sign-in budget that now keys on the platform's own forwarded header
-rather than one a proxy in front of the deployment can overwrite, and the songbook title decode that no
-longer unescapes an entity twice.
+rather than one a proxy in front of the deployment can overwrite, the songbook title decode that no
+longer unescapes an entity twice, and the search results that now decode channel titles exactly as the
+songbook walk does.
 Nothing is pushed -- the owner
 answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
 order.
@@ -1022,7 +1023,7 @@ reaches what production has.
   contains the old 55420–55429 range, so `supabase start` could no longer bind them. `supabase/config.toml`
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
-- [x] `npm test` reports 556 passing tests on the current tree (measured 2026-10-27 at `832a17f`).
+- [x] `npm test` reports 557 passing tests on the current tree (measured 2026-10-27 at `d582c02`).
 - [x] Every heartbeat is pinned inside the presence window: `tests/unit/presenceWindow.test.ts` parses
   the 30-second window from the newest migration that projects `online`, with a control that the parse
   found it, and requires the visible, hidden and host heartbeats to be shorter. Slowing one past the
