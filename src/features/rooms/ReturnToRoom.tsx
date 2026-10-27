@@ -15,7 +15,7 @@ export default function ReturnToRoom({ room, className }: { room: RoomSession | 
       Still hosting <span className="font-semibold text-ink">{room.roomName}</span>?{' '}
       <Link
         to={'/room/' + room.roomId + '/host'}
-        className="font-semibold text-signal hover:underline"
+        className="inline-flex min-h-11 items-center font-semibold text-signal hover:underline"
       >
         Back to the room
       </Link>

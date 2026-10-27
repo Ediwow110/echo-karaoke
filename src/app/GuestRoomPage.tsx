@@ -48,7 +48,7 @@ export default function GuestRoomPage() {
   const songbook = location.pathname.endsWith('/songbook');
   const navTab: GuestTab | null = songbook ? 'songbook' : tab;
   const { data, error, loading, connection, restoredAt, lastLiveAt, refresh } = useRoomData(roomId, 'guest');
-  const [toast, setToast] = useState<{ id: number; message: string; detail?: string } | null>(null);
+  const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone?: 'success' | 'info' | 'error' } | null>(null);
   const [playbackError, setPlaybackError] = useState<string | null>(null);
   const [playbackBusy, setPlaybackBusy] = useState(false);
   const [retrying, setRetrying] = useState(false);
@@ -155,7 +155,7 @@ export default function GuestRoomPage() {
       await voteSong(api, roomId, songId);
       await refresh();
     } catch (caught) {
-      setToast({ id: Date.now(), message: 'That vote could not be counted.', detail: describeVoteError(caught) });
+      setToast({ id: Date.now(), message: 'That vote could not be counted.', detail: describeVoteError(caught), tone: 'error' });
     } finally {
       setVotingSongId(null);
     }
@@ -588,6 +588,7 @@ export default function GuestRoomPage() {
                 listId={QUEUE_ELEMENT_ID}
                 viewerMemberId={viewer?.memberId}
                 onVote={(songId) => { void secondSong(songId); }}
+                voteLocked={locked}
                 votingSongId={votingSongId}
                 emptyTitle="The queue is waiting."
                 emptyDescription="Be the one who picks the next song."
@@ -606,7 +607,7 @@ export default function GuestRoomPage() {
             key={toast.id}
             message={toast.message}
             detail={toast.detail}
-            tone="success"
+            tone={toast.tone ?? 'success'}
             onDismiss={() => setToast(null)}
           />
         </div>

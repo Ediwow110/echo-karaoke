@@ -16,6 +16,7 @@ type UpNextListProps = {
   onRemove?: (songId: string) => void;
   onReorder?: (songId: string, direction: 'up' | 'down') => void;
   onVote?: (songId: string) => void;
+  voteLocked?: boolean;
   votingSongId?: string | null;
   busySongId?: string | null;
   emptyTitle?: string;
@@ -41,9 +42,10 @@ function stagger(index: number): { animationDelay: string } {
  * read rather than from the click, so a vote a member cast on another device
  * shows here too.
  */
-function VoteButton({ song, busy, onVote, compact = false }: {
+function VoteButton({ song, busy, locked, onVote, compact = false }: {
   song: QueueEntry;
   busy: boolean;
+  locked: boolean;
   onVote: (songId: string) => void;
   compact?: boolean;
 }) {
@@ -52,9 +54,10 @@ function VoteButton({ song, busy, onVote, compact = false }: {
     <button
       type="button"
       onClick={() => onVote(song.songId)}
-      disabled={busy}
+      disabled={busy || locked}
       aria-pressed={voted}
-      aria-label={(voted ? 'Take back your vote for ' : 'Second ') + song.title}
+      aria-label={(voted ? 'Take back your vote for ' : 'Second ') + song.title
+        + ', ' + song.voteCount + (song.voteCount === 1 ? ' vote' : ' votes')}
       className={[
         'flex shrink-0 items-center gap-1 rounded-full border transition-[background-color,border-color,color,transform,scale] active:scale-95',
         compact ? 'min-h-8 px-2 text-[0.625rem]' : 'min-h-11 px-3 text-[0.6875rem]',
@@ -75,6 +78,7 @@ export function UpNextList({
   onRemove,
   onReorder,
   onVote,
+  voteLocked = false,
   votingSongId = null,
   busySongId = null,
   emptyTitle = 'Nothing in the queue yet.',
@@ -175,7 +179,7 @@ export function UpNextList({
                 </div>
               )}
               {onVote === undefined ? null : (
-                <VoteButton song={song} busy={busy || votingSongId !== null} onVote={onVote} compact />
+                <VoteButton song={song} busy={busy || votingSongId !== null} locked={false} onVote={onVote} compact />
               )}
               {onRemove === undefined ? null : (
                 <button
@@ -220,7 +224,7 @@ export function UpNextList({
               ) : null}
             </div>
             {onVote === undefined ? null : (
-              <VoteButton song={song} busy={votingSongId !== null} onVote={onVote} />
+              <VoteButton song={song} busy={votingSongId !== null} locked={voteLocked} onVote={onVote} />
             )}
           </li>
         );

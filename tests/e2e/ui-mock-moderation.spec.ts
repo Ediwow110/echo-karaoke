@@ -79,7 +79,9 @@ async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', join
       // The server's own words for this code, which is not the app's voice.
       const serverMessage = refusal.code === 'GUEST_CONTROLS_LOCKED'
         ? 'The host locked guest controls'
-        : 'That song is already in the queue';
+        : refusal.code === 'RATE_LIMITED'
+          ? 'Too many votes. Give it a moment.'
+          : 'That song is already in the queue';
       await route.fulfill({ status: refusal.status, contentType: 'application/json', body: JSON.stringify({ error: { code: refusal.code, message: serverMessage } }) });
       return;
     }
@@ -288,6 +290,9 @@ test('a guest can second a song and the row remembers it', async ({ page }) => {
   await expect(second).toBeVisible();
   await expect(second).toHaveAttribute('aria-pressed', 'false');
   await expect(second).toHaveText('2');
+  // The label overrides the contents, so the count has to be in it or a screen
+  // reader never hears the number a sighted guest sees.
+  await expect(second).toHaveAccessibleName('Second Midnight City, 2 votes');
 
   await second.click();
 
@@ -362,6 +367,34 @@ test('the host can clear the queue from the queue page', async ({ page }) => {
 
   await expect.poll(() => scenario.hostActions).toContain('clear_queue');
   await expect(dialog).toBeHidden();
+});
+
+// Counting a vote is a request; a failed one landed in a toast hard-wired to
+// the success tone, so a refusal was announced with a green tick.
+test('a refused vote is announced as an error, not a success', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'guest', 'joined', { op: 'vote-command', status: 429, code: 'RATE_LIMITED' });
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+
+  await page.getByRole('button', { name: 'Second Midnight City' }).click();
+  const alert = page.getByRole('alert');
+  await expect(alert).toBeVisible();
+  await expect(alert).toContainText('That vote could not be counted.');
+  await expect(alert).toContainText('That is a lot of votes at once');
+});
+
+// The server refuses a locked guest's vote outright, so an enabled control is a
+// button that can only fail.
+test('a locked room does not offer an enabled vote', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, locked: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'guest');
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+
+  const vote = page.getByRole('button', { name: /Second Midnight City/ });
+  await expect(vote).toBeVisible();
+  await expect(vote).toBeDisabled();
 });
 
 const GUEST_SCREENS = [
