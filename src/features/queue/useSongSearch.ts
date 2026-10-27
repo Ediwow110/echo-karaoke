@@ -137,6 +137,10 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       setLoading(false);
       setSearched(false);
       setResults([]);
+      // A link is not a search: leaving the last search's failure or fallback
+      // note up would claim an outage beside an add that works.
+      setError(null);
+      setMessage(null);
       return;
     }
     requestId.current += 1;

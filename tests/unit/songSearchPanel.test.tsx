@@ -180,4 +180,27 @@ describe('song search panel', () => {
     expect(screen.getByRole('button', { name: 'Retry' })).toBeInTheDocument();
     expect(screen.queryByLabelText(/paste a youtube link/i)).not.toBeInTheDocument();
   });
+
+  it('drops a stale search failure once the box holds a video link', async () => {
+    // A pasted link turns the box into "add this video". Leaving the failed
+    // search's banner up claims an outage beside a working action, and its
+    // Retry button would add the link rather than repeat a search.
+    const api: EdgeApi = {
+      invoke: (async () => {
+        throw new RoomApiError('NETWORK_ERROR', 0, 'Network failed');
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderPanel(api);
+    await search();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('YouTube search is unreachable right now. Try again.');
+
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), {
+      target: { value: 'https://youtu.be/dQw4w9WgXcQ' },
+    });
+
+    await waitFor(() => {
+      expect(screen.queryByRole('alert')).not.toBeInTheDocument();
+    });
+  });
 });
