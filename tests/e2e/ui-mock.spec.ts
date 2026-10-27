@@ -191,6 +191,35 @@ test('a refused start leaves the host on the page that can retry it', async ({ p
   await expect(page.getByText('kara-echo song search')).toBeVisible();
 });
 
+test('the stage says Ready on an idle room, never Autoplay on', async ({ page }) => {
+  // The dot and its words used to share a catch-all that promised live
+  // autoplay whenever nothing was wrong -- so an empty stage claimed playback
+  // was running. "Ready" is the claim the data supports.
+  await mockApi(page);
+  const idle = {
+    ...room(false),
+    queue: [],
+    playback: {
+      currentSongId: null,
+      currentVideoId: null,
+      positionSeconds: 0,
+      durationSeconds: null,
+      isPlaying: false,
+      updatedAt: null,
+    },
+  };
+  await page.route('**/api/host-room-read', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(idle) });
+  });
+  // The status pill lives in the transport row, which is hidden below sm.
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+
+  await expect(page.getByText('Ready', { exact: true })).toBeVisible();
+  await expect(page.getByText('Autoplay on')).toHaveCount(0);
+});
+
 test('a failed handover keeps the confirmation open', async ({ page }) => {
   // transferRoom swallows its own error, so the dialog must be closed by the
   // reported outcome rather than by the await returning. Closing it anyway
