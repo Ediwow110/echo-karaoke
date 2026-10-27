@@ -19,7 +19,7 @@ type Props = {
   roomId: string;
   nowPlaying: QueueEntry | null;
   playback: PlaybackState | undefined;
-  onTogglePlay: () => Promise<void>;
+  onTogglePlay: () => Promise<unknown>;
   onNext: () => Promise<unknown>;
 };
 

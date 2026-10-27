@@ -219,8 +219,8 @@ export default function HostRoomPage() {
     return runManualNext();
   }, [runManualNext, runPlayback]);
 
-  const togglePlay = useCallback(async (): Promise<void> => {
-    await runPlayback(data?.playback?.isPlaying === true ? 'pause' : 'play');
+  const togglePlay = useCallback((): Promise<boolean> => {
+    return runPlayback(data?.playback?.isPlaying === true ? 'pause' : 'play');
   }, [data?.playback?.isPlaying, runPlayback]);
 
   const runHost = useCallback(async (action: HostAction): Promise<boolean> => {
@@ -455,8 +455,13 @@ export default function HostRoomPage() {
     lastAutoPlayKey.current = key;
     // A guest's first request should take the host screen straight into party
     // view; the manual "Take the stage" button is only a fallback.
-    void runPlayback('play');
-    openPartyView();
+    void runPlayback('play').then((started) => {
+      // Party view is where the host watches the video this command starts, so
+      // a refused play must leave them on the page that can retry it.
+      if (started) {
+        openPartyView();
+      }
+    });
   }, [openPartyView, live, data?.playback, queue, runPlayback]);
 
   if (loading) {

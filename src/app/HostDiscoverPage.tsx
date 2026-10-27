@@ -55,8 +55,11 @@ export default function HostDiscoverPage() {
     if (upNext.length > 0) {
       setStarting(true);
       try {
-        await togglePlay();
-        navigate(stageHref);
+        // The stage is where the host goes to watch the video this starts, so
+        // only go there once the room says playback actually began.
+        if (await togglePlay()) {
+          navigate(stageHref);
+        }
       } finally {
         setStarting(false);
       }

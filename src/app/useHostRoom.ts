@@ -23,7 +23,7 @@ export type HostRoomContext = {
   notify: HostNotify;
   refresh: () => Promise<void>;
   runHost: (action: HostAction) => Promise<boolean>;
-  togglePlay: () => Promise<void>;
+  togglePlay: () => Promise<boolean>;
   next: () => Promise<boolean>;
   removeSong: (songId: string) => Promise<void>;
   reorderSong: (songId: string, direction: 'up' | 'down') => Promise<void>;

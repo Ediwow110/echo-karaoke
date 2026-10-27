@@ -816,6 +816,34 @@ describe('host room workspace', () => {
     expect(await screen.findByText('Guest remote')).toBeInTheDocument();
   });
 
+  it('stays on the search screen when starting the session fails', async () => {
+    // "Start the session" is a promise that playback began: the stage is where
+    // the host goes to watch it. Navigating there after a refused command puts
+    // them in front of a silent video with nothing to retry.
+    const stoppedRoom = {
+      ...liveRoom,
+      playback: { currentSongId: null, positionSeconds: 0, isPlaying: false, updatedAt: null },
+      queue: [{ ...liveRoom.queue[0], status: 'queued' }],
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'playback-command') {
+          throw new Error('The room service could not be reached');
+        }
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return stoppedRoom;
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+
+    renderHost(api);
+    fireEvent.click(await screen.findByRole('button', { name: /start the session/i }));
+
+    await waitFor(() => expect(screen.getByText('Playback did not change.')).toBeInTheDocument());
+    expect(screen.getByText('kara-echo song search')).toBeInTheDocument();
+  });
+
   it('coalesces repeated YouTube end events into one automatic next request', async () => {
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
       matches: query.includes('min-width: 1024px'),
