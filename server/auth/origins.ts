@@ -38,8 +38,15 @@ export function resolveTrustedOrigins(
     }
   }
   for (const value of (env.ALLOWED_ORIGINS ?? '').split(',')) {
-    const origin = value.trim();
-    if (origin.length > 0) {
+    const trimmed = value.trim();
+    if (trimmed.length === 0 || trimmed.includes('*')) {
+      continue;
+    }
+    // The build-time guard is not the runtime contract: a hand-set value can
+    // carry a path, a trailing slash, or a scheme-less host. Reduce every entry
+    // to the origin the browser will actually send.
+    const origin = originFrom(trimmed);
+    if (origin !== null) {
       origins.add(origin);
     }
   }
