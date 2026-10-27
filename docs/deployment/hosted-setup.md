@@ -1001,8 +1001,11 @@ replays from scratch locally with pgTAP 414/414.
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, `0040` adds five (two of them pinning the host's own vote and its survival of an identity replacement), and the local stack reports 414/414 with the full `0001→0040` chain replayed from scratch. **Source-reconciled 2026-10-27:** the test files contain exactly 414 assertion calls — 201 `is`, 82 `throws_ok`, 45 `lives_ok`, 38 `function_privs_are`, 29 `ok`, 14 `table_privs_are`, 2 `isnt`, 2 `has_table`, 1 `has_column` — and none of them is an always-true `ok(true)`. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`. **Locally this needs
   `NEON_API_KEY` and `NEON_PROJECT_ID`** so `scripts/neon-branch.mjs` can create a disposable branch;
-  neither is on this machine (2026-10-27), so the suite is CI-only here. Point it at production and it
-  writes rooms — never do that.
+  neither is on this machine (2026-10-27), so the suite is CI-only here. The local-Docker fallback is
+  also unusable *as currently running*: `supabase status` reports `DB_URL` on 127.0.0.1:55422, but the
+  `supabase_db_online-karaoke` container publishes only `5432/tcp` with no host binding (Kong likewise),
+  so a host-run suite gets `ECONNREFUSED`; `supabase stop && supabase start` republishes them. Point it
+  at production and it writes rooms — never do that.
 - [x] `npm test` reports 551 passing tests on the current tree (measured 2026-10-27 at `0767a12`).
 - [x] No credential-bearing file is tracked. **Verified 2026-10-27:** `git ls-files` shows only
   `.env.example`; `.gitignore` covers `.env`, `.env.*` and `.neon`; and a `git grep` for
