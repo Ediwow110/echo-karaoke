@@ -125,7 +125,14 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
       }
       noteLatency(response.status);
 
-      const text = await response.text();
+      let text: string;
+      try {
+        text = await response.text();
+      } catch {
+        // The status line already reached the log above; a body that cannot be
+        // read is the same outage as a request that never arrived.
+        throw new RoomApiError('NETWORK_ERROR', 0, 'The room service could not be reached');
+      }
       let payload: unknown = null;
       if (text.length > 0) {
         try {
@@ -137,6 +144,18 @@ export function createEdgeApi(config: EdgeApiConfig): EdgeApi {
 
       if (!response.ok) {
         throw parseError(response.status, payload);
+      }
+
+      if (payload === null) {
+        // Every operation answers with an object, so an empty body is not a
+        // success the caller can use. Handing back null lets a room read store
+        // "no room" as the answer it just got, and the guest screen renders
+        // that as the host having ended the room.
+        throw new RoomApiError(
+          'EMPTY_RESPONSE',
+          response.status,
+          'The room service sent an empty answer',
+        );
       }
 
       return payload as T;

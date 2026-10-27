@@ -4,7 +4,7 @@ import { createElement, StrictMode, type ReactNode } from 'react';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import { useRoomData } from '../../src/features/rooms/useRoomData';
 import { saveGuestToken } from '../../src/features/rooms/tokenStore';
-import { RoomApiError, type EdgeApi } from '../../src/lib/edgeApi';
+import { createEdgeApi, RoomApiError, type EdgeApi } from '../../src/lib/edgeApi';
 
 const roomA = {
   roomId: 'room-a',
@@ -420,6 +420,31 @@ describe('room data isolation', () => {
       } else {
         Object.defineProperty(document, 'hidden', hiddenDescriptor);
       }
+      unmount();
+    }
+  });
+
+  it('reports an empty answer rather than leaving the room with no state at all', async () => {
+    const impl = (async () => new Response('', { status: 200 })) as unknown as typeof fetch;
+    const api = createEdgeApi({
+      getAccessToken: async () => 'access-token',
+      fetchImpl: impl,
+    });
+    const wrapper = ({ children }: { children: ReactNode }) => createElement(
+      RoomApiProvider,
+      { api, children },
+    );
+
+    const { result, unmount } = renderHook(() => useRoomData('room-a', 'guest'), { wrapper });
+
+    try {
+      // data null + error null + loading false is the one state the guest screen
+      // renders as "This room has ended. The host closed the session." -- a claim
+      // about the host that an empty response never made.
+      await waitFor(() => expect(result.current.loading).toBe(false));
+      expect(result.current.data).toBeNull();
+      expect(result.current.error).not.toBeNull();
+    } finally {
       unmount();
     }
   });

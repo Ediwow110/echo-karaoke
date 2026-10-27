@@ -156,4 +156,30 @@ describe('edge api client', () => {
     expect(debug.mock.calls[0].join(' ')).toContain('network');
     debug.mockRestore();
   });
+
+  it('refuses to hand back a success that carries no body', async () => {
+    const impl = (async () => new Response('', { status: 200 })) as unknown as typeof fetch;
+    const api = createEdgeApi({ ...base, fetchImpl: impl });
+
+    // Every operation answers with an object. A null payload would be stored as
+    // the room state, and a guest would be told the host had ended the room.
+    await expect(
+      api.invoke('guest-room-read', { roomId: 'r' }, { guestToken: 'guest-secret' }),
+    ).rejects.toMatchObject({ code: 'EMPTY_RESPONSE', status: 200 });
+  });
+
+  it('reports an unreadable response body as a network failure', async () => {
+    const impl = (async () => ({
+      ok: true,
+      status: 200,
+      text: async () => {
+        throw new TypeError('network error while reading the body');
+      },
+    })) as unknown as typeof fetch;
+    const api = createEdgeApi({ ...base, fetchImpl: impl });
+
+    await expect(
+      api.invoke('guest-room-read', { roomId: 'r' }, { guestToken: 'guest-secret' }),
+    ).rejects.toMatchObject({ code: 'NETWORK_ERROR' });
+  });
 });
