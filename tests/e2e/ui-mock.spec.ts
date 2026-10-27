@@ -149,6 +149,27 @@ async function openGuestSearch(page: Page): Promise<void> {
   await page.waitForSelector('ul[aria-label="Songs"] li');
 }
 
+test('a failed handover keeps the confirmation open', async ({ page }) => {
+  // transferRoom swallows its own error, so the dialog must be closed by the
+  // reported outcome rather than by the await returning. Closing it anyway
+  // leaves the host at a rebuilt list with a fading toast.
+  await mockApi(page);
+  await page.route('**/api/transfer-host', async (route) => {
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'The room could not be transferred' } }),
+    });
+  });
+
+  await page.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+  await page.getByLabel('Hand the room to Jamie').click();
+  await page.getByRole('button', { name: 'Hand it over' }).click();
+
+  await expect(page.getByText('The room could not be transferred.')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Hand it over' })).toBeVisible();
+});
+
 test('an empty room answer is reported as a failure, never as the host ending the room', async ({ page }) => {
   // The API client used to hand back a 200 with no body as if it were the room,
   // and "no room state" is the one state this screen renders as the host having
