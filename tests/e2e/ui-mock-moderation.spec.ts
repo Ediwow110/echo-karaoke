@@ -19,6 +19,8 @@ type Scenario = {
   vote?: { voted: boolean; count: number };
   /** Every host-command action the app sent. */
   hostActions?: string[];
+  /** Makes the host read fail, standing in for a transient blip. */
+  hostReadFails?: boolean;
   approvedMemberIds: unknown[];
 };
 
@@ -88,6 +90,10 @@ async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', join
     let payload: unknown = {};
     if (op === 'auth/token') payload = { token: 'mock-jwt' };
     else if (op === 'touch-member') payload = { memberId: role === 'host' ? 'm1' : 'm2' };
+    else if (op === 'host-room-read' && scenario.hostReadFails === true) {
+      await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'INTERNAL', message: 'The room service is having a moment' } }) });
+      return;
+    }
     else if (op === 'host-room-read') payload = hostView(scenario);
     else if (op === 'guest-room-read') payload = guestView(scenario);
     else if (op === 'approve-member' || op === 'reject-member') {
@@ -401,6 +407,35 @@ test('a locked room does not offer an enabled vote', async ({ page }) => {
   const vote = page.getByRole('button', { name: /Second Midnight City/ });
   await expect(vote).toBeVisible();
   await expect(vote).toBeDisabled();
+});
+
+// The offer to return to a hosted room was decided by one read at mount. A blip
+// removed the only way back until a reload, and a room that ended while the host
+// sat on this screen stayed offered.
+test('a blip does not take away the way back to the room', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [], hostReadFails: true };
+  await mock(page, scenario, 'host');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/create', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('link', { name: 'Back to the room' })).toHaveCount(0);
+
+  scenario.hostReadFails = false;
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(page.getByRole('link', { name: 'Back to the room' }), 'the offer never recovered')
+    .toBeVisible();
+});
+
+test('a room that ends while the host sits here stops being offered', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
+  await mock(page, scenario, 'host');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/create', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('link', { name: 'Back to the room' })).toBeVisible();
+
+  scenario.ended = true;
+  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await expect(page.getByRole('link', { name: 'Back to the room' }), 'a dead room was still offered')
+    .toHaveCount(0);
 });
 
 const GUEST_SCREENS = [

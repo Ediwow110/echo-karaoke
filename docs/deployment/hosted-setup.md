@@ -906,6 +906,12 @@ behind as well: the host screen owns the only player, so clicking the action tea
 and the "My sessions" list that used to offer a way back was removed in `10d09e6` because it kept
 listing dead rooms.
 
+**The offer is not taken on one reading.** After this change the hosted-room offer is re-checked when
+the tab becomes visible, when the network returns, and once a minute -- and a failed check keeps the
+last known room rather than blanking the only way back. Before that it was one read at mount: a
+blip removed the link until a reload, and a room that ended while the host sat on the screen stayed
+offered.
+
 **What ships now.** `/create` is a route of its own and renders the create form in every viewport;
 the landing page `/` keeps its join-first behaviour on a narrow screen. **Every** create action
 points at that route — the sidebar's "Create room" item, the sidebar's "Start something good."
@@ -980,7 +986,7 @@ replays from scratch locally with pgTAP 414/414.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
 - [x] `npm test` reports 527 passing tests on the current tree (measured 2026-10-27 at `93e08b1`).
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 36 passing tests on the current tree (measured 2026-10-27 at `93e08b1`; the suite is now two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`).
+- [x] `npm run test:e2e:ui` reports 44 passing tests on the current tree (measured 2026-10-27 at `dbcfc25`; the suite is now two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`).
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is
