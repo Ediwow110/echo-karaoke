@@ -115,6 +115,18 @@ export default function HostStagePage() {
   const current = duration > 0 ? Math.min(rawCurrent, duration) : rawCurrent;
   const progress = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
   const queueHref = '/room/' + roomId + '/host/queue';
+  // One computation feeds both the dot and its words. They used to be two
+  // separate ternaries whose catch-all promised live autoplay on a room that
+  // was merely not broken -- paused, empty and stalled all read "Autoplay on".
+  const status = player.playerError !== null
+    ? { dot: 'bg-danger', label: 'Playback error' }
+    : player.advanceStalled
+      ? { dot: 'bg-gold', label: 'Playback stalled' }
+      : player.needsTap
+        ? { dot: 'bg-gold', label: 'Autoplay blocked' }
+        : playing
+          ? { dot: 'bg-live', label: 'Autoplay on' }
+          : { dot: 'bg-line', label: 'Ready' };
 
   return (
     <div className="min-h-dvh bg-graphite text-ink">
@@ -246,12 +258,9 @@ export default function HostStagePage() {
                 <span className="hidden items-center gap-1.5 text-[0.6875rem] text-ink-2 sm:flex">
                   <span
                     aria-hidden="true"
-                    className={[
-                      'size-1.5 rounded-full',
-                      player.playerError !== null ? 'bg-danger' : player.needsTap ? 'bg-gold' : 'bg-live',
-                    ].join(' ')}
+                    className={['size-1.5 rounded-full', status.dot].join(' ')}
                   />
-                  {player.playerError !== null ? 'Playback error' : player.needsTap ? 'Autoplay blocked' : 'Autoplay on'}
+                  {status.label}
                 </span>
               </div>
 

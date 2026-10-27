@@ -710,6 +710,65 @@ describe('host room workspace', () => {
     expect(reports.some((report) => report.positionSeconds === 90)).toBe(true);
   });
 
+  it('does not claim autoplay is on while the room is paused', async () => {
+    const { api } = makeApi();
+
+    renderHost(api, '/room/' + roomId + '/host/stage');
+    await screen.findByText('Add more songs');
+
+    expect(screen.queryByText('Autoplay on')).toBeNull();
+    expect(screen.getByText('Ready')).toBeInTheDocument();
+  });
+
+  it('does not show a green autoplay light while the advance is stalled', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true, positionSeconds: 217 },
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'playback-command') {
+          throw new Error('The room service could not be reached');
+        }
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return playingRoom;
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    playerClock.state = 1;
+    playerClock.currentTime = 217;
+    playerClock.duration = 222;
+
+    // The song ends, the advance fails, and the player stays mounted across the
+    // route change, so the stage inherits the stalled flag.
+    renderHost(api);
+    fireEvent.click(await screen.findByLabelText('Open stage'));
+    await screen.findByText('Add more songs');
+
+    // One "Playback stalled" is the overlay over the video; the second is the
+    // status pill, which used to keep reporting that all was well.
+    await waitFor(() => expect(screen.getAllByText('Playback stalled').length).toBe(2));
+    expect(screen.queryByText('Autoplay on')).toBeNull();
+  });
+
+  it('still reports autoplay once the room is really playing', async () => {
+    const playing = { ...liveRoom, playback: { ...liveRoom.playback, isPlaying: true } };
+    const { api } = makeApi(playing);
+    playerClock.state = 1;
+
+    renderHost(api, '/room/' + roomId + '/host/stage');
+    await screen.findByText('Add more songs');
+
+    expect(screen.getByText('Autoplay on')).toBeInTheDocument();
+  });
+
   it('coalesces repeated YouTube end events into one automatic next request', async () => {
     vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
       matches: query.includes('min-width: 1024px'),
