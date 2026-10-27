@@ -21,6 +21,8 @@ type Scenario = {
   hostActions?: string[];
   /** Makes the host read fail, standing in for a transient blip. */
   hostReadFails?: boolean;
+  /** How many heartbeats the app sent. */
+  beats?: number;
   approvedMemberIds: unknown[];
 };
 
@@ -89,7 +91,10 @@ async function mock(page: Page, scenario: Scenario, role: 'host' | 'guest', join
     }
     let payload: unknown = {};
     if (op === 'auth/token') payload = { token: 'mock-jwt' };
-    else if (op === 'touch-member') payload = { memberId: role === 'host' ? 'm1' : 'm2' };
+    else if (op === 'touch-member') {
+      scenario.beats = (scenario.beats ?? 0) + 1;
+      payload = { memberId: role === 'host' ? 'm1' : 'm2' };
+    }
     else if (op === 'host-room-read' && scenario.hostReadFails === true) {
       await route.fulfill({ status: 503, contentType: 'application/json', body: JSON.stringify({ error: { code: 'INTERNAL', message: 'The room service is having a moment' } }) });
       return;
@@ -436,6 +441,18 @@ test('a room that ends while the host sits here stops being offered', async ({ p
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await expect(page.getByRole('link', { name: 'Back to the room' }), 'a dead room was still offered')
     .toHaveCount(0);
+});
+
+// The room's only heartbeat is the host screen's. A host who stepped out to this
+// screen is still hosting, so offering "Back to the room" while nothing kept the
+// room alive let the sweep take it out from under the guests.
+test('the create screen keeps the hosted room alive while it offers the way back', async ({ page }) => {
+  const scenario: Scenario = { admitted: true, approvedMemberIds: [], beats: 0 };
+  await mock(page, scenario, 'host');
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/create', { waitUntil: 'networkidle' });
+  await expect(page.getByRole('link', { name: 'Back to the room' })).toBeVisible();
+  await expect.poll(() => scenario.beats ?? 0, 'the room was left without a heartbeat').toBeGreaterThan(0);
 });
 
 const GUEST_SCREENS = [

@@ -910,7 +910,9 @@ listing dead rooms.
 the tab becomes visible, when the network returns, and once a minute -- and a failed check keeps the
 last known room rather than blanking the only way back. Before that it was one read at mount: a
 blip removed the link until a reload, and a room that ended while the host sat on the screen stayed
-offered.
+offered. The screen also sends the room's heartbeat now: the host screen owns the only one, so offering
+"Back to the room" from a screen that kept nothing alive let the sweep take the room while the link
+still said it was there.
 
 **What ships now.** `/create` is a route of its own and renders the create form in every viewport;
 the landing page `/` keeps its join-first behaviour on a narrow screen. **Every** create action
