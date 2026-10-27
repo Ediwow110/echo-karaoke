@@ -341,7 +341,8 @@ export default function HostSettingsPage() {
               </div>
             </dl>
             <p className="mt-4 border-t border-line pt-3 text-[0.625rem] leading-[1.6] text-ink-2">
-              The room stays live until you end it. Keep this screen open to keep hosting.
+              The room stays live while anyone in it keeps a tab open; it is cleaned up once nobody
+              has been online for 30 minutes. Keep this screen open to keep hosting.
             </p>
           </section>
         </aside>

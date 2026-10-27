@@ -174,7 +174,8 @@ export default function InviteCard({
             </div>
           )}
           <p className="mt-3 text-[0.625rem] leading-[1.5] text-ink-3">
-            The code stays live until the host ends the room.
+            The code works while the room lives. The room is cleaned up once nobody has been online
+            for 30 minutes.
           </p>
         </div>
       </div>
