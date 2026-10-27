@@ -973,7 +973,9 @@ order.
    the remote is at `0038`. Applying first is safe under the build that is running: `git grep room_queue
    origin/master -- server/` returns nothing, so the deployed Function only calls
    `read_room_guest` / `read_room_host`, whose signatures `0039` preserves. The old build ignores the
-   extra field on each queue row.
+   extra field on each queue row. The client half is pinned by
+`tests/unit/queueRows.test.tsx`: a row with no `votedByViewer` key renders as "not voted", so the wrong
+deploy order degrades instead of crashing.
 2. `git push origin HEAD:master`. Rehearsed with `--dry-run` at `24bd328`, which printed
    `862e747..24bd328  HEAD -> master` -- a clean fast-forward, no force, no merge.
 3. Watch the CI jobs and the Vercel build, then prove the bundle actually changed rather than
@@ -1020,7 +1022,7 @@ reaches what production has.
   contains the old 55420–55429 range, so `supabase start` could no longer bind them. `supabase/config.toml`
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
-- [x] `npm test` reports 552 passing tests on the current tree (measured 2026-10-27 at `49cb2d3`).
+- [x] `npm test` reports 554 passing tests on the current tree (measured 2026-10-27 at `abb80d9`).
 - [x] CI itself is healthy before relying on it: `gh run list` on 2026-10-27 shows the last five runs on
   `master` all concluded `success` (latest `2026-10-26T03:41Z`), so the push runs against a working
   workflow rather than inheriting a broken pipeline.
