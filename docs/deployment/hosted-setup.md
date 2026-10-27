@@ -965,7 +965,9 @@ order.
 **Order, and why either direction is safe.**
 
 1. `supabase db push --dry-run` against `main` must list exactly `0039_vote_viewer_flag.sql` and
-   `0040_vote_host_identity.sql`, then `supabase db push`. Applying first is safe under the build that is running: `git grep room_queue
+   `0040_vote_host_identity.sql`, then `supabase db push`. **Rehearsed 2026-10-27 against production
+   `main`:** the dry-run printed exactly those two files and nothing else, and the tracker read confirms
+   the remote is at `0038`. Applying first is safe under the build that is running: `git grep room_queue
    origin/master -- server/` returns nothing, so the deployed Function only calls
    `read_room_guest` / `read_room_host`, whose signatures `0039` preserves. The old build ignores the
    extra field on each queue row.
