@@ -965,7 +965,9 @@ walk and in the search path, whose second copy still had the wrong order -- that
 entity twice, the search results that now decode channel titles exactly as the songbook walk does, and
 the door row that marks the answer it is actually running instead of always marking "Let ... in", and
 the search box that drops a failed search's banner once its text becomes a video link (the stale
-banner's Retry button added that link rather than repeating a search).
+banner's Retry button added that link rather than repeating a search), and the two room-lifetime
+notes that no longer promise a room outlives every closed tab (the sweep deletes it after 30 minutes
+with nobody online).
 Nothing is pushed -- the owner
 answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
 order.
@@ -1027,11 +1029,15 @@ reaches what production has.
   contains the old 55420–55429 range, so `supabase start` could no longer bind them. `supabase/config.toml`
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
-- [x] `npm test` reports 560 passing tests on the current tree (measured 2026-10-27 at `5b32c82`).
+- [x] `npm test` reports 561 passing tests on the current tree (measured 2026-10-27 at `6939495`).
 - [x] Every heartbeat is pinned inside the presence window: `tests/unit/presenceWindow.test.ts` parses
   the 30-second window from the newest migration that projects `online`, with a control that the parse
   found it, and requires the visible, hidden and host heartbeats to be shorter. Slowing one past the
   window turns it red.
+- [x] The room-lifetime notes quote the real cleanup window: `tests/unit/roomLifetimeCopy.test.ts`
+  parses the 30-minute interval from the newest migration that schedules `cleanup_abandoned_rooms`,
+  with a control that the parse found it, and requires both `HostSettingsPage` and `InviteCard` to
+  state it instead of promising the room outlives every tab. Changing the cron window turns it red.
 - [x] CI itself is healthy before relying on it: `gh run list` on 2026-10-27 shows the last five runs on
   `master` all concluded `success` (latest `2026-10-26T03:41Z`), so the push runs against a working
   workflow rather than inheriting a broken pipeline.
