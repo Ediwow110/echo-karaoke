@@ -956,8 +956,9 @@ claims autoplay on a paused, empty or stalled room, and the API client refusing 
 answer as a room that ended, the promoted guest who keeps retrying a failed host-pass claim, the
 handover dialog that stays open when a transfer fails, the songbook that no longer blames the
 catalog for a failed search, the refused start that no longer jumps to a silent party view, and the
-songbook refresh that no longer blames a channel for a spent daily budget, and the search fallback that
-keeps the reason it was asked.
+songbook refresh that no longer blames a channel for a spent daily budget, the search fallback that
+keeps the reason it was asked, and two error screens whose copy now says only what is true whatever
+the cause.
 Nothing is pushed -- the owner
 answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
 order.
@@ -1005,7 +1006,7 @@ replays from scratch locally with pgTAP 414/414.
   (docs and four unit tests) — no real connection string. Re-run this before any push that touched env
   handling.
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 56 passing tests on the current tree (measured 2026-10-27 at `c65c78f`; the suite is two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`). **Thirteen of those gates are mutation-proved** (2026-10-27): suppressing `clear_queue`, suppressing the vote call, pointing `buildJoinUrl` at `/j/`, shrinking one link below `min-h-6`, removing the empty-answer guard, closing the handover dialog regardless, navigating on a refused start, restoring the status pill's catch-all, dropping the host-pass retry, reporting the raw player clock while buffering, reporting a seek the player never made, and dropping the songbook's error gate — the last on **both** the host and guest songbook routes — each turned exactly one test red, on its own assertion — including the QR gate, which also navigates to the encoded URL and checks the join form. The suite is load-bearing rather than decorative.
+- [x] `npm run test:e2e:ui` reports 56 passing tests on the current tree (measured 2026-10-27 at `759eff9`; the suite is two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`). **Thirteen of those gates are mutation-proved** (2026-10-27): suppressing `clear_queue`, suppressing the vote call, pointing `buildJoinUrl` at `/j/`, shrinking one link below `min-h-6`, removing the empty-answer guard, closing the handover dialog regardless, navigating on a refused start, restoring the status pill's catch-all, dropping the host-pass retry, reporting the raw player clock while buffering, reporting a seek the player never made, and dropping the songbook's error gate — the last on **both** the host and guest songbook routes — each turned exactly one test red, on its own assertion — including the QR gate, which also navigates to the encoded URL and checks the join form. The suite is load-bearing rather than decorative.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is
