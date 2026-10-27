@@ -259,6 +259,36 @@ test('a buffering video never reports a position the room has not reached', asyn
   expect(reports.filter((report) => report.positionSeconds === 0)).toEqual([]);
 });
 
+test('a failed songbook search is not reported as no matches', async ({ page }) => {
+  // An empty first page is a real answer, so the list marks itself loaded. A
+  // later search that fails is not a search that matched nothing, and saying
+  // both at once blames the catalog for an outage.
+  await mockApi(page);
+  await page.route('**/api/catalog-page', async (route) => {
+    const body = route.request().postDataJSON() as { query?: string };
+    if ((body.query ?? '') === '') {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ total: 0, items: [] }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 503,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'The songbook could not load.' } }),
+    });
+  });
+
+  await page.goto('/room/' + ROOM + '/songbook', { waitUntil: 'networkidle' });
+  await expect(page.getByText(/the songbook is warming up/i)).toBeVisible();
+
+  await page.getByPlaceholder('Search title or artist').fill('halo');
+  await expect(page.getByRole('alert')).toContainText('could not load');
+  await expect(page.getByText('No song matches that search.')).toHaveCount(0);
+});
+
 test('a seek on a player that never started is still reported when it can land', async ({ page }) => {
   // The control for the gate below: a ready player confirms the seek and the
   // room must hear about it, so an empty result there means the guard worked.
@@ -293,6 +323,38 @@ test('a seek the player cannot confirm is never reported', async ({ page }) => {
   await page.waitForTimeout(1000);
 
   expect(reports.filter((report) => report.positionSeconds === 90)).toEqual([]);
+});
+
+test('a failed songbook search never claims nothing matched', async ({ page }) => {
+  // Once a search has legitimately matched nothing, a later search that fails
+  // used to render "No song matches that search" under the alert saying the
+  // request never completed -- blaming the catalog for an outage.
+  await mockApi(page);
+  let calls = 0;
+  await page.route('**/api/catalog-page', async (route) => {
+    calls += 1;
+    if (calls === 1) {
+      await route.fulfill({
+        status: 200,
+        contentType: 'application/json',
+        body: JSON.stringify({ total: 0, items: [] }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 500,
+      contentType: 'application/json',
+      body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'The songbook could not load' } }),
+    });
+  });
+
+  await page.goto('/room/' + ROOM + '/host/songbook', { waitUntil: 'networkidle' });
+  await expect(page.getByText(/the songbook is warming up/i)).toBeVisible();
+
+  await page.getByLabel('Search the songbook').fill('halo');
+
+  await expect(page.getByRole('alert')).toBeVisible();
+  await expect(page.getByText(/no song matches that search/i)).toHaveCount(0);
 });
 
 test('a promoted guest keeps claiming the host pass until it lands', async ({ page }) => {
