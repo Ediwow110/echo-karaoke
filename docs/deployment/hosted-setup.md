@@ -999,7 +999,14 @@ replays from scratch locally with pgTAP 414/414.
 ## Verification checklist
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, `0040` adds five (two of them pinning the host's own vote and its survival of an identity replacement), and the local stack reports 414/414 with the full `0001→0040` chain replayed from scratch. **Source-reconciled 2026-10-27:** the test files contain exactly 414 assertion calls — 201 `is`, 82 `throws_ok`, 45 `lives_ok`, 38 `function_privs_are`, 29 `ok`, 14 `table_privs_are`, 2 `isnt`, 2 `has_table`, 1 `has_column` — and none of them is an always-true `ok(true)`. **Re-run 2026-10-27 against the running local stack at
-`e40ee16`:** `npx supabase test db --local` reported `Files=21, Tests=414`, `Result: PASS`. Re-run on a
+`e40ee16`:** `npx supabase test db --local` reported `Files=21, Tests=414`, `Result: PASS`.
+**Fresh-chain replay 2026-10-27:** a scratch database built by applying `0000→0018` + `0020→0040` in
+order (skipping only `0019`, because pg_cron may only be created in the database named by
+`cron.database_name`, here `postgres`) ran 20 of the 21 test files with byte-identical results to the
+migrated database — 383 assertion lines and zero failures. The single difference is
+`abandoned_test.sql` (18 assertions), which tests the cron-scheduled sweep and therefore needs the real
+database. That is the evidence that a database built from zero reaches production's shape, including
+`0039` and `0040`. Re-run on a
 disposable branch before the next ship — this line is the only one that proves a fresh database
 reaches what production has.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`. **Locally it needs
