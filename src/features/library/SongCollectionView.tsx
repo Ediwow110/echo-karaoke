@@ -43,7 +43,7 @@ const copy: Record<CollectionMode, { eyebrow: string; title: string; description
     title: 'The songs you come back to.',
     description: 'Save the YouTube versions you love and bring them into the next room.',
     emptyTitle: 'No favorites yet.',
-    emptyBody: 'Tap the heart on a song in the queue or library and it will wait for you here.',
+    emptyBody: 'Tap the heart on any song in your library and it will wait for you here.',
   },
   recent: {
     eyebrow: 'Your collection',
