@@ -191,6 +191,47 @@ test('a refused start leaves the host on the page that can retry it', async ({ p
   await expect(page.getByText('kara-echo song search')).toBeVisible();
 });
 
+test('a promoted guest keeps claiming the host pass until it lands', async ({ page }) => {
+  // The transfer revokes the outgoing host's pass, so a claim that fails once
+  // leaves the room with no host pass at all. The poll never changes this
+  // effect's inputs, so without a retry nothing would ever try again.
+  await mockApi(page);
+  // mockApi seeds a host pass as well; this screen must start without one or
+  // the claim is correctly skipped.
+  await page.addInitScript(([roomId]) => {
+    localStorage.removeItem('karaoke.host.' + roomId);
+  }, [ROOM]);
+  const promoted = {
+    ...room(false),
+    viewer: { memberId: 'm2', displayName: 'Jamie', role: 'host' },
+  };
+  await page.route('**/api/guest-room-read', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(promoted) });
+  });
+  let claims = 0;
+  await page.route('**/api/claim-host', async (route) => {
+    claims += 1;
+    if (claims === 1) {
+      await route.fulfill({
+        status: 500,
+        contentType: 'application/json',
+        body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'The host pass could not be claimed' } }),
+      });
+      return;
+    }
+    await route.fulfill({
+      status: 200,
+      contentType: 'application/json',
+      body: JSON.stringify({ hostToken: 'h'.repeat(43) }),
+    });
+  });
+
+  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+
+  await expect(page.getByText('You are the host now')).toBeVisible({ timeout: 15000 });
+  expect(claims).toBeGreaterThan(1);
+});
+
 test('the stage says Ready on an idle room, never Autoplay on', async ({ page }) => {
   // The dot and its words used to share a catch-all that promised live
   // autoplay whenever nothing was wrong -- so an empty stage claimed playback
