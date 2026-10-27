@@ -21,7 +21,7 @@ export default class ErrorBoundary extends Component<Props, State> {
           <div className="w-full max-w-[30rem] rounded-panel border border-line bg-surface p-6">
             <h1 className="font-display text-[1.9rem] font-bold tracking-[-0.02em]">This screen stopped.</h1>
             <p role="alert" className="mt-3 text-[0.8125rem] leading-[1.6] text-ink-2">
-              The room data is safe. Reload to reconnect to the host screen.
+              The room data is safe. Reload to reconnect.
             </p>
             <button
               type="button"

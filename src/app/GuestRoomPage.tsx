@@ -244,7 +244,7 @@ export default function GuestRoomPage() {
       <main className="mx-auto grid min-h-dvh w-full max-w-[430px] place-items-center bg-graphite px-4 text-ink">
         <div className="w-full rounded-panel border border-line bg-surface p-5">
           <Logo size="sm" />
-          <h1 className="mt-5 font-display text-[1.8rem] font-bold tracking-[-0.02em]">Room unavailable.</h1>
+          <h1 className="mt-5 font-display text-[1.8rem] font-bold tracking-[-0.02em]">Can't open this room.</h1>
           <p role="alert" className="mt-3 rounded-media border border-danger/30 bg-danger-soft/50 px-3.5 py-2.5 text-[0.8125rem] text-danger">{error}</p>
           <div className="mt-4 flex gap-2">
             <Button variant="primary" size="sm" icon={<ArrowClockwiseIcon size={14} />} onClick={() => void retry()} busy={retrying}>Try again</Button>
