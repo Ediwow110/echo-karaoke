@@ -71,8 +71,8 @@ export type RoomState = {
 };
 
 const POLL_INTERVAL_MS = 4000;
-const HIDDEN_HEARTBEAT_MS = 15_000;
-const VISIBLE_HEARTBEAT_MS = 10_000;
+export const HIDDEN_HEARTBEAT_MS = 15_000;
+export const VISIBLE_HEARTBEAT_MS = 10_000;
 
 export function useRoomData(roomId: string, role: 'guest' | 'host'): RoomState {
   const api = useRoomApi();

@@ -11,7 +11,7 @@ const CHECK_INTERVAL_MS = 60_000;
 // The room's only heartbeat is the host screen's. A host who stepped out to this
 // screen is still hosting, so the offer has to keep the room alive or the sweep
 // takes it out from under the guests while the link still says it is there.
-const HEARTBEAT_MS = 20_000;
+export const HEARTBEAT_MS = 20_000;
 
 /**
  * The room this browser is still hosting, decided by the server.
