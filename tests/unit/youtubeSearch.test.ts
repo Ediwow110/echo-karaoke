@@ -61,6 +61,17 @@ describe('youtube search mapping', () => {
     expect(results[0].title).toBe('Rock & Roll "Live"');
   });
 
+  it('decodes an escaped entity once, not twice, on the search path too', () => {
+    // Same shape as the songbook walk's fix (49cb2d3): replacing &amp; first
+    // turns a title that literally contains "&quot;" into a quote, changing
+    // the song's name on its way into a room.
+    const results = mapSearchResponse(payload([
+      { id: { videoId: 'abc123XYZ_-' }, snippet: { title: 'A &amp;quot; B &amp; C' } },
+    ]));
+
+    expect(results[0].title).toBe('A &quot; B & C');
+  });
+
   it('decodes the same entities in channel titles the songbook walk already decodes', () => {
     // search.list and playlistItems.list return the same snippet field. The
     // catalog mapper turns "C &amp; D" into "C & D"; a raw channel title here

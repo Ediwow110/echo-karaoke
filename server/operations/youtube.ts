@@ -40,12 +40,14 @@ function text(value: unknown, limit: number): string | null {
 }
 
 function decodeEntities(value: string): string {
+  // &amp; goes last: decoding it first turns a title that literally contains
+  // "&amp;quot;" into a quote and silently changes the song's name.
   return value
-    .replace(/&amp;/g, '&')
     .replace(/&quot;/g, '"')
     .replace(/&#39;/g, "'")
     .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>');
+    .replace(/&gt;/g, '>')
+    .replace(/&amp;/g, '&');
 }
 
 type Snippet = {
