@@ -693,9 +693,12 @@ describe('host room workspace', () => {
     playerClock.duration = duration;
 
     renderHost(api);
-    await screen.findByLabelText('Back 10 seconds');
+    // The dock renders its controls disabled until the room read lands, and a
+    // click on a disabled button is a no-op, so wait for it to be live.
+    const back = await screen.findByLabelText('Back 10 seconds');
+    await waitFor(() => expect(back).toBeEnabled());
     await act(async () => {
-      fireEvent.click(screen.getByLabelText('Back 10 seconds'));
+      fireEvent.click(back);
     });
     return reports;
   }
