@@ -1003,6 +1003,10 @@ replays from scratch locally with pgTAP 414/414.
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is
   the one that tells you whether the build will be refused. Tick it after the secret exists.
+  **Measured 2026-10-27: production is not the problem.** `GET /api/cron/catalog-retention` with no
+  Authorization header answers **401**, which means the handler reached its bearer comparison — so
+  `CRON_SECRET` *is* set in Vercel and the 02:00 retention job runs. Only the local environment this
+  command reads lacks it. Do not "fix" production for this line.
 - [x] 0031–0034 applied to production `main` (2026-10-26): remote history reads 0034, two catalog
   tables and seven catalog functions exist, and `karaoke_catalog_page` executes as `echo_service`
   rather than merely being granted to it. This line is new — without it the next reader has nothing
