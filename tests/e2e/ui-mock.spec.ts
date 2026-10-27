@@ -149,6 +149,21 @@ async function openGuestSearch(page: Page): Promise<void> {
   await page.waitForSelector('ul[aria-label="Songs"] li');
 }
 
+test('an empty room answer is reported as a failure, never as the host ending the room', async ({ page }) => {
+  // The API client used to hand back a 200 with no body as if it were the room,
+  // and "no room state" is the one state this screen renders as the host having
+  // closed the room -- a claim the response never made.
+  await mockApi(page);
+  await page.route('**/api/guest-room-read', async (route) => {
+    await route.fulfill({ status: 200, contentType: 'application/json', body: '' });
+  });
+
+  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+
+  await expect(page.getByRole('alert')).toContainText('empty answer');
+  await expect(page.getByText('This room has ended.')).toHaveCount(0);
+});
+
 test('host player uses a visible minimum-sized desktop frame and parks it on mobile queue', async ({ page }) => {
   await mockApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });
