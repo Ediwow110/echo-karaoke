@@ -202,7 +202,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
           <p className="text-[0.8125rem] text-ink-2" aria-hidden="true">Loading the songbook…</p>
           <span role="status" aria-label="Loading the songbook…" className="sr-only">Loading the songbook…</span>
         </div>
-      ) : hasLoaded === false ? null : items.length === 0 && (busy === false || syncing) ? (
+      ) : hasLoaded === false ? null : items.length === 0 && error === null && (busy === false || syncing) ? (
         <div className="flex flex-col items-center gap-3">
           <p className="w-full rounded-panel border border-line bg-surface px-4 py-6 text-center text-[0.8125rem] text-ink-2">
             {filtering

@@ -105,6 +105,34 @@ describe('songbook list', () => {
     });
   });
 
+  it('does not claim a search matched nothing when the search never ran', async () => {
+    let fails = false;
+    const api = {
+      invoke: (async (name: string) => {
+        if (name === 'catalog-page') {
+          if (fails) {
+            throw new Error('The room service could not be reached');
+          }
+          return { total: 0, items: [] };
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.host.' + roomId, 'host-pass-value');
+    render(<SongbookList api={api} roomId={roomId} />);
+
+    // An empty first page is a real answer, so the list marks itself loaded.
+    await screen.findByText(/the songbook is warming up/i);
+
+    fails = true;
+    fireEvent.change(screen.getByLabelText(/search the songbook/i), { target: { value: 'halo' } });
+
+    // The refusal is a request that never completed, not a search that matched
+    // nothing; saying both at once blames the catalog for an outage.
+    await screen.findByRole('alert');
+    expect(screen.queryByText(/no song matches that search/i)).toBeNull();
+  });
+
   it('keeps the newest results when an older search response lands late', async () => {
     const pending = new Map<string, (page: CatalogPayload) => void>();
     const api = {
