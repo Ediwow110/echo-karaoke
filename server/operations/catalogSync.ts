@@ -343,6 +343,14 @@ async function walkCatalog(apiKey: string, request: Request): Promise<Response> 
             stoppedEarly = true;
             break channels;
           }
+          if (lookup.state === 'out-of-budget') {
+            // The page was already paid for; the re-resolve was not. Say the
+            // budget ran out instead of blaming a channel that never refused us.
+            return jsonResponse({
+              available: true, added, skipped, unresolved, unreachable,
+              message: 'Songbook refresh paused for today',
+            });
+          }
           if (lookup.state === 'ok' && lookup.playlistId !== playlistId) {
             playlistId = lookup.playlistId;
             token = null;

@@ -274,6 +274,29 @@ describe('catalog access guards', () => {
 });
 
 describe('catalog sync orchestration', () => {
+  it('names the daily budget, not an unreachable channel, when the recovery lookup is refused', async () => {
+    // The page fetch is paid for, then a 503 sends the walk back to re-resolve
+    // the handle, which needs a second unit. Falling out of that branch with no
+    // matching state reported the channel as unreachable -- a cause the walk
+    // never established, and one the host would believe until the daily reset.
+    let quotaCalls = 0;
+    useDatabase(baseHandlers({
+      karaoke_catalog_cursors: () => cursors('@musisikaraoke', new Date().toISOString()),
+      consume_daily_rate_limit: () => {
+        quotaCalls += 1;
+        return { allowed: quotaCalls === 1 };
+      },
+    }));
+    stubFetch({ failingPlaylists: ['UUmusisikaraoke'] });
+
+    const response = await catalogSync(syncRequest(), CALLER);
+    const body = await response.json() as { message?: string; unreachable?: string[] };
+
+    expect(body.message).toContain('paused for today');
+    expect(body.message ?? '').not.toContain('could not reach');
+    expect(body.unreachable ?? []).not.toContain('@musisikaraoke');
+  });
+
   it('retires expired provider metadata only after confirming host access and before fetching YouTube', async () => {
     useDatabase(baseHandlers({
       karaoke_catalog_retire_stale: () => ({ expiredSongs: 2, expiredCursors: 1 }),
