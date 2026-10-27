@@ -1022,7 +1022,11 @@ reaches what production has.
   contains the old 55420–55429 range, so `supabase start` could no longer bind them. `supabase/config.toml`
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
-- [x] `npm test` reports 554 passing tests on the current tree (measured 2026-10-27 at `abb80d9`).
+- [x] `npm test` reports 556 passing tests on the current tree (measured 2026-10-27 at `832a17f`).
+- [x] Every heartbeat is pinned inside the presence window: `tests/unit/presenceWindow.test.ts` parses
+  the 30-second window from the newest migration that projects `online`, with a control that the parse
+  found it, and requires the visible, hidden and host heartbeats to be shorter. Slowing one past the
+  window turns it red.
 - [x] CI itself is healthy before relying on it: `gh run list` on 2026-10-27 shows the last five runs on
   `master` all concluded `success` (latest `2026-10-26T03:41Z`), so the push runs against a working
   workflow rather than inheriting a broken pipeline.
