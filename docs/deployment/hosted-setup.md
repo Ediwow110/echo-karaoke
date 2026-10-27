@@ -957,8 +957,9 @@ answer as a room that ended, the promoted guest who keeps retrying a failed host
 handover dialog that stays open when a transfer fails, the songbook that no longer blames the
 catalog for a failed search, the refused start that no longer jumps to a silent party view, and the
 songbook refresh that no longer blames a channel for a spent daily budget, the search fallback that
-keeps the reason it was asked, and two error screens whose copy now says only what is true whatever
-the cause.
+keeps the reason it was asked, two error screens whose copy now says only what is true whatever
+the cause, and the per-network sign-in budget that now keys on the platform's own forwarded header
+rather than one a proxy in front of the deployment can overwrite.
 Nothing is pushed -- the owner
 answered "Hold the push, keep hunting" on 2026-10-27 -- so this section is the rehearsal, not the
 order.
@@ -999,7 +1000,7 @@ replays from scratch locally with pgTAP 414/414.
 
 - [x] `npx supabase test db --db-url "$NEON_DATABASE_URL"` reports 406 passing assertions on a fresh branch. **Stale as of 2026-10-27:** `0039` adds three, `0040` adds five (two of them pinning the host's own vote and its survival of an identity replacement), and the local stack reports 414/414 with the full `0001→0040` chain replayed from scratch. **Source-reconciled 2026-10-27:** the test files contain exactly 414 assertion calls — 201 `is`, 82 `throws_ok`, 45 `lives_ok`, 38 `function_privs_are`, 29 `ok`, 14 `table_privs_are`, 2 `isnt`, 2 `has_table`, 1 `has_column` — and none of them is an always-true `ok(true)`. Re-run on a disposable branch before the next ship — this line is the only one that proves a fresh database reaches what production has.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`.
-- [x] `npm test` reports 550 passing tests on the current tree (measured 2026-10-27 at `24bd328`).
+- [x] `npm test` reports 551 passing tests on the current tree (measured 2026-10-27 at `0767a12`).
 - [x] No credential-bearing file is tracked. **Verified 2026-10-27:** `git ls-files` shows only
   `.env.example`; `.gitignore` covers `.env`, `.env.*` and `.neon`; and a `git grep` for
   `postgres://user:pass@` across tracked files returns only placeholder fixtures on `.example` hosts
