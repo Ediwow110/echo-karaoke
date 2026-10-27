@@ -61,6 +61,20 @@ describe('youtube search mapping', () => {
     expect(results[0].title).toBe('Rock & Roll "Live"');
   });
 
+  it('decodes the same entities in channel titles the songbook walk already decodes', () => {
+    // search.list and playlistItems.list return the same snippet field. The
+    // catalog mapper turns "C &amp; D" into "C & D"; a raw channel title here
+    // reaches the queue row and the now-playing card as the literal text.
+    const results = mapSearchResponse(payload([
+      {
+        id: { videoId: 'abc123XYZ_-' },
+        snippet: { title: 'Song', channelTitle: 'C &amp; D' },
+      },
+    ]));
+
+    expect(results[0].channelTitle).toBe('C & D');
+  });
+
   it('falls back through thumbnail sizes', () => {
     const results = mapSearchResponse(payload([
       { id: { videoId: 'abc123XYZ_-' }, snippet: { title: 'T', thumbnails: { default: { url: 'small.jpg' } } } },

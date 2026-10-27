@@ -62,10 +62,11 @@ function mapItem(videoId: unknown, snippet: Snippet | undefined): SearchResult |
   const thumbnail = text(thumbnails?.medium?.url, 500)
     ?? text(thumbnails?.high?.url, 500)
     ?? text(thumbnails?.default?.url, 500);
+  const channelTitle = text(snippet?.channelTitle, 200);
   return {
     videoId,
     title: decodeEntities(title),
-    channelTitle: text(snippet?.channelTitle, 200),
+    channelTitle: channelTitle === null ? null : decodeEntities(channelTitle),
     thumbnailUrl: thumbnail,
     durationSeconds: null,
   };
