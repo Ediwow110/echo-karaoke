@@ -22,6 +22,10 @@ export type HostPlayerValue = {
   requestPlay: () => void;
   seekBy: (seconds: number) => void;
   seekTo: (seconds: number) => void;
+  /** Move the player without telling the room; pair with commitSeek on release. */
+  previewSeek: (seconds: number) => void;
+  /** Send the player's current position once a previewed seek is released. */
+  commitSeek: () => void;
   setVolume: (volume: number) => void;
   toggleFullscreen: () => void;
   skipFailed: () => void;

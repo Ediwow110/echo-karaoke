@@ -318,6 +318,7 @@ export default function HostSettingsPage() {
             hostName={hostName}
             joinUrl={joinUrl}
             guests={onlineGuestCount(roster)}
+            shareReady={connection === 'live'}
             variant="compact"
           />
           <section className="rounded-panel border border-line bg-surface p-5">

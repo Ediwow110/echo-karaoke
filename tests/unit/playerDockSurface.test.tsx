@@ -48,6 +48,8 @@ function renderDock(playbackSurfaceReady: boolean): void {
     requestPlay: () => undefined,
     seekBy: () => undefined,
     seekTo: () => undefined,
+    previewSeek: () => undefined,
+    commitSeek: () => undefined,
     setVolume: () => undefined,
     toggleFullscreen: () => undefined,
     skipFailed: () => undefined,

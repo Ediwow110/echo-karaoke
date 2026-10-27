@@ -1098,3 +1098,27 @@ test('host floating video stays clear of header controls', async ({ page }) => {
   });
   expect(geometry).toEqual({ overlaps: false, topIsParty: true });
 });
+
+test('the host console keeps 44 pixel touch targets', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 768, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/queue', { waitUntil: 'networkidle' });
+
+  const controls = [
+    page.getByLabel('Back 10 seconds'),
+    page.getByRole('button', { name: /^(Play|Pause)$/ }),
+    page.getByLabel('Skip song'),
+    page.getByRole('link', { name: 'Open stage' }),
+    page.getByRole('button', { name: /^Second / }).first(),
+    page.getByRole('button', { name: /^Move .* up$/ }).first(),
+    page.getByRole('button', { name: /^Remove / }).first(),
+  ];
+
+  for (const control of controls) {
+    await expect(control).toBeVisible();
+    const box = await control.boundingBox();
+    expect(box).not.toBeNull();
+    expect(box!.width).toBeGreaterThanOrEqual(44);
+    expect(box!.height).toBeGreaterThanOrEqual(44);
+  }
+});

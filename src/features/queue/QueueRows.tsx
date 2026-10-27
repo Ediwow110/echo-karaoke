@@ -59,8 +59,8 @@ function VoteButton({ song, busy, locked, onVote, compact = false }: {
       aria-label={(voted ? 'Take back your vote for ' : 'Second ') + song.title
         + ', ' + song.voteCount + (song.voteCount === 1 ? ' vote' : ' votes')}
       className={[
-        'flex shrink-0 items-center gap-1 rounded-full border transition-[background-color,border-color,color,transform,scale] active:scale-95',
-        compact ? 'min-h-8 px-2 text-[0.625rem]' : 'min-h-11 px-3 text-[0.6875rem]',
+        'flex min-w-11 shrink-0 items-center justify-center gap-1 rounded-full border transition-[background-color,border-color,color,transform,scale] active:scale-95',
+        compact ? 'min-h-11 px-2 text-[0.625rem]' : 'min-h-11 px-3 text-[0.6875rem]',
         voted
           ? 'border-signal/40 bg-signal-soft text-signal'
           : 'border-line text-ink-2 hover:bg-surface-2 hover:text-ink',
@@ -163,7 +163,7 @@ export function UpNextList({
                     onClick={() => onReorder(song.songId, 'up')}
                     disabled={busy || index === 0}
                     aria-label={'Move ' + song.title + ' up'}
-                    className="grid size-8 place-items-center rounded-full text-ink-2 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 hover:text-ink disabled:opacity-25"
+                    className="grid size-11 place-items-center rounded-full text-ink-2 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 hover:text-ink disabled:opacity-25"
                   >
                     <ArrowUpIcon size={14} weight="bold" aria-hidden="true" />
                   </button>
@@ -172,7 +172,7 @@ export function UpNextList({
                     onClick={() => onReorder(song.songId, 'down')}
                     disabled={busy || index === upNext.length - 1}
                     aria-label={'Move ' + song.title + ' down'}
-                    className="grid size-8 place-items-center rounded-full text-ink-2 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 hover:text-ink disabled:opacity-25"
+                    className="grid size-11 place-items-center rounded-full text-ink-2 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-surface-2 hover:text-ink disabled:opacity-25"
                   >
                     <ArrowDownIcon size={14} weight="bold" aria-hidden="true" />
                   </button>
@@ -187,7 +187,7 @@ export function UpNextList({
                   onClick={() => onRemove(song.songId)}
                   disabled={busy}
                   aria-label={'Remove ' + song.title}
-                  className="grid size-8 shrink-0 place-items-center rounded-full text-ink-3 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-danger-soft hover:text-danger disabled:opacity-30"
+                  className="grid size-11 shrink-0 place-items-center rounded-full text-ink-3 transition-[background-color,color,transform,scale] active:scale-95 hover:bg-danger-soft hover:text-danger disabled:opacity-30"
                 >
                   <XIcon size={14} weight="bold" aria-hidden="true" />
                 </button>

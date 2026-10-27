@@ -121,7 +121,7 @@ export default function HostPartyPage() {
         </p>
         <div className="flex items-center gap-2">
           {connection === 'offline' ? <Chip tone="gold">Reconnecting</Chip> : null}
-          <Button variant="secondary" size="sm" icon={<ArrowsInIcon size={14} />} onClick={backToStage}>
+          <Button variant="secondary" size="sm" className="min-h-11" icon={<ArrowsInIcon size={14} />} onClick={backToStage}>
             Leave party view
           </Button>
         </div>
@@ -180,7 +180,9 @@ export default function HostPartyPage() {
             min={0}
             max={Math.max(1, Math.floor(duration))}
             value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))}
-            onChange={(event) => player.seekTo(Number(event.target.value))}
+            onChange={(event) => player.previewSeek(Number(event.target.value))}
+            onPointerUp={player.commitSeek}
+            onKeyUp={player.commitSeek}
             aria-label="Playback position"
             disabled={!hasVideo || duration <= 0}
             className="h-1 w-full cursor-pointer appearance-none rounded-full bg-line accent-signal disabled:cursor-default"

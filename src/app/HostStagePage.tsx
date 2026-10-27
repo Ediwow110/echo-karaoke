@@ -138,7 +138,7 @@ export default function HostStagePage() {
             <Link
               to={'/room/' + roomId + '/host'}
               aria-label="Back to discovery"
-              className="inline-flex size-8 items-center justify-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink sm:hidden"
+              className="inline-flex size-11 items-center justify-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink sm:hidden"
             >
               <ArrowLeftIcon size={16} weight="bold" aria-hidden="true" />
             </Link>
@@ -154,7 +154,7 @@ export default function HostStagePage() {
             {connection === 'offline' ? <Chip tone="gold">Reconnecting</Chip> : null}
             <Link
               to={'/room/' + roomId + '/host/party'}
-              className="inline-flex min-h-9 items-center gap-1.5 whitespace-nowrap rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink hover:border-line-strong"
+              className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink hover:border-line-strong"
             >
               <ArrowsOutIcon size={14} aria-hidden="true" />
               Party view
@@ -234,7 +234,9 @@ export default function HostStagePage() {
                 min={0}
                 max={Math.max(1, Math.floor(duration))}
                 value={Math.min(Math.floor(current), Math.max(1, Math.floor(duration)))}
-                onChange={(event) => player.seekTo(Number(event.target.value))}
+                onChange={(event) => player.previewSeek(Number(event.target.value))}
+                onPointerUp={player.commitSeek}
+                onKeyUp={player.commitSeek}
                 aria-label="Playback position"
                 disabled={nowPlaying === null || duration <= 0}
                 className="h-1.5 w-full cursor-pointer appearance-none rounded-full bg-line accent-signal disabled:cursor-default"
@@ -330,7 +332,7 @@ export default function HostStagePage() {
           <section className="rounded-panel border border-line bg-surface p-4">
             <div className="flex items-center justify-between gap-2">
               <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>
-              <Link to={queueHref} aria-label="Manage room queue" className="grid size-8 place-items-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink">
+              <Link to={queueHref} aria-label="Manage room queue" className="grid size-11 place-items-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink">
                 <QueueIcon size={17} aria-hidden="true" />
               </Link>
             </div>
