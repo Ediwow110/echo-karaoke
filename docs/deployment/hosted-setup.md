@@ -1020,6 +1020,9 @@ reaches what production has.
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
 - [x] `npm test` reports 551 passing tests on the current tree (measured 2026-10-27 at `0767a12`).
+- [x] CI itself is healthy before relying on it: `gh run list` on 2026-10-27 shows the last five runs on
+  `master` all concluded `success` (latest `2026-10-26T03:41Z`), so the push runs against a working
+  workflow rather than inheriting a broken pipeline.
 - [x] `npm audit --audit-level=high` reports 0 vulnerabilities (measured 2026-10-27), and
   `package.json`/`package-lock.json` are unchanged since the deployed `862e747`, so the `verify` job's
   audit step and the lockfile are both already validated. The `ui` job's command is the mocked-UI suite
