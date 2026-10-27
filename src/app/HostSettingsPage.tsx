@@ -52,8 +52,10 @@ export default function HostSettingsPage() {
     try {
       // transferRoom reports its own failures and navigates away on success, so
       // the dialog only closes when the handover actually went through.
-      await transferRoom(confirmTransfer.memberId);
-      setConfirmTransfer(null);
+      const handedOver = await transferRoom(confirmTransfer.memberId);
+      if (handedOver) {
+        setConfirmTransfer(null);
+      }
     } finally {
       setTransferring(false);
     }

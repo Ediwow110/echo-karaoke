@@ -314,7 +314,7 @@ export default function HostRoomPage() {
     }
   }, [api, notify, refresh, roomId]);
 
-  const transferRoom = useCallback(async (memberId: string): Promise<void> => {
+  const transferRoom = useCallback(async (memberId: string): Promise<boolean> => {
     try {
       const transferred = await transferRoomTo(api, roomId, memberId);
       // The stored session said "you host this room". Leaving it that way would
@@ -332,8 +332,10 @@ export default function HostRoomPage() {
         'You are a guest: you can still add and vote, but playback is theirs.',
         'info',
       );
+      return true;
     } catch (caught) {
       notify('The room could not be transferred.', caught instanceof Error ? caught.message : undefined, 'error');
+      return false;
     }
   }, [api, code, navigate, notify, roomId, roomName]);
 

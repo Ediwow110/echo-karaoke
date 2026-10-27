@@ -32,7 +32,7 @@ export type HostRoomContext = {
   removeMember: (memberId: string) => Promise<void>;
   approveGuest: (memberId: string) => Promise<void>;
   rejectGuest: (memberId: string) => Promise<void>;
-  transferRoom: (memberId: string) => Promise<void>;
+  transferRoom: (memberId: string) => Promise<boolean>;
   endRoom: () => Promise<void>;
 };
 

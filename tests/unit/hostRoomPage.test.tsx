@@ -167,6 +167,7 @@ function renderHost(api: EdgeApi, path = '/room/' + roomId + '/host') {
           Routes,
           null,
           createElement(Route, { path: '/', element: createElement('p', null, 'Back at the start') }),
+          createElement(Route, { path: '/room/:roomId', element: createElement('p', null, 'Guest remote') }),
           createElement(
             Route,
             { path: '/room/:roomId/host', element: createElement(HostRoomPage) },
@@ -767,6 +768,49 @@ describe('host room workspace', () => {
     await screen.findByText('Add more songs');
 
     expect(screen.getByText('Autoplay on')).toBeInTheDocument();
+  });
+
+  async function confirmTransfer(fails: boolean): Promise<void> {
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'transfer-host') {
+          if (fails) {
+            throw new Error('The room service could not be reached');
+          }
+          return {
+            roomId,
+            guestToken: 'g'.repeat(40),
+            role: 'guest',
+            newHost: { memberId: '22222222-2222-2222-2222-222222222222', displayName: 'Jamie' },
+          };
+        }
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return liveRoom;
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+
+    renderHost(api, '/room/' + roomId + '/host/settings');
+    fireEvent.click(await screen.findByLabelText('Hand the room to Jamie'));
+    fireEvent.click(await screen.findByText('Hand it over'));
+  }
+
+  it('keeps the handover dialog open when the transfer fails', async () => {
+    // A handover that did not happen must not look like one that did: the host
+    // needs the same dialog still there to try again, not a rebuilt list.
+    await confirmTransfer(true);
+
+    await waitFor(() => {
+      expect(screen.getByText('The room could not be transferred.')).toBeInTheDocument();
+    });
+    expect(screen.getByText('Hand it over')).toBeInTheDocument();
+  });
+
+  it('hands the room over and leaves the host screen when the transfer succeeds', async () => {
+    await confirmTransfer(false);
+
+    expect(await screen.findByText('Guest remote')).toBeInTheDocument();
   });
 
   it('coalesces repeated YouTube end events into one automatic next request', async () => {
