@@ -22,9 +22,10 @@ and deployment contract.
 - `npm run test:e2e:ui`: Playwright UI checks against Vite with mocked `/api` calls.
   This suite must stay database-free and key-free.
 - `npm run test:e2e`: real host/guest flows against `E2E_BASE_URL`, which is now
-  **required** — `scripts/e2e-target.mjs` stops the run at config load without it and
-  refuses the deployed production origin, because `vercel dev`'s defaults write real
-  rooms into production. Point it at a branch-backed server.
+  **required** — `scripts/e2e-target.mjs` stops the run at config load without it,
+  refuses the deployed production origin outright, and refuses a loopback port
+  unless `E2E_BRANCH_TARGET_CONFIRMED=1` states that the port serves a disposable
+  branch. Point it at a branch-backed server.
 - `npm run test:integration`: router/auth/operation path against a disposable Neon
   branch. It skips without `DATABASE_URL`, `AUTH_DATABASE_URL`, and
   `BETTER_AUTH_SECRET`.

@@ -18,10 +18,27 @@ describe('e2e target guard', () => {
   });
 
   it('accepts an explicitly named disposable target', () => {
-    expect(resolveE2EBaseURL({ E2E_BASE_URL: 'http://127.0.0.1:3000' }))
-      .toBe('http://127.0.0.1:3000');
     expect(resolveE2EBaseURL({ E2E_BASE_URL: 'https://branch-deployment.example/' }))
       .toBe('https://branch-deployment.example');
+    expect(resolveE2EBaseURL({ E2E_BASE_URL: 'https://echo-git-abc123.vercel.app' }))
+      .toBe('https://echo-git-abc123.vercel.app');
+  });
+
+  it('refuses a loopback target until the branch behind it is confirmed', () => {
+    // Naming the hazard did not defuse it: the same URL writes real rooms into
+    // production whether or not the operator remembered the warning, and nothing
+    // in the URL itself says which database is behind the port.
+    expect(() => resolveE2EBaseURL({ E2E_BASE_URL: 'http://127.0.0.1:3000' })).toThrow(/E2E_BRANCH_TARGET_CONFIRMED/);
+    const message = catchMessage(() => resolveE2EBaseURL({ E2E_BASE_URL: 'http://localhost:3000' }));
+    expect(message).toContain('vercel dev');
+    expect(message).toContain('disposable branch');
+  });
+
+  it('accepts loopback once the caller confirms the branch behind it', () => {
+    expect(resolveE2EBaseURL({ E2E_BASE_URL: 'http://127.0.0.1:3000', E2E_BRANCH_TARGET_CONFIRMED: '1' }))
+      .toBe('http://127.0.0.1:3000');
+    expect(() => resolveE2EBaseURL({ E2E_BASE_URL: 'http://127.0.0.1:3000', E2E_BRANCH_TARGET_CONFIRMED: '0' }))
+      .toThrow(/E2E_BRANCH_TARGET_CONFIRMED/);
   });
 
   it('refuses the documented production origin even when named', () => {
@@ -29,6 +46,12 @@ describe('e2e target guard', () => {
       .toThrow(/production/);
     expect(() => resolveE2EBaseURL({ E2E_BASE_URL: 'https://echo-karaoke-mocha.vercel.app/room/x' }))
       .toThrow(/production/);
+    // The confirmation is about a local port's database, not a licence to drive
+    // production, so it must not unlock the origin it already refuses.
+    expect(() => resolveE2EBaseURL({
+      E2E_BASE_URL: 'https://echo-karaoke-mocha.vercel.app',
+      E2E_BRANCH_TARGET_CONFIRMED: '1',
+    })).toThrow(/production/);
   });
 
   it('accepts a preview deployment on the same vercel.app host', () => {

@@ -95,14 +95,14 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 589 unit and component tests (jsdom)
+    npm test                 # 591 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # 440 pgTAP assertions
     npm run test:integration # 9 operation-path and runtime-role grant tests against a Neon branch
     npm run test:e2e:ui      # 61 CI-safe Playwright UI flows with a mocked API
-    npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL, refuses the production origin
+    npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL, plus E2E_BRANCH_TARGET_CONFIRMED=1 for a local port
 
-`vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, and it refuses the deployed production origin even when one names it. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
+`vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, and it refuses the deployed production origin even when one names it. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment. A loopback target additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in `http://127.0.0.1:3000` says whether that port is backed by a branch or by production — and the default it replaced was production.
 
 The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.
 

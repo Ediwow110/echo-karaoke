@@ -10,6 +10,12 @@ const PRODUCTION_HOSTS = new Set([
   'echo-karaoke-mocha.vercel.app',
 ]);
 
+// A loopback port says nothing about the database behind it. Under `vercel dev`
+// it is production Neon, so it needs an explicit statement that the port serves
+// a disposable branch instead of a warning nobody has to read.
+const CONFIRMATION = 'E2E_BRANCH_TARGET_CONFIRMED';
+const LOOPBACK_HOSTS = new Set(['127.0.0.1', 'localhost', '0.0.0.0', '[::1]', '::1']);
+
 const GUIDANCE = 'The real-browser suite creates rooms, queue rows and catalog cursors wherever it points. '
   + 'The old default, `vercel dev` on http://127.0.0.1:3000, reads .env.local, whose database URLs name '
   + 'production Neon. Set E2E_BASE_URL to a disposable, branch-backed deployment first: '
@@ -38,6 +44,14 @@ export function resolveE2EBaseURL(env = process.env) {
 
   if (PRODUCTION_HOSTS.has(url.hostname)) {
     throw new Error(`E2E_BASE_URL names the production origin ${url.hostname}. ${GUIDANCE}`);
+  }
+
+  if (LOOPBACK_HOSTS.has(url.hostname) && (env[CONFIRMATION] ?? '').trim() !== '1') {
+    throw new Error(
+      `E2E_BASE_URL names a local port (${url.hostname}), and nothing in a URL says which database answers it. `
+      + `Under \`vercel dev\` that is production Neon. Set ${CONFIRMATION}=1 only when the port serves a `
+      + `disposable branch, or point E2E_BASE_URL at a branch-backed deployment instead. ` + GUIDANCE,
+    );
   }
 
   return url.href.replace(/\/+$/, '');
