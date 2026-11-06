@@ -1,9 +1,10 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { resolveE2EBaseURL } from '../../scripts/e2e-target.mjs';
 
-// These tests drive the real SPA and the same-origin Vercel Function.
-// Start: npx vercel dev, then set E2E_BASE_URL only for a different origin.
-
-const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000';
+// These tests drive the real SPA and the same-origin Vercel Function. Set
+// E2E_BASE_URL to a branch-backed deployment: `vercel dev` with its default
+// environment writes these rooms into production Neon.
+const BASE = resolveE2EBaseURL();
 
 async function createRoom(page: Page, roomName = 'After Hours', hostName = 'Alex'): Promise<{ code: string; joinUrl: string }> {
   await page.goto(BASE + '/');
