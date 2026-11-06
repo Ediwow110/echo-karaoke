@@ -5,7 +5,7 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 ## What it does
 
 - Create a named room and share a real, scannable QR or the 80-bit room code.
-- Split guest permissions: requests can stay open while playback stays host-only, or either can be switched independently.
+- Guest permissions have one switch: playback is host-only unless the host lets guests pause or resume. Adding and voting are always open to guests, and who gets in is moderated by the door instead.
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
 - Queue songs, reorder and remove as host, and let the next song start automatically.
@@ -17,7 +17,7 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 - Local Song library, Favorites and Recently sung, plus remembered room sessions.
 - Ended-room and unavailable-video states that do not leave dead controls.
 
-Host-only controls: skip, remove, reorder, guest removal, lock and clear. Link rotation, turn rotation and room expiry are not implemented; the UI does not pretend they exist.
+Host-only controls: skip, remove, reorder, guest removal, closing the door, and clearing the queue. Link rotation and turn rotation are not implemented; the UI does not pretend they exist. Room expiry is: a hard 24-hour ceiling ends a room even if nobody does.
 
 ## Architecture
 
@@ -37,7 +37,7 @@ not configured or resting. It is not a general replacement for search.
 - Realtime is not used for room data. Screens poll the token-checked read function and use visibility-aware polling.
 - The host screen owns one persistent YouTube player. It stays mounted while the host moves between Discover, Queue, Settings, Library and Favorites; the Stage and Party views dock that same player into a measured slot.
 
-Room codes use 16 Crockford Base32 characters (80 bits). Rooms live until the host ends them, and abandoned rooms are swept when the next room is created.
+Room codes use 16 Crockford Base32 characters (80 bits). Rooms live until the host ends them or 24 hours pass, whichever comes first, and abandoned rooms are swept when the next room is created.
 
 ## Local setup
 
@@ -95,7 +95,7 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 591 unit and component tests (jsdom)
+    npm test                 # 589 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # 440 pgTAP assertions
     npm run test:integration # 9 operation-path and runtime-role grant tests against a Neon branch
@@ -118,7 +118,7 @@ The UI suite needs no database or YouTube key. The real E2E suite creates rooms 
 - `ALLOWED_ORIGINS` is a trusted auth origin, not a CORS policy. The function is same-origin, so a browser on another origin cannot call it through CORS.
 - Rotating `BETTER_AUTH_SECRET` requires deleting `public.jwks` first; otherwise the stored private key cannot be decrypted.
 - Room codes gate joining only. Do not treat a room as secret.
-- One lock covers guest queue adds and votes together (`require_guest_controls`, consulted by `queue_add`, `queue_add_preflight` and `vote_toggle`); a separate lock covers playback control. Skip, remove and reorder are always host-only.
+- Guest adds and votes share one SQL lock (`require_guest_controls`, consulted by `queue_add`, `queue_add_preflight` and `vote_toggle`), and playback has its own. The adds lock is not exposed: nothing sends `lock` or `unlock` and no server path sets the column, so it stays false and the door is what moderates a room. Skip, remove and reorder are always host-only.
 - A partial unique index prevents two active copies of the same video in one room. Played songs may return.
 - A song cap of five per minute per member is enforced. Room creation is capped at 10 rooms per session per hour, and a room is capped at 50 present members including the host (`ROOM_MEMBER_LIMIT`, 2–500). Inactive guest rows stop counting after 30 seconds; the host can remove a guest, which also removes that guest's queue and votes. Anonymous sign-in is capped at 120 per hour per network address (`ANON_SIGNIN_LIMIT_PER_HOUR`, 1–1000), stored as an HMAC, not a raw IP. These are speed bumps; a large venue should set the sign-in cap for its expected crowd.
 
