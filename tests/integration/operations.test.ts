@@ -494,6 +494,18 @@ describe('runtime-role grants', () => {
     expect(names.length, 'the source enumeration found almost no RPCs').toBeGreaterThanOrEqual(24);
 
     const { serviceDatabase } = await import('../../server/db/client');
+    // The assertion below only means something if this is the role production uses.
+    // CI supplies the URL from a secret, so record which role was verified on every
+    // run, and refuse outright if the owner credential ended up in it: an owner can
+    // execute anything, which would make this gate pass without testing anything.
+    const identity = await serviceDatabase().query('select current_user as role') as unknown as Array<{ role: string }>;
+    const verifiedRole = identity[0]?.role ?? 'unknown';
+    console.log(`runtime-role grants verified as "${verifiedRole}"`);
+    expect(
+      ['neondb_owner', 'postgres'].includes(verifiedRole),
+      `the suite connected as ${verifiedRole}, which bypasses the grant check it is supposed to make`,
+    ).toBe(false);
+
     const checks = await serviceDatabase().query(
       `select x.name,
         (select count(*) from pg_proc p join pg_namespace n on n.oid = p.pronamespace
