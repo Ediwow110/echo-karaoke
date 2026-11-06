@@ -79,6 +79,10 @@ async function mockApi(
   catalogQueries: string[] = [],
   syncs: number[] = [],
 ): Promise<void> {
+  // A keepalive fetch issued from `pagehide` is not intercepted here, so the exit
+  // pause at teardown reaches Vite's preview proxy and the web server logs
+  // ECONNREFUSED on 127.0.0.1:3002. That noise is expected and no assertion reads
+  // it; the keepalive contract itself is asserted in tests/unit/hostRoomPage.test.tsx.
   await page.route('**/api/**', async (route) => {
     const path = new URL(route.request().url()).pathname;
     let body: unknown = {};
