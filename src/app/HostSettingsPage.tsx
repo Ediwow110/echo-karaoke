@@ -38,7 +38,7 @@ export default function HostSettingsPage() {
   } = useHostRoom();
   const api = useRoomApi();
   const navigate = useNavigate();
-  const [pending, setPending] = useState<'playback' | 'door' | 'approval' | null>(null);
+  const [pending, setPending] = useState<'adds' | 'playback' | 'door' | 'approval' | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -84,6 +84,16 @@ export default function HostSettingsPage() {
       await refresh();
     } catch (caught) {
       notify('The approval setting could not be changed.', caught instanceof Error ? caught.message : undefined, 'error');
+    } finally {
+      setPending(null);
+    }
+  }
+
+  async function setGuestAdds(next: boolean): Promise<void> {
+    if (pending !== null) return;
+    setPending('adds');
+    try {
+      await runHost(next ? 'unlock' : 'lock');
     } finally {
       setPending(null);
     }
@@ -149,6 +159,15 @@ export default function HostSettingsPage() {
           <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="permissions-title">
             <p id="permissions-title" className="eyebrow text-ink-2">Guest permissions</p>
             <div className="mt-5 flex flex-col gap-5">
+              <Toggle
+                checked={!room.guestControlLocked}
+                onChange={(next) => { void setGuestAdds(next); }}
+                label="Guests can add and vote"
+                description="On by default. Off stops guests adding songs or voting; they can still search, and the host keeps skip, remove and reorder."
+                disabled={offline || pending !== null}
+                busy={pending === 'adds'}
+              />
+              <div className="h-px bg-line" aria-hidden="true" />
               <Toggle
                 checked={!room.guestPlaybackLocked}
                 onChange={(next) => { void setGuestPlayback(next); }}
@@ -333,7 +352,7 @@ export default function HostSettingsPage() {
                 <dd className="text-ink">{joinUrl.length > 0 ? 'Live' : 'Unavailable'}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink-2">Guest adds</dt>
+                <dt className="text-ink-2">Guest adds and votes</dt>
                 <dd className={room.guestControlLocked ? 'text-ink-2' : 'text-live'}>{room.guestControlLocked ? 'Off' : 'On'}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">

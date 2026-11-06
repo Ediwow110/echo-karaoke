@@ -393,6 +393,37 @@ describe('host room workspace', () => {
     });
   });
 
+  it('locks guest adds and votes from settings', async () => {
+    const { api, calls } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    const guestAdds = await screen.findByRole('switch', { name: /guests can add and vote/i });
+    expect(guestAdds).toBeChecked();
+    fireEvent.click(guestAdds);
+    await waitFor(() => {
+      expect(calls).toContainEqual(expect.objectContaining({
+        name: 'host-command',
+        body: { roomId, action: 'lock' },
+      }));
+    });
+  });
+
+  it('shows guest adds blocked and reopens them from settings', async () => {
+    const lockedRoom = { ...liveRoom, room: { ...liveRoom.room, guestControlLocked: true } };
+    const { api, calls } = makeApi(lockedRoom);
+    renderHost(api, '/room/' + roomId + '/host/settings');
+
+    const guestAdds = await screen.findByRole('switch', { name: /guests can add and vote/i });
+    expect(guestAdds).not.toBeChecked();
+    fireEvent.click(guestAdds);
+    await waitFor(() => {
+      expect(calls).toContainEqual(expect.objectContaining({
+        name: 'host-command',
+        body: { roomId, action: 'unlock' },
+      }));
+    });
+  });
+
   it('announces the door count on every host screen', async () => {
     const withDoor = {
       ...liveRoom,
