@@ -235,8 +235,10 @@ describe('host room workspace', () => {
 
     expect(await screen.findByRole('switch', { name: /guests can pause or resume/i })).not.toBeChecked();
     expect(screen.getByRole('switch', { name: /approve each guest/i })).toBeChecked();
-    // Guests can always add songs now, so the control is gone rather than hidden.
-    expect(screen.queryByRole('switch', { name: /guests can add songs/i })).toBeNull();
+    // Guests can always add songs now, so no switch for it survives under any
+    // label. Matching the concept rather than the old wording is the point: the
+    // control came back once already behind a renamed label.
+    expect(screen.queryByRole('switch', { name: /guests can add/i })).toBeNull();
     expect(screen.getByRole('button', { name: /leave & end room/i })).toBeInTheDocument();
   });
 
@@ -389,37 +391,6 @@ describe('host room workspace', () => {
       expect(calls).toContainEqual(expect.objectContaining({
         name: 'set-admissions',
         body: { roomId, locked: false },
-      }));
-    });
-  });
-
-  it('locks guest adds and votes from settings', async () => {
-    const { api, calls } = makeApi();
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    const guestAdds = await screen.findByRole('switch', { name: /guests can add and vote/i });
-    expect(guestAdds).toBeChecked();
-    fireEvent.click(guestAdds);
-    await waitFor(() => {
-      expect(calls).toContainEqual(expect.objectContaining({
-        name: 'host-command',
-        body: { roomId, action: 'lock' },
-      }));
-    });
-  });
-
-  it('shows guest adds blocked and reopens them from settings', async () => {
-    const lockedRoom = { ...liveRoom, room: { ...liveRoom.room, guestControlLocked: true } };
-    const { api, calls } = makeApi(lockedRoom);
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    const guestAdds = await screen.findByRole('switch', { name: /guests can add and vote/i });
-    expect(guestAdds).not.toBeChecked();
-    fireEvent.click(guestAdds);
-    await waitFor(() => {
-      expect(calls).toContainEqual(expect.objectContaining({
-        name: 'host-command',
-        body: { roomId, action: 'unlock' },
       }));
     });
   });
