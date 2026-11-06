@@ -22,10 +22,11 @@ import { isFavorite, subscribeLibrary, toggleFavorite } from '../features/librar
 import { formatTime, onlineGuestCount } from '../lib/format';
 import { Button, Chip, IconButton, Logo, SongArtwork, TransportButton } from '../ui';
 
-// The view switch is a query param on this route, never a link to another one.
-// HostRoomPage renders Stage and Party in their own immersive tree, so a pathname
-// change remounts the persistent player and reloads the video mid-song. A search
-// change keeps the same tree, which is what lets a host flip views while singing.
+// The view switch is a query param on this route, not a link to another screen.
+// The player itself survives a route change either way, because HostRoomPage keys
+// it to the room. What a navigation would cost is this screen's measured slot:
+// the video would hop to the floating frame and re-lay-out under the host's hands,
+// so a view change stays a view change.
 const LAYOUT_PARAM = 'layout';
 
 export default function HostStagePage() {
@@ -158,6 +159,7 @@ export default function HostStagePage() {
           <Chip tone="gold">Your private stage</Chip>
         </span>
         <div className="ml-auto flex items-center gap-2">
+          {connection === 'offline' ? <Chip tone="gold">Reconnecting</Chip> : null}
           <span className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-line bg-surface px-2.5 text-[0.6875rem] text-ink-2">
             <span
               aria-hidden="true"
@@ -176,7 +178,7 @@ export default function HostStagePage() {
           </button>
           <Link
             to={'/room/' + roomId + '/host/party'}
-            className="hidden min-h-11 items-center gap-1.5 whitespace-nowrap rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink hover:border-line-strong lg:inline-flex"
+            className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink hover:border-line-strong"
           >
             <ArrowsOutIcon size={14} aria-hidden="true" />
             Party view
@@ -213,7 +215,7 @@ export default function HostStagePage() {
             <Chip tone="default" className="shrink-0">{upNext.length} up next</Chip>
           </div>
 
-          <div className="relative min-h-[34vh] flex-1 overflow-hidden rounded-panel border border-line bg-graphite-deep lg:min-h-0" data-stage-frame>
+          <div className="relative aspect-video w-full overflow-hidden rounded-panel border border-line bg-graphite-deep lg:aspect-auto lg:min-h-0 lg:flex-1" data-stage-frame>
             {nowPlaying !== null && playback?.currentVideoId != null ? (
               <div ref={attachSlot} className="absolute inset-0" data-stage-slot />
             ) : (
@@ -248,7 +250,7 @@ export default function HostStagePage() {
               </>
             )}
 
-            <div className="pointer-events-none absolute bottom-3 left-3 max-w-[min(21rem,88vw)]" data-join-overlay>
+            <div className="pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(21rem,88vw)]" data-join-overlay>
               <InviteCard
                 roomName={roomName}
                 code={code}
@@ -329,7 +331,7 @@ export default function HostStagePage() {
                   <QueueIcon size={14} aria-hidden="true" />
                   Queue
                 </Link>
-                <span className="hidden items-center gap-2 lg:flex">
+                <span className="flex items-center gap-2">
                   <SpeakerHighIcon size={15} className="text-ink-2" aria-hidden="true" />
                   <input
                     type="range"

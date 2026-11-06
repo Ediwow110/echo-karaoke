@@ -432,9 +432,9 @@ test('the stage says Ready on an idle room, never Autoplay on', async ({ page })
 });
 
 test('the stage switches between TV and laptop on one route', async ({ page }) => {
-  // The switch is a query param because HostRoomPage renders Stage and Party in
-  // their own immersive tree: a pathname change would remount the persistent
-  // player and reload the song mid-verse. The URL is the evidence.
+  // The switch is a query param, so the stage screen and its measured slot stay
+  // mounted; a navigation would move the video to the floating frame. The URL is
+  // the evidence.
   await mockApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
@@ -491,6 +491,45 @@ test('the stage fills the viewport in both layouts without covering its own cont
   expect(video!.height).toBeGreaterThanOrEqual(300);
   expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
     .toBeLessThanOrEqual(1);
+});
+
+test('the join overlay stays above the docked player once a song is loaded', async ({ page }) => {
+  // boundingBox() and toBeVisible() both miss occlusion. The player layer is a
+  // fixed, opaque z-20 sibling, so an overlay without a z-index is painted under
+  // it the moment a video docks -- exactly when a room needs its QR most.
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+  await page.waitForSelector('[data-host-player]', { state: 'visible' });
+
+  const hit = await page.evaluate(() => {
+    const overlay = document.querySelector<HTMLElement>('[data-join-overlay]');
+    const rect = overlay?.getBoundingClientRect();
+    if (overlay === undefined || overlay === null || rect === undefined) return null;
+    const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
+    return {
+      onTop: top !== null && (top === overlay || overlay.contains(top)),
+      topTag: top?.tagName ?? 'none',
+      inPlayer: top?.closest('[data-host-player]') !== null && top?.closest('[data-host-player]') !== undefined,
+    };
+  });
+
+  expect(hit, 'the overlay must be measurable').not.toBeNull();
+  expect(hit!.inPlayer, 'the player layer covers the invitation').toBe(false);
+  expect(hit!.onTop, 'a tap at the overlay centre must reach the invitation').toBe(true);
+});
+
+test('the stage frame stays tall enough for the player to dock on a landscape phone', async ({ page }) => {
+  // HostPlayer refuses to drive a video whose slot is under 200x200, so a frame
+  // sized from the viewport height can silently park the player on a short
+  // landscape screen instead of playing.
+  await mockApi(page);
+  await page.setViewportSize({ width: 844, height: 390 });
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+
+  const box = await page.locator('[data-stage-frame]').boundingBox();
+  expect(box!.width).toBeGreaterThanOrEqual(200);
+  expect(box!.height, 'a slot under 200px tall parks the player and pauses the song').toBeGreaterThanOrEqual(200);
 });
 
 test('a failed handover keeps the confirmation open', async ({ page }) => {

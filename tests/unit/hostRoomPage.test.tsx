@@ -1046,9 +1046,9 @@ describe('host room workspace', () => {
 
     expect(await screen.findByRole('search')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /switch to tv/i })).toHaveAttribute('aria-pressed', 'true');
-    // The switch is a query param, not a route change. Navigating would remount the
-    // persistent player and reload the song mid-verse, and it would land on
-    // Discover, whose own heading must not appear here.
+    // The switch is a query param, not a route change: navigating would leave this
+    // screen's measured slot and move the video to the floating frame, and it would
+    // land on Discover, whose own heading must not appear here.
     expect(screen.queryByText('kara-echo song search')).toBeNull();
     expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Afterglow');
   });
