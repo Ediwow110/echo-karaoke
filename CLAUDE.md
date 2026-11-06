@@ -6,8 +6,9 @@ and deployment contract.
 ## Commands
 
 - `npm run dev`: Vite only — `/api` is not served. Vite proxies `/api` to
-  `http://127.0.0.1:3002`, but nothing in this repo listens there. Use
-  `npx vercel dev` below for the full stack.
+  `http://127.0.0.1:3002`, and `scripts/.local-backend.ts` binds that port, but it is
+  a hand-run launcher wired to no npm script, so nothing is listening unless you start
+  it yourself. Use `npx vercel dev` below for the full stack.
 - `npx vercel dev`: the only working full-stack local path, on port 3000.
   **Caution:** `.env.local`'s `DATABASE_URL`, `AUTH_DATABASE_URL`, and
   `NEON_DATABASE_URL` all name production Neon `main`, so this command writes real
@@ -20,10 +21,10 @@ and deployment contract.
 - `npm test`: unit and component tests in jsdom.
 - `npm run test:e2e:ui`: Playwright UI checks against Vite with mocked `/api` calls.
   This suite must stay database-free and key-free.
-- `npm run test:e2e`: real host/guest flows against `vercel dev` or `E2E_BASE_URL`.
-  Its default base URL is `127.0.0.1:3000`, so with no `E2E_BASE_URL` set it drives
-  whatever `vercel dev` is serving — which is production unless you repointed it.
-  Set `E2E_BASE_URL` to a branch-backed server before running it.
+- `npm run test:e2e`: real host/guest flows against `E2E_BASE_URL`, which is now
+  **required** — `scripts/e2e-target.mjs` stops the run at config load without it and
+  refuses the deployed production origin, because `vercel dev`'s defaults write real
+  rooms into production. Point it at a branch-backed server.
 - `npm run test:integration`: router/auth/operation path against a disposable Neon
   branch. It skips without `DATABASE_URL`, `AUTH_DATABASE_URL`, and
   `BETTER_AUTH_SECRET`.

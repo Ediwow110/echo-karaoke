@@ -1,2 +1,3 @@
 -- Intentionally empty. The pgTAP suites create their own fixtures inside
--- transactions, and the application creates real rooms through Edge Functions.
+-- transactions, and the application creates real rooms through the single /api
+-- Vercel Function, not through Supabase Edge Functions.

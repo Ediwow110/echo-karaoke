@@ -59,11 +59,14 @@ YouTube search and chart require a data API key. Without it the app explains tha
 Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed, with a per-room daily lookup budget and a larger deployment budget. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0033 before deploying this tree; queue and search now call
+migrations 0025 through 0044 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
 karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
 calls `playback_next_if_current`, and the songbook catalog tables and its retention
-function must exist before the sync and the daily cron run.
+function must exist before the sync and the daily cron run. 0042 gives a room a hard
+24-hour ceiling and 0043 grants the sweep that enforces it, so a tree older than those
+two still ends rooms lazily inside the room read but leaves expired rows uncollected;
+0044 adds the daily sweep that keeps the rate-limit ledger from growing without bound.
 
     npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
     npx supabase test db --db-url "$NEON_DATABASE_URL"
@@ -91,30 +94,30 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 578 unit and component tests (jsdom)
+    npm test                 # 589 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # 440 pgTAP assertions
-    npm run test:integration # 8 router/auth/operation tests against a Neon branch
+    npm run test:integration # 9 operation-path and runtime-role grant tests against a Neon branch
     npm run test:e2e:ui      # 57 CI-safe Playwright UI flows with a mocked API
-    npm run test:e2e         # real Playwright flows against vercel dev on port 3000
+    npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL, refuses the production origin
 
-`vercel dev` reads `.env.local`, whose database URLs name production Neon, so `npm run test:e2e` with no `E2E_BASE_URL` creates real rooms in production. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
+`vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, and it refuses the deployed production origin even when one names it. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
 
 The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.
 
-The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app; start `vercel dev` first or set `E2E_BASE_URL`. One E2E test decodes the rendered QR through the local Vite dev resolver.
+The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app, so `E2E_BASE_URL` is mandatory and checked by `scripts/e2e-target.mjs` before anything launches. One E2E test decodes the rendered QR through the local Vite dev resolver.
 
 ## Security notes
 
 - Guest and host passes live in localStorage, so any same-origin script can read them. An XSS bug can take over a session.
 - Losing the host pass leaves a live room without host controls. There is no recovery flow.
 - The `service_role` and `echo_auth` connection strings exist only in the function environment. They must never reach the browser bundle, logs, or the repository. The browser has no database credential at all.
-- The function connects as `echo_service`. A new SQL function must be granted to `echo_service` as well as `service_role`, or the feature 500s in production while every owner-run database test passes; `supabase/tests/role_grant_parity_test.sql` fails if the two roles' surfaces drift.
+- The function connects as `echo_service`. A new SQL function must be granted to `echo_service` as well as `service_role`, or the feature 500s in production while every owner-run database test passes; `supabase/tests/role_grant_parity_test.sql` fails if the two roles' surfaces drift, and `tests/unit/runtimeRoleGrants.test.ts` checks the same rule offline from the migration text, so the drift surfaces in `npm test` instead of only on a CI branch.
 - The owner connection string is used only for migrations and CI. It is never set on Vercel.
 - `ALLOWED_ORIGINS` is a trusted auth origin, not a CORS policy. The function is same-origin, so a browser on another origin cannot call it through CORS.
 - Rotating `BETTER_AUTH_SECRET` requires deleting `public.jwks` first; otherwise the stored private key cannot be decrypted.
 - Room codes gate joining only. Do not treat a room as secret.
-- Guest request and playback permissions are independent. Skip, remove and reorder are always host-only.
+- One lock covers guest queue adds and votes together (`require_guest_controls`, consulted by `queue_add`, `queue_add_preflight` and `vote_toggle`); a separate lock covers playback control. Skip, remove and reorder are always host-only.
 - A partial unique index prevents two active copies of the same video in one room. Played songs may return.
 - A song cap of five per minute per member is enforced. Room creation is capped at 10 rooms per session per hour, and a room is capped at 50 present members including the host (`ROOM_MEMBER_LIMIT`, 2–500). Inactive guest rows stop counting after 30 seconds; the host can remove a guest, which also removes that guest's queue and votes. Anonymous sign-in is capped at 120 per hour per network address (`ANON_SIGNIN_LIMIT_PER_HOUR`, 1–1000), stored as an HMAC, not a raw IP. These are speed bumps; a large venue should set the sign-in cap for its expected crowd.
 
