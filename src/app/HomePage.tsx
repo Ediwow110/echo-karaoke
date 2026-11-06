@@ -14,11 +14,9 @@ import { getHostSessionByCode, rememberSession } from '../features/rooms/session
 import { RoomApiError } from '../lib/edgeApi';
 import { saveGuestToken, saveHostToken } from '../features/rooms/tokenStore';
 import { useMediaQuery } from '../lib/useMediaQuery';
-import AppShell from '../features/rooms/AppShell';
+import { Avatar, Button, Field, Logo } from '../ui';
 import ReturnToRoom from '../features/rooms/ReturnToRoom';
 import { useHostedRoom } from '../features/rooms/useHostedRoom';
-import type { ActiveRoom } from '../features/rooms/Sidebar';
-import { Avatar, Button, Field, Logo } from '../ui';
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Try again.';
@@ -417,31 +415,24 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
   }
 
   const resolvedHost = hostName.trim().length > 0 ? hostName.trim() : 'You';
-  const activeRoom: ActiveRoom | null = hostedRoom === null
-    ? null
-    : {
-        roomId: hostedRoom.roomId,
-        name: hostedRoom.roomName,
-        code: hostedRoom.code,
-        hostName: hostedRoom.hostName,
-      };
 
   return (
-    <AppShell
-      activeNav="create"
-      activeRoom={activeRoom}
-      hostName={hostName.trim()}
-      mobileAction={<Link to="/scan" className="inline-flex min-h-11 items-center text-[0.75rem] font-semibold text-signal">Scan a code</Link>}
-    >
+    <div className="min-h-dvh bg-graphite text-ink">
       <main className="mx-auto w-full max-w-[1240px] px-4 pb-12 pt-6 sm:px-6 lg:px-8 lg:pt-8">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-5 animate-console-in">
           <div>
             <p className="eyebrow text-gold">YouTube karaoke room</p>
             <h1 className="mt-1 font-display text-[1.55rem] font-bold tracking-[-0.02em] text-ink">Create room</h1>
           </div>
-          <span className="rounded-full border border-signal/25 bg-signal-soft px-3 py-1.5 text-[0.625rem] font-semibold text-signal">
-            {hostName.trim().length > 0 ? hostName.trim() + ' · Host setup' : 'Host setup'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-signal/25 bg-signal-soft px-3 py-1.5 text-[0.625rem] font-semibold text-signal">
+              {hostName.trim().length > 0 ? hostName.trim() + ' · Host setup' : 'Host setup'}
+            </span>
+            <Link to="/scan" className="inline-flex min-h-11 items-center gap-1.5 px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
+              <QrCodeIcon size={14} aria-hidden="true" />
+              Scan a code
+            </Link>
+          </div>
         </header>
 
         <section className="mt-8 animate-console-in" style={{ animationDelay: '60ms' }} aria-labelledby="create-title">
@@ -602,6 +593,6 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
           More room settings are available after creation. Change guest permissions whenever you need.
         </p>
       </main>
-    </AppShell>
+    </div>
   );
 }

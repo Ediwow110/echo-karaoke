@@ -431,6 +431,68 @@ test('the stage says Ready on an idle room, never Autoplay on', async ({ page })
   await expect(page.getByText('Autoplay on')).toHaveCount(0);
 });
 
+test('the stage switches between TV and laptop on one route', async ({ page }) => {
+  // The switch is a query param because HostRoomPage renders Stage and Party in
+  // their own immersive tree: a pathname change would remount the persistent
+  // player and reload the song mid-verse. The URL is the evidence.
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toBeVisible();
+  await expect(page.getByRole('search')).toHaveCount(0);
+
+  await page.getByRole('button', { name: 'Switch to laptop' }).click();
+  await expect(page.getByRole('search')).toBeVisible();
+  await expect(page).toHaveURL(/\/host\/stage\?layout=laptop$/);
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toBeVisible();
+
+  await page.getByRole('button', { name: 'Switch to TV' }).click();
+  await expect(page.getByRole('search')).toHaveCount(0);
+  await expect(page).toHaveURL(/\/host\/stage\?layout=tv$/);
+});
+
+test('the stage fills the viewport in both layouts without covering its own controls', async ({ page }) => {
+  // The redesign's whole claim is a full-bleed screen with the invitation
+  // overlaid on the video. Two ways that goes wrong: horizontal overflow at
+  // phone width, and the overlay landing on the transport row.
+  await mockApi(page);
+  for (const [width, height] of [[1440, 900], [390, 844]] as const) {
+    await page.setViewportSize({ width, height });
+    await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+
+    const frame = page.locator('[data-stage-frame]');
+    const invite = page.locator('[data-stage-frame] [data-join-overlay]');
+    await expect(frame).toBeVisible();
+    const box = await frame.boundingBox();
+    const overlaid = await invite.boundingBox();
+    expect(overlaid, 'the invitation belongs to the video frame').not.toBeNull();
+    expect(overlaid!.x).toBeGreaterThanOrEqual(box!.x - 1);
+    expect(overlaid!.x + overlaid!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
+    expect(overlaid!.y + overlaid!.height).toBeLessThanOrEqual(box!.y + box!.height + 1);
+
+    const transport = page.getByRole('button', { name: /play|pause/i }).first();
+    const transportBox = await transport.boundingBox();
+    expect(transportBox!.y).toBeGreaterThan(box!.y + box!.height - 1);
+
+    expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+      .toBeLessThanOrEqual(1);
+  }
+
+  // Laptop mode has to actually use the width: a 25rem panel that starves the
+  // video would be worse than the spacing it replaced.
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await page.goto('/room/' + ROOM + '/host/stage', { waitUntil: 'networkidle' });
+  await page.getByRole('button', { name: 'Switch to laptop' }).click();
+  await expect(page.getByRole('search')).toBeVisible();
+
+  const video = await page.locator('[data-stage-frame]').boundingBox();
+  expect(video!.width).toBeGreaterThanOrEqual(700);
+  expect(video!.height).toBeGreaterThanOrEqual(300);
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(1);
+});
+
 test('a failed handover keeps the confirmation open', async ({ page }) => {
   // transferRoom swallows its own error, so the dialog must be closed by the
   // reported outcome rather than by the await returning. Closing it anyway
@@ -607,17 +669,12 @@ test('the create action opens the create form and keeps the hosted room one clic
   const back = page.getByRole('link', { name: 'Back to the room' });
   await expect(back).toHaveAttribute('href', '/room/' + ROOM + '/host');
 
-  // On a wide window the create screen carries the sidebar the host arrived
-  // from, so the room they still commands has to stay in it. It used to
-  // collapse to a single "Create room" link beside a "Your next session" card.
+  // The create screen no longer carries the primary nav: the owner asked for the
+  // home page without it. What has to survive is the way back to the room the
+  // host still commands, so the create form states it in its own body.
   await page.setViewportSize({ width: 1440, height: 900 });
-  const nav = page.getByRole('navigation', { name: 'Primary' });
-  await expect(nav.getByRole('link', { name: 'Room queue' }))
-    .toHaveAttribute('href', '/room/' + ROOM + '/host/queue');
-  await expect(nav.getByRole('link', { name: 'Discover' }))
-    .toHaveAttribute('href', '/room/' + ROOM + '/host');
-  await expect(page.getByText('Your next session')).toHaveCount(0);
-  await expect(page.getByText("You're hosting this room.")).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
+  await expect(page.getByText('Still hosting')).toBeVisible();
 
   await back.click();
   await expect(page).toHaveURL(new RegExp('/room/' + ROOM + '/host$'));

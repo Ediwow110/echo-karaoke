@@ -1,23 +1,32 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { Link, useNavigate } from 'react-router-dom';
+import { Link, useNavigate, useSearchParams } from 'react-router-dom';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
-import { ArrowLeftIcon } from '@phosphor-icons/react/dist/csr/ArrowLeft';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
 import { HeartIcon } from '@phosphor-icons/react/dist/csr/Heart';
+import { LaptopIcon } from '@phosphor-icons/react/dist/csr/Laptop';
 import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
 import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
+import { TelevisionIcon } from '@phosphor-icons/react/dist/csr/Television';
 import { useHostRoom } from './useHostRoom';
 import { useHostPlayer } from '../features/playback/useHostPlayer';
 import { UpNextList } from '../features/queue/QueueRows';
+import SongSearchPanel from '../features/queue/SongSearchPanel';
+import PopularSongs from '../features/queue/PopularSongs';
 import InviteCard from '../features/rooms/InviteCard';
 import { isFavorite, subscribeLibrary, toggleFavorite } from '../features/library/libraryStore';
 import { formatTime, onlineGuestCount } from '../lib/format';
 import { Button, Chip, IconButton, Logo, SongArtwork, TransportButton } from '../ui';
+
+// The view switch is a query param on this route, never a link to another one.
+// HostRoomPage renders Stage and Party in their own immersive tree, so a pathname
+// change remounts the persistent player and reloads the video mid-song. A search
+// change keeps the same tree, which is what lets a host flip views while singing.
+const LAYOUT_PARAM = 'layout';
 
 export default function HostStagePage() {
   const {
@@ -27,15 +36,19 @@ export default function HostStagePage() {
     hostName,
     joinUrl,
     roster,
+    queue,
     playback,
     nowPlaying,
     upNext,
     connection,
+    refresh,
     togglePlay,
     next,
   } = useHostRoom();
   const player = useHostPlayer();
   const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const laptop = params.get(LAYOUT_PARAM) === 'laptop';
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -53,6 +66,10 @@ export default function HostStagePage() {
   const attachSlot = useCallback((node: HTMLDivElement | null) => {
     player.registerStageSlot(node);
   }, [player.registerStageSlot]);
+
+  const switchLayout = useCallback((): void => {
+    setParams({ [LAYOUT_PARAM]: laptop ? 'tv' : 'laptop' }, { replace: true });
+  }, [laptop, setParams]);
 
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
@@ -78,11 +95,16 @@ export default function HostStagePage() {
       if (event.key.toLowerCase() === 'f') {
         event.preventDefault();
         player.toggleFullscreen();
+        return;
+      }
+      if (event.key.toLowerCase() === 'v') {
+        event.preventDefault();
+        switchLayout();
       }
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [player.seekBy, player.toggleFullscreen, togglePlay]);
+  }, [player.seekBy, player.toggleFullscreen, switchLayout, togglePlay]);
 
   async function playPause(): Promise<void> {
     setBusy('play');
@@ -129,72 +151,69 @@ export default function HostStagePage() {
           : { dot: 'bg-line', label: 'Ready' };
 
   return (
-    <div className="min-h-dvh bg-graphite text-ink">
-      <header className="sticky top-0 z-30 border-b border-line bg-graphite/95 backdrop-blur animate-console-in">
-        <div className="mx-auto flex h-16 max-w-[1600px] items-center justify-between gap-3 px-4 sm:px-6">
-          <div className="flex min-w-0 items-center gap-3">
-            <Logo size="md" wordmarkClassName="hidden sm:inline" />
-            <span className="hidden h-5 w-px bg-line sm:block" aria-hidden="true" />
-            <Link
-              to={'/room/' + roomId + '/host'}
-              aria-label="Back to discovery"
-              className="inline-flex size-11 items-center justify-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink sm:hidden"
-            >
-              <ArrowLeftIcon size={16} weight="bold" aria-hidden="true" />
-            </Link>
-            <Link to={'/room/' + roomId + '/host'} className="hidden items-center gap-1.5 text-[0.6875rem] text-ink-2 hover:text-ink sm:flex">
-              <ArrowLeftIcon size={14} weight="bold" aria-hidden="true" />
-              Back to discovery
-            </Link>
-          </div>
-          <div className="hidden sm:block">
-            <Chip tone="gold">Your private stage</Chip>
-          </div>
-          <div className="flex items-center gap-2">
-            {connection === 'offline' ? <Chip tone="gold">Reconnecting</Chip> : null}
-            <Link
-              to={'/room/' + roomId + '/host/party'}
-              className="inline-flex min-h-11 items-center gap-1.5 whitespace-nowrap rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink hover:border-line-strong"
-            >
-              <ArrowsOutIcon size={14} aria-hidden="true" />
-              Party view
-            </Link>
-            <IconButton
-              icon={<SignOutIcon size={17} />}
-              label="Leave host screen"
-              tone="ghost"
-              size="sm"
-              placement="bottom"
-              onClick={() => navigate('/')}
+    <div className="flex min-h-dvh flex-col bg-graphite text-ink lg:h-dvh lg:overflow-hidden">
+      <header className="flex h-14 shrink-0 items-center gap-3 border-b border-line px-3 sm:px-4">
+        <Logo size="sm" wordmarkClassName="hidden sm:inline" />
+        <span className="hidden sm:block">
+          <Chip tone="gold">Your private stage</Chip>
+        </span>
+        <div className="ml-auto flex items-center gap-2">
+          <span className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-line bg-surface px-2.5 text-[0.6875rem] text-ink-2">
+            <span
+              aria-hidden="true"
+              className={['size-1.5 rounded-full', connection === 'offline' ? 'bg-gold' : 'bg-live'].join(' ')}
             />
-          </div>
+            {onlineGuestCount(roster)} in room
+          </span>
+          <button
+            type="button"
+            onClick={switchLayout}
+            aria-pressed={laptop}
+            className="inline-flex min-h-11 items-center gap-2 rounded-media border border-signal/40 bg-signal-soft px-3 text-[0.75rem] font-semibold text-signal transition-[background-color,border-color] duration-150 hover:border-signal"
+          >
+            {laptop ? <TelevisionIcon size={16} aria-hidden="true" /> : <LaptopIcon size={16} aria-hidden="true" />}
+            Switch to {laptop ? 'TV' : 'laptop'}
+          </button>
+          <Link
+            to={'/room/' + roomId + '/host/party'}
+            className="hidden min-h-11 items-center gap-1.5 whitespace-nowrap rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink hover:border-line-strong lg:inline-flex"
+          >
+            <ArrowsOutIcon size={14} aria-hidden="true" />
+            Party view
+          </Link>
+          <IconButton
+            icon={<SignOutIcon size={17} />}
+            label="Leave host screen"
+            tone="ghost"
+            size="sm"
+            placement="bottom"
+            onClick={() => navigate('/')}
+          />
         </div>
       </header>
 
-      <div className="mx-auto grid w-full max-w-[1600px] gap-5 px-4 py-5 sm:px-6 xl:grid-cols-[minmax(0,1fr)_19rem]">
-        <main className="min-w-0">
-          <div className="mb-3 flex flex-wrap items-center justify-between gap-3 animate-console-in" style={{ animationDelay: '40ms' }}>
-            <div className="flex min-w-0 items-center gap-3">
-              <SongArtwork src={nowPlaying?.thumbnailUrl} className="h-11 w-11" iconSize={16} />
-              <div className="min-w-0">
-                <h1 className="truncate font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">
-                  {nowPlaying?.title ?? 'The stage is yours.'}
-                </h1>
-                <p className="truncate text-[0.6875rem] text-ink-2">
-                  {nowPlaying === null ? 'Add a song to start the set' : (nowPlaying.channelTitle ?? 'YouTube') + ' · Added by ' + nowPlaying.addedBy}
-                </p>
-              </div>
+      <div className="flex min-h-0 w-full flex-1 flex-col gap-3 p-3 lg:flex-row lg:gap-4 lg:p-4">
+        <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
+          <div className="mb-2 flex min-w-0 items-center gap-3">
+            <SongArtwork src={nowPlaying?.thumbnailUrl} className="h-10 w-10 shrink-0" iconSize={15} />
+            <div className="min-w-0 flex-1">
+              <h1 className="truncate font-display text-[clamp(1.35rem,2.4vw,2.1rem)] font-bold leading-tight tracking-[-0.025em] text-ink">
+                {nowPlaying?.title ?? 'The stage is yours.'}
+              </h1>
+              <p className="truncate text-[0.6875rem] text-ink-2">
+                {nowPlaying === null
+                  ? 'Add a song to start the set'
+                  : (nowPlaying.channelTitle ?? 'YouTube') + ' · Added by ' + nowPlaying.addedBy}
+              </p>
             </div>
-            <div className="flex items-center gap-2">
-              <Chip tone="default">{upNext.length} up next</Chip>
-              <Link to={queueHref} className="inline-flex min-h-6 items-center gap-1.5 px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink">
-                <QueueIcon size={14} aria-hidden="true" />
-                Queue
-              </Link>
-            </div>
+            <span className="hidden shrink-0 items-center gap-1.5 text-[0.6875rem] text-ink-2 sm:flex">
+              <span aria-hidden="true" className={['size-1.5 rounded-full', status.dot].join(' ')} />
+              {status.label}
+            </span>
+            <Chip tone="default" className="shrink-0">{upNext.length} up next</Chip>
           </div>
 
-          <div className="relative aspect-video w-full overflow-hidden rounded-panel border border-line bg-graphite-deep shadow-[0_20px_70px_rgba(0,0,0,0.35)]">
+          <div className="relative min-h-[34vh] flex-1 overflow-hidden rounded-panel border border-line bg-graphite-deep lg:min-h-0" data-stage-frame>
             {nowPlaying !== null && playback?.currentVideoId != null ? (
               <div ref={attachSlot} className="absolute inset-0" data-stage-slot />
             ) : (
@@ -203,30 +222,47 @@ export default function HostStagePage() {
                 <div className="absolute inset-0 stage-sheen" aria-hidden="true" />
                 <div className="stage-smoke absolute inset-0" aria-hidden="true" />
                 <div className="relative grid h-full place-items-center px-6 text-center">
-                  <div className="max-w-[30rem]">
-                    <p className="eyebrow text-gold">Your private stage</p>
-                    <h2 className="mt-2 font-display text-[clamp(2rem,4vw,3.2rem)] font-bold leading-[0.98] tracking-[-0.04em] text-ink">
+                  <div className="max-w-[34rem]">
+                    <p className="eyebrow text-gold">{roomName}</p>
+                    <h2 className="mt-2 font-display text-[clamp(2rem,4.6vw,3.6rem)] font-bold leading-[0.98] tracking-[-0.04em] text-ink">
                       Let's hear your encore.
                     </h2>
-                    <p className="mx-auto mt-3 max-w-[38ch] text-[0.8125rem] leading-[1.65] text-ink-2">
-                      No video is playing. Search for a song and start it from the host screen.
+                    <p className="mx-auto mt-3 max-w-[40ch] text-[0.8125rem] leading-[1.65] text-ink-2">
+                      {laptop
+                        ? 'Search above, or hand the code to anyone with a phone.'
+                        : 'Scan the code to search from a phone and queue songs straight to this screen.'}
                     </p>
-                    <Button
-                      variant="primary"
-                      size="md"
-                      className="mt-5"
-                      icon={<PlayIcon size={15} weight="fill" />}
-                      onClick={() => navigate('/room/' + roomId + '/host')}
-                    >
-                      Find the first song
-                    </Button>
+                    {laptop ? null : (
+                      <Button
+                        variant="primary"
+                        size="md"
+                        className="mt-5"
+                        icon={<PlayIcon size={15} weight="fill" />}
+                        onClick={() => navigate('/room/' + roomId + '/host')}
+                      >
+                        Find the first song
+                      </Button>
+                    )}
                   </div>
                 </div>
               </>
             )}
+
+            <div className="pointer-events-none absolute bottom-3 left-3 max-w-[min(21rem,88vw)]" data-join-overlay>
+              <InviteCard
+                roomName={roomName}
+                code={code}
+                hostName={hostName}
+                joinUrl={joinUrl}
+                guests={onlineGuestCount(roster)}
+                shareReady={connection === 'live'}
+                variant="party"
+                className="pointer-events-auto"
+              />
+            </div>
           </div>
 
-          <div className="mt-4 rounded-panel border border-line bg-surface px-4 py-3.5 animate-console-in" style={{ animationDelay: '120ms' }}>
+          <div className="mt-3 shrink-0 rounded-panel border border-line bg-surface px-3 py-2.5">
             <div className="flex items-center gap-3">
               <span className="w-10 shrink-0 text-[0.6875rem] tabular text-ink-2">{formatTime(current)}</span>
               <input
@@ -245,27 +281,7 @@ export default function HostStagePage() {
               <span className="w-10 shrink-0 text-right text-[0.6875rem] tabular text-ink-2">{duration > 0 ? formatTime(duration) : '—:—'}</span>
             </div>
 
-            <div className="mt-3 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={favorite}
-                  disabled={nowPlaying === null}
-                  aria-pressed={saved}
-                  className={['inline-flex min-h-6 items-center gap-1.5 px-1 text-[0.6875rem] transition-colors', saved ? 'text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
-                >
-                  <HeartIcon size={15} weight={saved ? 'fill' : 'regular'} aria-hidden="true" />
-                  {saved ? 'Saved' : 'Save'}
-                </button>
-                <span className="hidden items-center gap-1.5 text-[0.6875rem] text-ink-2 sm:flex">
-                  <span
-                    aria-hidden="true"
-                    className={['size-1.5 rounded-full', status.dot].join(' ')}
-                  />
-                  {status.label}
-                </span>
-              </div>
-
+            <div className="mt-2.5 flex flex-wrap items-center justify-between gap-3">
               <div className="flex items-center gap-1.5">
                 <TransportButton
                   icon={<ArrowCounterClockwiseIcon size={18} />}
@@ -298,17 +314,33 @@ export default function HostStagePage() {
                 />
               </div>
 
-              <div className="flex items-center gap-2">
-                <SpeakerHighIcon size={15} className="text-ink-2" aria-hidden="true" />
-                <input
-                  type="range"
-                  min={0}
-                  max={100}
-                  value={Number.isFinite(player.volume) ? player.volume : 100}
-                  onChange={(event) => player.setVolume(Number(event.target.value))}
-                  aria-label="Volume"
-                  className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-line accent-signal"
-                />
+              <div className="flex items-center gap-3">
+                <button
+                  type="button"
+                  onClick={favorite}
+                  disabled={nowPlaying === null}
+                  aria-pressed={saved}
+                  className={['inline-flex min-h-9 items-center gap-1.5 px-1 text-[0.6875rem] transition-colors', saved ? 'text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
+                >
+                  <HeartIcon size={15} weight={saved ? 'fill' : 'regular'} aria-hidden="true" />
+                  {saved ? 'Saved' : 'Save'}
+                </button>
+                <Link to={queueHref} className="inline-flex min-h-9 items-center gap-1.5 px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink">
+                  <QueueIcon size={14} aria-hidden="true" />
+                  Queue
+                </Link>
+                <span className="hidden items-center gap-2 lg:flex">
+                  <SpeakerHighIcon size={15} className="text-ink-2" aria-hidden="true" />
+                  <input
+                    type="range"
+                    min={0}
+                    max={100}
+                    value={Number.isFinite(player.volume) ? player.volume : 100}
+                    onChange={(event) => player.setVolume(Number(event.target.value))}
+                    aria-label="Volume"
+                    className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-line accent-signal"
+                  />
+                </span>
                 <IconButton
                   icon={<ArrowsOutIcon size={16} />}
                   label={player.fullscreen ? 'Exit fullscreen' : 'Fullscreen player'}
@@ -319,49 +351,54 @@ export default function HostStagePage() {
               </div>
             </div>
           </div>
-
-          <p className="mt-3 hidden items-center justify-center gap-5 text-[0.5625rem] tracking-[0.02em] text-ink-3 sm:flex">
-            <span>SPACE Pause / play</span>
-            <span>← → Skip 10 seconds</span>
-            <span>F Full screen</span>
-            <span>HOST CONTROLS</span>
-          </p>
         </main>
 
-        <aside className="flex min-w-0 flex-col gap-4 animate-console-in" style={{ animationDelay: '160ms' }} aria-label="Room queue">
-          <section className="rounded-panel border border-line bg-surface p-4">
-            <div className="flex items-center justify-between gap-2">
-              <h2 className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>
-              <Link to={queueHref} aria-label="Manage room queue" className="grid size-11 place-items-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink">
-                <QueueIcon size={17} aria-hidden="true" />
-              </Link>
-            </div>
-            <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
-              Songs play in order. The next video starts automatically when the current one ends.
-            </p>
-            <div className="mt-3">
-              <UpNextList
-                queue={upNext}
-                variant="stage"
-                emptyTitle="Queue is empty."
-                emptyDescription="Search from this screen or any phone to keep the set going."
-              />
-            </div>
-            <Link to={'/room/' + roomId + '/host'} className="mt-3 inline-flex min-h-6 items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
-              Add more songs
-            </Link>
-          </section>
+        {laptop ? (
+          <aside className="flex w-full min-w-0 shrink-0 flex-col gap-3 lg:w-[25rem] lg:overflow-y-auto" aria-label="Stage controls">
+            <section className="rounded-panel border border-line bg-surface p-4">
+              <p className="eyebrow text-gold">Add the next chorus</p>
+              <h2 className="mt-1 font-display text-[1.15rem] font-bold tracking-[-0.02em] text-ink">Search and queue</h2>
+              <div className="mt-3">
+                <SongSearchPanel
+                  roomId={roomId}
+                  queue={queue}
+                  variant="host"
+                  onAdded={() => { void refresh(); }}
+                  onOpenQueue={() => navigate(queueHref)}
+                  popularSlot={(
+                    <PopularSongs
+                      roomId={roomId}
+                      layout="vertical"
+                      queuedVideoIds={queue.map((song) => song.videoId)}
+                      moreHref={'/room/' + roomId + '/host/songbook'}
+                      onAdded={() => { void refresh(); }}
+                    />
+                  )}
+                />
+              </div>
+            </section>
 
-          <InviteCard
-            roomName={roomName}
-            code={code}
-            hostName={hostName}
-            joinUrl={joinUrl}
-            guests={onlineGuestCount(roster)}
-            shareReady={connection === 'live'}
-            variant="compact"
-          />
-        </aside>
+            <section className="rounded-panel border border-line bg-surface p-4">
+              <div className="flex items-center justify-between gap-2">
+                <h2 className="font-display text-[1.15rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>
+                <Link to={queueHref} aria-label="Manage room queue" className="grid size-11 place-items-center rounded-full text-ink-2 hover:bg-surface-2 hover:text-ink">
+                  <QueueIcon size={17} aria-hidden="true" />
+                </Link>
+              </div>
+              <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
+                Songs play in order. The next video starts automatically when the current one ends.
+              </p>
+              <div className="mt-3">
+                <UpNextList
+                  queue={upNext}
+                  variant="stage"
+                  emptyTitle="Queue is empty."
+                  emptyDescription="Search here or on any phone to keep the set going."
+                />
+              </div>
+            </section>
+          </aside>
+        ) : null}
       </div>
     </div>
   );

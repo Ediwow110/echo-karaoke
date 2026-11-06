@@ -783,7 +783,7 @@ describe('host room workspace', () => {
     const { api } = makeApi();
 
     renderHost(api, '/room/' + roomId + '/host/stage');
-    await screen.findByText('Add more songs');
+    await screen.findByRole('button', { name: /switch to (tv|laptop)/i });
 
     expect(screen.queryByText('Autoplay on')).toBeNull();
     expect(screen.getByText('Ready')).toBeInTheDocument();
@@ -819,7 +819,7 @@ describe('host room workspace', () => {
     // route change, so the stage inherits the stalled flag.
     renderHost(api);
     fireEvent.click(await screen.findByLabelText('Open stage'));
-    await screen.findByText('Add more songs');
+    await screen.findByRole('button', { name: /switch to (tv|laptop)/i });
 
     // One "Playback stalled" is the overlay over the video; the second is the
     // status pill, which used to keep reporting that all was well.
@@ -833,7 +833,7 @@ describe('host room workspace', () => {
     playerClock.state = 1;
 
     renderHost(api, '/room/' + roomId + '/host/stage');
-    await screen.findByText('Add more songs');
+    await screen.findByRole('button', { name: /switch to (tv|laptop)/i });
 
     expect(screen.getByText('Autoplay on')).toBeInTheDocument();
   });
@@ -1027,6 +1027,30 @@ describe('host room workspace', () => {
     expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
     expect(screen.queryByText('Now on the host screen')).toBeNull();
     expect(screen.getByRole('slider', { name: 'Playback position' })).toBeInTheDocument();
+  });
+
+  it('opens the stage as a TV layout with no operator panel', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/stage');
+
+    const switcher = await screen.findByRole('button', { name: /switch to laptop/i });
+    expect(switcher).toHaveAttribute('aria-pressed', 'false');
+    expect(screen.queryByRole('search')).toBeNull();
+  });
+
+  it('adds the search panel without leaving the stage route', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/stage');
+
+    fireEvent.click(await screen.findByRole('button', { name: /switch to laptop/i }));
+
+    expect(await screen.findByRole('search')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /switch to tv/i })).toHaveAttribute('aria-pressed', 'true');
+    // The switch is a query param, not a route change. Navigating would remount the
+    // persistent player and reload the song mid-verse, and it would land on
+    // Discover, whose own heading must not appear here.
+    expect(screen.queryByText('kara-echo song search')).toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Afterglow');
   });
 
   it('does not request play when a song is already playing', async () => {
