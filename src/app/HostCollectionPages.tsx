@@ -8,7 +8,7 @@ export function HostLibraryPage() {
       mode="library"
       roomId={roomId}
       queueHref={'/room/' + roomId + '/host/queue'}
-      searchHref={'/room/' + roomId + '/host'}
+      searchHref={'/room/' + roomId + '/host/party?layout=computer'}
       onAdded={() => { void refresh(); }}
     />
   );
@@ -21,7 +21,7 @@ export function HostFavoritesPage() {
       mode="favorites"
       roomId={roomId}
       queueHref={'/room/' + roomId + '/host/queue'}
-      searchHref={'/room/' + roomId + '/host'}
+      searchHref={'/room/' + roomId + '/host/party?layout=computer'}
       onAdded={() => { void refresh(); }}
     />
   );
@@ -34,7 +34,7 @@ export function HostRecentPage() {
       mode="recent"
       roomId={roomId}
       queueHref={'/room/' + roomId + '/host/queue'}
-      searchHref={'/room/' + roomId + '/host'}
+      searchHref={'/room/' + roomId + '/host/party?layout=computer'}
       onAdded={() => { void refresh(); }}
     />
   );

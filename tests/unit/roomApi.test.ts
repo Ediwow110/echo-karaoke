@@ -122,7 +122,6 @@ describe('room api', () => {
       roomName: 'After Hours',
       guestsCanAdd: false,
       guestsCanControlPlayback: true,
-      requireApproval: false,
     });
 
     expect(calls[0].name).toBe('create-room');
@@ -131,7 +130,6 @@ describe('room api', () => {
       roomName: 'After Hours',
       guestsCanAdd: false,
       guestsCanControlPlayback: true,
-      requireApproval: false,
     });
     expect(created.roomId).toBe('550e8400-e29b-41d4-a716-446655440000');
     expect(loadGuestToken('550e8400-e29b-41d4-a716-446655440000')).toBe('guest-token-value');
@@ -190,7 +188,7 @@ describe('room api', () => {
     expect(loadGuestToken('3a1ee27f-a539-4190-9250-bdc14ff631e0')).toBeNull();
   });
 
-  it('carries the waiting status from a moderated join and still stores the pass', async () => {
+  it('leaves a moderated-era join response without a status field', async () => {
     const { api } = fakeApi({
       roomId: '3a1ee27f-a539-4190-9250-bdc14ff631e0',
       roomCode: 'ABCDEFGHJKMNPQRS',
@@ -198,43 +196,8 @@ describe('room api', () => {
       memberId: 'member-2',
       displayName: 'Guest 07',
       role: 'guest',
-      guestToken: 'guest-waiting',
+      guestToken: 'guest-2',
       status: 'waiting',
-    });
-
-    const joined = await joinRoom({ api }, 'ABCDEFGHJKMNPQRS', 'Guest 07');
-
-    expect(joined.status).toBe('waiting');
-    expect(loadGuestToken('3a1ee27f-a539-4190-9250-bdc14ff631e0')).toBe('guest-waiting');
-  });
-
-  it('leaves an older server\'s join response without a status field', async () => {
-    const { api } = fakeApi({
-      roomId: '3a1ee27f-a539-4190-9250-bdc14ff631e0',
-      roomCode: 'ABCDEFGHJKMNPQRS',
-      roomName: 'Songs',
-      memberId: 'member-2',
-      displayName: 'Guest 07',
-      role: 'guest',
-      guestToken: 'guest-2',
-    });
-
-    const joined = await joinRoom({ api }, 'ABCDEFGHJKMNPQRS', 'Guest 07');
-
-    expect('status' in joined).toBe(false);
-    expect(joined.status).toBeUndefined();
-  });
-
-  it('does not invent a join status it does not recognize', async () => {
-    const { api } = fakeApi({
-      roomId: '3a1ee27f-a539-4190-9250-bdc14ff631e0',
-      roomCode: 'ABCDEFGHJKMNPQRS',
-      roomName: 'Songs',
-      memberId: 'member-2',
-      displayName: 'Guest 07',
-      role: 'guest',
-      guestToken: 'guest-2',
-      status: 'pending',
     });
 
     const joined = await joinRoom({ api }, 'ABCDEFGHJKMNPQRS', 'Guest 07');
@@ -320,7 +283,7 @@ describe('room api', () => {
 });
 
 describe('room defaults', () => {
-  it('moderates new rooms unless the caller explicitly says otherwise', async () => {
+  it('opens new rooms to guests and never sends an approval flag', async () => {
     const { api, calls } = fakeApi({
       roomId: '550e8400-e29b-41d4-a716-446655440000',
       roomCode: 'ABCDEFGHJKMNPQRS',
@@ -337,7 +300,7 @@ describe('room defaults', () => {
     expect(calls[0].body).toMatchObject({
       guestsCanAdd: true,
       guestsCanControlPlayback: false,
-      requireApproval: true,
     });
+    expect(calls[0].body).not.toHaveProperty('requireApproval');
   });
 });

@@ -5,7 +5,8 @@ import Sidebar from '../../src/features/rooms/Sidebar';
 import type { SidebarNav } from '../../src/features/rooms/Sidebar';
 import '@testing-library/jest-dom/vitest';
 
-const roomOnly = ['Discover', 'Songbook', 'Room queue', 'Room settings'];
+// The first destination is the stage now: the separate console page is retired.
+const roomOnly = ['TV stage', 'Songbook', 'Room queue', 'Room settings'];
 const always = ['Song library', 'Favorites', 'Recently sung'];
 
 function renderSidebar(props: { activeNav?: SidebarNav; roomId?: string } = {}) {

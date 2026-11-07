@@ -13,7 +13,6 @@ import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { useRoomData } from '../features/rooms/useRoomData';
 import GuestSongbook from './GuestSongbook';
-import WaitingRoom from './WaitingRoom';
 import { useRoomApi } from './RoomApiProvider';
 import { sendPlaybackCommand } from '../features/playback/playbackApi';
 import { claimHostPass } from '../features/rooms/roomApi';
@@ -255,16 +254,6 @@ export default function GuestRoomPage() {
     );
   }
 
-  if (data !== null && data.status === 'waiting') {
-    const waitingRoom = (data as { room?: { name?: unknown; hostName?: unknown } }).room;
-    return (
-      <WaitingRoom
-        roomName={typeof waitingRoom?.name === 'string' ? waitingRoom.name : 'This room'}
-        hostName={typeof waitingRoom?.hostName === 'string' ? waitingRoom.hostName : 'The host'}
-      />
-    );
-  }
-
   if (data === null || data.status === 'ended') {
     return (
       <main className="mx-auto grid min-h-dvh w-full max-w-[430px] place-items-center bg-graphite px-4 text-ink">
@@ -281,7 +270,9 @@ export default function GuestRoomPage() {
   const header = (
     <header className="sticky top-0 z-30 border-b border-line bg-graphite/95 backdrop-blur">
       <div className="mx-auto w-full max-w-[430px] px-4 pb-3 pt-4">
-        <div className="flex items-center justify-between gap-3">
+        {/* At 200% text the status pill is wider than the space beside the logo;
+            wrapping keeps it on screen instead of pushing the page sideways. */}
+        <div className="flex flex-wrap items-center justify-between gap-3">
           <Logo size="sm" />
           <span role="status" aria-live="polite" className="inline-flex items-center gap-1.5 text-[0.6875rem] font-medium">
             <span
@@ -476,7 +467,7 @@ export default function GuestRoomPage() {
                 size="sm"
                 full
                 className="mt-3"
-                onClick={() => navigate('/room/' + roomId + '/host')}
+                onClick={() => navigate('/room/' + roomId + '/host/party')}
               >
                 Open the host view
               </Button>

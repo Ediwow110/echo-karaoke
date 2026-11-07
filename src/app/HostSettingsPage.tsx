@@ -9,9 +9,8 @@ import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { useHostRoom } from './useHostRoom';
 import { useRoomApi } from './RoomApiProvider';
-import DoorList from '../features/rooms/DoorList';
 import InviteCard from '../features/rooms/InviteCard';
-import { setAdmissions, setApproval as requestApproval } from '../features/rooms/roomApi';
+import { setAdmissions } from '../features/rooms/roomApi';
 import { onlineGuestCount, presenceSummary } from '../lib/format';
 import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
 
@@ -23,22 +22,18 @@ export default function HostSettingsPage() {
     code,
     joinUrl,
     roster,
-    door,
-    doorPending,
     room,
     connection,
     notify,
     refresh,
     runHost,
-    approveGuest,
-    rejectGuest,
     transferRoom,
     endRoom,
     removeMember,
   } = useHostRoom();
   const api = useRoomApi();
   const navigate = useNavigate();
-  const [pending, setPending] = useState<'playback' | 'door' | 'approval' | null>(null);
+  const [pending, setPending] = useState<'playback' | 'door' | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -68,24 +63,6 @@ export default function HostSettingsPage() {
       await removeMember(memberId);
     } finally {
       setRemovingId(null);
-    }
-  }
-
-  async function changeApproval(next: boolean): Promise<void> {
-    if (pending !== null) return;
-    setPending('approval');
-    try {
-      const result = await requestApproval(api, roomId, next);
-      // Turning approval off admits whoever was waiting; say so rather than let
-      // the door list quietly empty itself.
-      if (result.admitted > 0) {
-        notify(result.admitted === 1 ? 'Let the waiting guest in.' : 'Let ' + result.admitted + ' waiting guests in.');
-      }
-      await refresh();
-    } catch (caught) {
-      notify('The approval setting could not be changed.', caught instanceof Error ? caught.message : undefined, 'error');
-    } finally {
-      setPending(null);
     }
   }
 
@@ -159,15 +136,6 @@ export default function HostSettingsPage() {
               />
               <div className="h-px bg-line" aria-hidden="true" />
               <Toggle
-                checked={room.requireApproval === true}
-                onChange={(next) => { void changeApproval(next); }}
-                label="Approve each guest"
-                description="On by default. New guests wait at the door; turning this off lets whoever is already waiting in."
-                disabled={offline || pending !== null}
-                busy={pending === 'approval'}
-              />
-              <div className="h-px bg-line" aria-hidden="true" />
-              <Toggle
                 checked={room.admissionsLocked === true}
                 onChange={(next) => { void setDoorLock(next); }}
                 label="Close the door to new guests"
@@ -194,21 +162,6 @@ export default function HostSettingsPage() {
             </div>
           </section>
 
-          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="door-title">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <DoorOpenIcon size={18} className="text-signal" aria-hidden="true" />
-                <h3 id="door-title" className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">At the door</h3>
-              </div>
-              <span className="text-[0.6875rem] text-ink-2">
-                {door.length} {door.length === 1 ? 'guest waiting' : 'guests waiting'}
-              </span>
-            </div>
-            <div className="mt-4">
-              <DoorList door={door} pending={doorPending} onApprove={approveGuest} onReject={rejectGuest} />
-            </div>
-          </section>
-
           <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="people-title">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -226,7 +179,9 @@ export default function HostSettingsPage() {
                     <p className="mt-0.5 text-[0.6875rem] text-ink-2">Host · This screen</p>
                   </div>
                   <Chip tone="gold">Host</Chip>
-                  <span className="size-1.5 rounded-full bg-live" aria-label="Online" />
+                  {/* The row already says who is connected; a label on a bare span is invalid
+                      ARIA and repeats the text. */}
+                  <span className="size-1.5 rounded-full bg-live" aria-hidden="true" />
                 </li>
               )}
               {guests.map((member, index) => (
@@ -242,7 +197,7 @@ export default function HostSettingsPage() {
                       Guest · {member.online ? 'Phone remote connected' : 'Away'}
                     </p>
                   </div>
-                  <span className={['size-1.5 rounded-full', member.online ? 'bg-live' : 'bg-ink-3'].join(' ')} aria-label={member.online ? 'Online' : 'Away'} />
+                  <span className={['size-1.5 rounded-full', member.online ? 'bg-live' : 'bg-ink-3'].join(' ')} aria-hidden="true" />
                   <button
                     type="button"
                     onClick={() => setConfirmTransfer({ memberId: member.memberId, displayName: member.displayName })}

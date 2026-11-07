@@ -97,17 +97,23 @@ describe('create room workspace', () => {
     expect(screen.getByText('Rafa · Host setup')).toBeInTheDocument();
   });
 
-  it('offers joining by code as an action beside the create button, not as fine print', async () => {
+  it('sends the host to the stage with no join action on the create screen', () => {
+    // The owner removed the "Have a room code? Join a room" action: this screen
+    // exists to open a room on this display, and a guest with a code reaches the
+    // join screen by URL or QR instead.
     stubWide(true);
     renderHome();
 
-    expect(screen.queryByRole('link', { name: /have a room code/i })).toBeNull();
-    const join = screen.getByRole('button', { name: /have a room code\? join a room/i });
-    const create = screen.getByRole('button', { name: 'Launch TV' });
-    expect(create.compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /join a room/i })).toBeNull();
+    expect(screen.queryByRole('link', { name: /join a room/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeInTheDocument();
 
-    fireEvent.click(join);
-    expect(await screen.findByText('Join by code')).toBeInTheDocument();
+    cleanup();
+    stubWide(false);
+    renderHome();
+    fireEvent.click(screen.getByRole('button', { name: /hosting tonight/i }));
+    expect(screen.queryByRole('button', { name: /join a room/i })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeInTheDocument();
   });
 
   const created = {
@@ -449,7 +455,7 @@ describe('create room workspace', () => {
     expect(screen.getByText(/skip, remove and reorder stay host-only/i)).toBeInTheDocument();
   });
 
-  it('creates a room with approval on and guest playback locked', async () => {
+  it('creates a room that guests join directly, with guest playback locked', async () => {
     stubWide(true);
     const calls: Array<{ name: string; body: unknown }> = [];
     const api: EdgeApi = {
@@ -466,8 +472,9 @@ describe('create room workspace', () => {
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     expect(calls[0]).toMatchObject({
       name: 'create-room',
-      body: { requireApproval: true, guestsCanAdd: true, guestsCanControlPlayback: false },
+      body: { guestsCanAdd: true, guestsCanControlPlayback: false },
     });
+    expect(calls[0].body).not.toHaveProperty('requireApproval');
   });
 
   it('shows the stage guide with real process steps', () => {
@@ -511,7 +518,6 @@ describe('create room workspace', () => {
         roomName: 'After Hours',
         guestsCanAdd: true,
         guestsCanControlPlayback: false,
-        requireApproval: true,
       },
     });
   });
@@ -584,7 +590,7 @@ describe('create room workspace', () => {
     renderHome(liveRoomApi());
 
     expect(await screen.findByRole('link', { name: 'Back to the room' }))
-      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
+      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host/party');
   });
 
   it('keeps the hosted room one click away on a phone as well', async () => {
@@ -600,7 +606,7 @@ describe('create room workspace', () => {
     renderHome(liveRoomApi());
 
     expect(await screen.findByRole('link', { name: 'Back to the room' }))
-      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
+      .toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host/party');
   });
 
   it('keeps the live room beside the create form', async () => {
@@ -619,7 +625,7 @@ describe('create room workspace', () => {
     renderHomeAt('/create', { intent: 'create' }, liveRoomApi());
 
     const back = await screen.findByRole('link', { name: 'Back to the room' });
-    expect(back).toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
+    expect(back).toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host/party');
     expect(screen.getByRole('button', { name: /launch tv/i })).toBeEnabled();
   });
 

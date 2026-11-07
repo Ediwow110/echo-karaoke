@@ -193,7 +193,16 @@ export default function HostPlayer({
         onReady: () => {
           playerRef.current?.setVolume(volumeRef.current);
         },
-        onStateChange: (state) => setPlayerState(state),
+        onStateChange: (state) => {
+          setPlayerState(state);
+          // A transient API error (one thrown while a cue is still loading, for
+          // example) must not blacken the stage or auto-skip a video that is in
+          // fact playing. Recovery clears it; a real failure never reaches these
+          // states and keeps the overlay.
+          if (state === PLAYER_STATE.playing || state === PLAYER_STATE.buffering) {
+            setPlayerError(null);
+          }
+        },
       });
     }
     setFactoryReady(true);

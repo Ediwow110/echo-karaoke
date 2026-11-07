@@ -864,6 +864,23 @@ shows a spinner (the others disable); the waiting screen has no offline signal a
 the browser's back button; and the door list fetches `online`/`joinedAt` without rendering them, so a
 host cannot yet tell who is still watching from who walked away.
 
+## The door is removed (migration 0045, 2026-11-07)
+
+Moderated entry was retired, not defaulted off. Scanning a code lands a guest in the room: there is
+no waiting state, no approval switch, no "At the door" list, and no `approve-member` /
+`reject-member` / `set-approval` operation. `members.status`, `rooms.require_approval`,
+`private.room_door` and `private.require_guest_any` are gone; `join_room`, both reads and the guest
+check were redefined without them. Anyone pending when the migration ran keeps their row and pass
+and is simply a member. The separate **Close the door to new guests** lock (`admissions_locked`)
+survives; it refuses strangers outright rather than queuing them.
+
+**Deploy order is now safe in either direction.** `0045` keeps the nine-argument `create_room` as a
+delegate that ignores the approval flag, the same device `0040` used for its four-argument
+`vote_toggle`. The shipped server can keep calling it while the migration applies, and the new
+server calls the eight-argument form. A later migration retires the delegate once no deployed build
+references it. `supabase/tests/direct_entry_test.sql` replaces the moderated-entry suites and pins
+the removal from both sides: a join lands live immediately, and the door objects no longer exist.
+
 ## What protects the API from a browser console (2026-10-26)
 
 DevTools holds the page's own session, so "only the UI calls the API" was never a control. The

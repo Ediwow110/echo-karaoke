@@ -6,12 +6,9 @@ import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHor
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import {
-  approveMember,
-  rejectMember,
   removeRoomMember,
   sendHostCommand,
   transferRoomTo,
-  type DoorAnswer,
   type HostAction,
 } from '../features/rooms/roomApi';
 import { removeSong as removeQueueSong, reorderSong as reorderQueueSong, voteSong as castVote, describeVoteError } from '../features/queue/queueApi';
@@ -47,7 +44,6 @@ export default function HostRoomPage() {
   const location = useLocation();
   const { data, error, loading, connection, restoredAt, refresh } = useRoomData(roomId, 'host');
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone: ToastTone } | null>(null);
-  const [doorPending, setDoorPending] = useState<DoorAnswer | null>(null);
   const playbackBusy = useRef(false);
   const advanceBusy = useRef(false);
   const playbackSettled = useRef<Promise<void> | null>(null);
@@ -139,7 +135,6 @@ export default function HostRoomPage() {
   }, [data, live, queue]);
   const upNext = useMemo(() => queue.filter((song) => song.status !== 'playing'), [queue]);
   const roster = live ? (data.roster ?? []) : [];
-  const door = live ? (data.door ?? []) : [];
   const hostName = roster.find((member) => member.role === 'host')?.displayName?.trim() || 'Host';
   const roomName = room?.name ?? 'Karaoke room';
   const code = room?.code ?? '';
@@ -278,40 +273,6 @@ export default function HostRoomPage() {
       notify('Guest removed.', 'Their queued songs and votes were removed too.', 'info');
     } catch (caught) {
       notify('The guest could not be removed.', caught instanceof Error ? caught.message : undefined, 'error');
-    }
-  }, [api, notify, refresh, roomId]);
-
-  const doorBusy = useRef(false);
-
-  const approveGuest = useCallback(async (memberId: string): Promise<void> => {
-    if (doorBusy.current) return;
-    doorBusy.current = true;
-    setDoorPending({ memberId, action: 'approve' });
-    try {
-      await approveMember(api, roomId, memberId);
-      notify('They are in.');
-      await refresh();
-    } catch (caught) {
-      notify('That guest could not be admitted.', caught instanceof Error ? caught.message : undefined, 'error');
-    } finally {
-      doorBusy.current = false;
-      setDoorPending(null);
-    }
-  }, [api, notify, refresh, roomId]);
-
-  const rejectGuest = useCallback(async (memberId: string): Promise<void> => {
-    if (doorBusy.current) return;
-    doorBusy.current = true;
-    setDoorPending({ memberId, action: 'reject' });
-    try {
-      await rejectMember(api, roomId, memberId);
-      notify('They were turned away.');
-      await refresh();
-    } catch (caught) {
-      notify('That guest could not be turned away.', caught instanceof Error ? caught.message : undefined, 'error');
-    } finally {
-      doorBusy.current = false;
-      setDoorPending(null);
     }
   }, [api, notify, refresh, roomId]);
 
@@ -535,8 +496,6 @@ export default function HostRoomPage() {
     hostName,
     joinUrl,
     roster,
-    door,
-    doorPending,
     queue,
     nowPlaying,
     upNext,
@@ -552,8 +511,6 @@ export default function HostRoomPage() {
     voteSong,
     votingSongId,
     removeMember,
-    approveGuest,
-    rejectGuest,
     transferRoom,
     endRoom,
   };
@@ -624,9 +581,6 @@ export default function HostRoomPage() {
                     {groupRoomCode(code)} · {presenceSummary(roster)}
                   </span>
                 )}
-                {door.length === 0 ? null : (
-                  <Chip tone="gold">{door.length} at the door</Chip>
-                )}
                 <Link
                   to={'/room/' + roomId + '/host/party'}
                   className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
@@ -654,7 +608,7 @@ export default function HostRoomPage() {
             <nav aria-label="Room sections" className="lg:hidden">
               <div className="no-scrollbar mx-auto flex max-w-[1240px] gap-1 overflow-x-auto px-4 pb-2 sm:px-6">
                 {[
-                  { label: 'Discover', href: '/room/' + roomId + '/host' },
+                  { label: 'TV stage', href: '/room/' + roomId + '/host/party' },
                   { label: 'Queue', href: '/room/' + roomId + '/host/queue' },
                   { label: 'Library', href: '/room/' + roomId + '/host/library' },
                   { label: 'Favorites', href: '/room/' + roomId + '/host/favorites' },

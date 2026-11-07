@@ -9,7 +9,7 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
 - Queue songs, reorder and remove as host, and let the next song start automatically.
-- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume, favorites and keyboard shortcuts, and the room QR over the video for new singers. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Hits panel beside the video with the invite card above it. The TV layout carries no search, and `/host/stage` redirects here.
+- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume, favorites and keyboard shortcuts, and the room QR over the video for new singers. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Hits panel beside the video with the invite card above it. The TV layout carries no search. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
 - The landing and create screens carry no side navigation; the live room stays one click away in the page body.
 - Phone remote with Search and Queue tabs, duration, automatic-advance feedback, and a "you're up next" card.
 - Honest connection states: stale queue while offline, automatic recovery and a restored notice.
@@ -34,7 +34,7 @@ not configured or resting. It is not a general replacement for search.
 - Every guest or host request carries its pass to the function, which verifies the JWT against the published JWKS, then verifies the room membership and the pass inside the authorized SQL operation.
 - Row Level Security is enabled on every table. The anon and authenticated roles hold no table privileges and no execute rights on the operations. `echo_auth` reaches only the auth tables; `service_role` reaches only the room operations.
 - Realtime is not used for room data. Screens poll the token-checked read function and use visibility-aware polling.
-- The host screen owns one persistent YouTube player. It stays mounted while the host moves between Discover, Queue, Settings, Library and Favorites; the TV stage docks that same player into a measured slot, and switching between its TV and computer layouts never unmounts it.
+- The host screen owns one persistent YouTube player. It stays mounted while the host moves between the Queue, Settings, Library, Favorites and Songbook pages reachable from the stage panel; the stage docks that same player into a measured slot, and switching between its TV and computer layouts never unmounts it.
 
 Room codes use 16 Crockford Base32 characters (80 bits). Rooms live until the host ends them or 24 hours pass, whichever comes first, and abandoned rooms are swept when the next room is created.
 

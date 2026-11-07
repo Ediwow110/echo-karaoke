@@ -45,12 +45,12 @@ select is(
   'text',
   'the member user id is text');
 select is(
-  (select pg_get_function_identity_arguments(p.oid) like '%p_user_id text%'
+  (select bool_and(pg_get_function_identity_arguments(p.oid) like '%p_user_id text%')
    from pg_proc p
    join pg_namespace n on n.oid = p.pronamespace
    where n.nspname = 'public' and p.proname = 'create_room'),
   true,
-  'create_room accepts a text user id');
+  'every create_room overload accepts a text user id');
 select is(
   (select pg_get_function_identity_arguments(p.oid) like '%p_user_id text%'
    from pg_proc p

@@ -22,8 +22,6 @@ export type JoinedRoom = {
   displayName: string;
   role: string;
   guestToken: string;
-  /** 'waiting' means the host has to admit this device; absent on older servers. */
-  status?: 'joined' | 'waiting';
 };
 
 const ROOM_UUID = /^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$/;
@@ -77,7 +75,6 @@ function verifyJoinedRoom(value: unknown, requestedCode: string): JoinedRoom {
     || typeof room.guestToken !== 'string' || room.guestToken.length === 0) {
     return invalid();
   }
-  const status = room.status === 'waiting' ? 'waiting' : room.status === 'joined' ? 'joined' : undefined;
   return {
     roomId: room.roomId,
     roomCode: requestedCode,
@@ -86,7 +83,6 @@ function verifyJoinedRoom(value: unknown, requestedCode: string): JoinedRoom {
     displayName: room.displayName,
     role: 'guest',
     guestToken: room.guestToken,
-    ...(status === undefined ? {} : { status }),
   };
 }
 
@@ -99,7 +95,6 @@ export type CreateRoomOptions = {
   roomName?: string;
   guestsCanAdd?: boolean;
   guestsCanControlPlayback?: boolean;
-  requireApproval?: boolean;
 };
 
 export async function createRoom(
@@ -114,7 +109,6 @@ export async function createRoom(
     roomName: options.roomName ?? '',
     guestsCanAdd: options.guestsCanAdd ?? true,
     guestsCanControlPlayback: options.guestsCanControlPlayback ?? false,
-    requireApproval: options.requireApproval !== false,
   });
   const created = verifyCreatedRoom(response);
 
@@ -224,35 +218,10 @@ export async function removeRoomMember(
   await api.invoke('host-remove-member', { roomId, memberId }, { hostToken });
 }
 
-/** Which door answer is in flight, so the row marks the control actually running. */
-export type DoorAnswer = { memberId: string; action: 'approve' | 'reject' };
-
-export type DoorEntry = { memberId: string; displayName: string; online: boolean; joinedAt: string };
-
-export async function approveMember(api: EdgeApi, roomId: string, memberId: string): Promise<{ door: DoorEntry[] }> {
-  return api.invoke('approve-member', { roomId, memberId }, { hostToken: loadHostToken(roomId) ?? undefined });
-}
-
-export async function rejectMember(api: EdgeApi, roomId: string, memberId: string): Promise<{ door: DoorEntry[] }> {
-  return api.invoke('reject-member', { roomId, memberId }, { hostToken: loadHostToken(roomId) ?? undefined });
-}
-
 export type AdmissionsState = { roomId: string; admissionsLocked: boolean };
 
 export async function setAdmissions(api: EdgeApi, roomId: string, locked: boolean): Promise<AdmissionsState> {
   return api.invoke('set-admissions', { roomId, locked }, { hostToken: loadHostToken(roomId) ?? undefined });
-}
-
-export type ApprovalState = {
-  roomId: string;
-  requireApproval: boolean;
-  /** How many waiting guests the change admitted. Only a turn-off can admit. */
-  admitted: number;
-  door: DoorEntry[];
-};
-
-export async function setApproval(api: EdgeApi, roomId: string, requireApproval: boolean): Promise<ApprovalState> {
-  return api.invoke('set-approval', { roomId, requireApproval }, { hostToken: loadHostToken(roomId) ?? undefined });
 }
 
 export type TransferredRoom = {

@@ -1,5 +1,4 @@
 import { describe, expect, it, vi } from 'vitest';
-import { HttpError } from '../../server/operations/errors';
 
 const db = vi.hoisted(() => ({ query: vi.fn<(text: string, params: unknown[]) => Promise<unknown[]>>() }));
 
@@ -8,7 +7,7 @@ vi.mock('../../server/db/client.js', async (importOriginal) => {
   return { ...actual, serviceDatabase: () => ({ query: db.query }) };
 });
 
-import { approveMember, rejectMember, setAdmissions, setApproval } from '../../server/operations/admission';
+import { setAdmissions } from '../../server/operations/admission';
 import { requireHostAccess } from '../../server/operations/catalogAccess';
 
 vi.mock('../../server/operations/catalogAccess', () => ({
@@ -16,67 +15,38 @@ vi.mock('../../server/operations/catalogAccess', () => ({
 }));
 
 const ROOM_ID = '11111111-1111-4111-8111-111111111111';
-const MEMBER_ID = '22222222-2222-4222-8222-222222222222';
 const CALLER = { userId: '33333333-3333-4333-8333-333333333333', accessToken: 'token' };
 const HOST_TOKEN = 'h'.repeat(32);
 
-// Both database functions take (room, caller, host pass, member) in that order,
-// so the params array is asserted position by position: swapping hostToken and
-// memberId would still satisfy a check of the SQL text alone.
-const ADMISSION_PARAMS = [ROOM_ID, CALLER.userId, HOST_TOKEN, MEMBER_ID];
-
-function request(headers: Record<string, string>, body: unknown = { roomId: ROOM_ID, memberId: MEMBER_ID }): Request {
-  return new Request('http://localhost/api/approve-member', {
+function request(headers: Record<string, string>, body: unknown = { roomId: ROOM_ID, locked: true }): Request {
+  return new Request('http://localhost/api/set-admissions', {
     method: 'POST',
     headers: { 'content-type': 'application/json', ...headers },
     body: JSON.stringify(body),
   });
 }
 
-describe('admission operations', () => {
+describe('the door lock', () => {
   it('refuses without a host pass before touching the database', async () => {
     db.query.mockReset();
-    await expect(approveMember(request({}), CALLER as never)).rejects.toMatchObject({ status: 403 });
+    await expect(setAdmissions(request({}), CALLER as never)).rejects.toMatchObject({ status: 403 });
     expect(db.query).not.toHaveBeenCalled();
     expect(requireHostAccess).not.toHaveBeenCalled();
   });
 
   it('refuses a host pass too short to be one', async () => {
     db.query.mockReset();
-    await expect(approveMember(request({ 'x-room-host-token': 'h'.repeat(31) }), CALLER as never))
+    await expect(setAdmissions(request({ 'x-room-host-token': 'h'.repeat(31) }), CALLER as never))
       .rejects.toMatchObject({ status: 403 });
     expect(db.query).not.toHaveBeenCalled();
     expect(requireHostAccess).not.toHaveBeenCalled();
-  });
-
-  it('admits through the database function and returns the new door', async () => {
-    db.query.mockReset();
-    db.query.mockResolvedValue([{ result: { memberId: MEMBER_ID, displayName: 'Waiting Guest', door: [] } }]);
-    const response = await approveMember(request({ 'x-room-host-token': HOST_TOKEN }), CALLER as never);
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ memberId: MEMBER_ID, displayName: 'Waiting Guest', door: [] });
-    expect(requireHostAccess).toHaveBeenCalledWith(CALLER, ROOM_ID, HOST_TOKEN);
-    expect(String(db.query.mock.calls[0]?.[0])).toContain('room_approve_member');
-    expect(db.query.mock.calls[0]?.[1]).toEqual(ADMISSION_PARAMS);
-  });
-
-  it('maps a denied grant to a failure rather than an empty success', async () => {
-    db.query.mockReset();
-    db.query.mockRejectedValue(new Error('permission denied for function room_reject_member'));
-    await expect(rejectMember(request({ 'x-room-host-token': HOST_TOKEN }), CALLER as never))
-      .rejects.toBeInstanceOf(HttpError);
-    expect(String(db.query.mock.calls[0]?.[0])).toContain('room_reject_member');
-    expect(db.query.mock.calls[0]?.[1]).toEqual(ADMISSION_PARAMS);
   });
 
   it('closes the door through the database function', async () => {
     db.query.mockReset();
     vi.mocked(requireHostAccess).mockClear();
     db.query.mockResolvedValue([{ result: { roomId: ROOM_ID, admissionsLocked: true } }]);
-    const response = await setAdmissions(
-      request({ 'x-room-host-token': HOST_TOKEN }, { roomId: ROOM_ID, locked: true }),
-      CALLER as never,
-    );
+    const response = await setAdmissions(request({ 'x-room-host-token': HOST_TOKEN }), CALLER as never);
     expect(response.status).toBe(200);
     expect(await response.json()).toEqual({ roomId: ROOM_ID, admissionsLocked: true });
     expect(requireHostAccess).toHaveBeenCalledWith(CALLER, ROOM_ID, HOST_TOKEN);
@@ -92,32 +62,6 @@ describe('admission operations', () => {
     )).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
     await expect(setAdmissions(
       request({ 'x-room-host-token': HOST_TOKEN }, { roomId: ROOM_ID, locked: 'yes' }),
-      CALLER as never,
-    )).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
-    expect(db.query).not.toHaveBeenCalled();
-  });
-});
-
-describe('the approval setting', () => {
-  it('changes it through the door function and returns who was admitted', async () => {
-    db.query.mockReset();
-    db.query.mockResolvedValue([{ result: { roomId: ROOM_ID, requireApproval: false, admitted: 1, door: [] } }]);
-
-    const response = await setApproval(
-      request({ 'x-room-host-token': HOST_TOKEN }, { roomId: ROOM_ID, requireApproval: false }),
-      CALLER as never,
-    );
-
-    expect(response.status).toBe(200);
-    expect(await response.json()).toEqual({ roomId: ROOM_ID, requireApproval: false, admitted: 1, door: [] });
-    expect(String(db.query.mock.calls[0][0])).toContain('room_set_approval');
-    expect(db.query.mock.calls[0][1]).toEqual([ROOM_ID, CALLER.userId, HOST_TOKEN, false]);
-  });
-
-  it('refuses a body without the boolean rather than guessing', async () => {
-    db.query.mockReset();
-    await expect(setApproval(
-      request({ 'x-room-host-token': HOST_TOKEN }, { roomId: ROOM_ID }),
       CALLER as never,
     )).rejects.toMatchObject({ code: 'VALIDATION_ERROR', status: 400 });
     expect(db.query).not.toHaveBeenCalled();

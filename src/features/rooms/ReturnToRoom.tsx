@@ -14,7 +14,7 @@ export default function ReturnToRoom({ room, className }: { room: RoomSession | 
     <p className={['text-[0.75rem] leading-[1.6] text-ink-2', className].filter(Boolean).join(' ')}>
       Still hosting <span className="font-semibold text-ink">{room.roomName}</span>?{' '}
       <Link
-        to={'/room/' + room.roomId + '/host'}
+        to={'/room/' + room.roomId + '/host/party'}
         className="inline-flex min-h-11 items-center font-semibold text-signal hover:underline"
       >
         Back to the room

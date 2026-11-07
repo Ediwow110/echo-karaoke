@@ -1,28 +1,28 @@
-import { lazy, Suspense, useEffect } from 'react';
+import { Suspense, useEffect } from 'react';
 import { BrowserRouter, Navigate, Route, Routes, useLocation, useParams } from 'react-router-dom';
 import HomePage from './HomePage';
 import ErrorBoundary from '../ui/ErrorBoundary';
+import { lazyRoute } from '../lib/lazyRoute';
 
 // The landing screen stays in the entry bundle because it carries the
 // largest contentful paint. Every room screen loads on demand, which keeps
 // the YouTube player and the QR encoder out of a guest's first download.
-const JoinRoomPage = lazy(() => import('./JoinRoomPage'));
-const GuestRoomPage = lazy(() => import('./GuestRoomPage'));
-const HostRoomPage = lazy(() => import('./HostRoomPage'));
-const HostDiscoverPage = lazy(() => import('./HostDiscoverPage'));
-const HostQueuePage = lazy(() => import('./HostQueuePage'));
-const HostSettingsPage = lazy(() => import('./HostSettingsPage'));
-const HostPartyPage = lazy(() => import('./HostPartyPage'));
-const HostSongbookPage = lazy(() => import('./HostSongbookPage'));
-const ScanRoomPage = lazy(() => import('../features/scan/ScanRoomPage'));
-const HostLibraryPage = lazy(() => import('./HostCollectionPages').then((module) => ({ default: module.HostLibraryPage })));
-const HostFavoritesPage = lazy(() => import('./HostCollectionPages').then((module) => ({ default: module.HostFavoritesPage })));
-const HostRecentPage = lazy(() => import('./HostCollectionPages').then((module) => ({ default: module.HostRecentPage })));
-const LibraryPage = lazy(() => import('./CollectionPages').then((module) => ({ default: module.LibraryPage })));
-const FavoritesPage = lazy(() => import('./CollectionPages').then((module) => ({ default: module.FavoritesPage })));
-const RecentPage = lazy(() => import('./CollectionPages').then((module) => ({ default: module.RecentPage })));
-const LastRoomQueueRedirect = lazy(() => import('./CollectionPages').then((module) => ({ default: module.LastRoomQueueRedirect })));
-const LastRoomSettingsRedirect = lazy(() => import('./CollectionPages').then((module) => ({ default: module.LastRoomSettingsRedirect })));
+const JoinRoomPage = lazyRoute(() => import('./JoinRoomPage'));
+const GuestRoomPage = lazyRoute(() => import('./GuestRoomPage'));
+const HostRoomPage = lazyRoute(() => import('./HostRoomPage'));
+const HostQueuePage = lazyRoute(() => import('./HostQueuePage'));
+const HostSettingsPage = lazyRoute(() => import('./HostSettingsPage'));
+const HostPartyPage = lazyRoute(() => import('./HostPartyPage'));
+const HostSongbookPage = lazyRoute(() => import('./HostSongbookPage'));
+const ScanRoomPage = lazyRoute(() => import('../features/scan/ScanRoomPage'));
+const HostLibraryPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostLibraryPage })));
+const HostFavoritesPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostFavoritesPage })));
+const HostRecentPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostRecentPage })));
+const LibraryPage = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.LibraryPage })));
+const FavoritesPage = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.FavoritesPage })));
+const RecentPage = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.RecentPage })));
+const LastRoomQueueRedirect = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.LastRoomQueueRedirect })));
+const LastRoomSettingsRedirect = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.LastRoomSettingsRedirect })));
 
 // React Router reuses a route element when only its parameter changes. Keying
 // the room screens by room id resets their state and tears down the old
@@ -120,7 +120,9 @@ export default function App() {
           <Route path="/room/:roomId/search" element={<GuestRoomRoute />} />
           <Route path="/room/:roomId/songbook" element={<GuestRoomRoute />} />
           <Route path="/room/:roomId/host" element={<HostRoomRoute />}>
-            <Route index element={<HostDiscoverPage />} />
+            {/* The console page is retired: the room opens on the stage, and the
+                computer layout carries search, queue and hits. */}
+            <Route index element={<Navigate to="party" replace />} />
             <Route path="queue" element={<HostQueuePage />} />
             <Route path="settings" element={<HostSettingsPage />} />
             <Route path="library" element={<HostLibraryPage />} />

@@ -1,13 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
-import { Link, useNavigate, useSearchParams } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
+import { DoorOpenIcon } from '@phosphor-icons/react/dist/csr/DoorOpen';
 import { HeartIcon } from '@phosphor-icons/react/dist/csr/Heart';
 import { LaptopIcon } from '@phosphor-icons/react/dist/csr/Laptop';
 import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
-import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
 import { TelevisionIcon } from '@phosphor-icons/react/dist/csr/Television';
@@ -19,7 +19,7 @@ import PopularSongs from '../features/queue/PopularSongs';
 import InviteCard from '../features/rooms/InviteCard';
 import { isFavorite, subscribeLibrary, toggleFavorite } from '../features/library/libraryStore';
 import { formatTime, onlineGuestCount, queueSummary } from '../lib/format';
-import { Button, Chip, IconButton, Logo, SongArtwork, TransportButton } from '../ui';
+import { Button, Chip, ConfirmDialog, Logo, SongArtwork, TransportButton } from '../ui';
 
 type PanelTab = 'search' | 'queue' | 'hits';
 type Density = 'grid' | 'list';
@@ -38,7 +38,6 @@ export default function HostPartyPage() {
     joinUrl,
     roster,
     queue,
-    door,
     playback,
     nowPlaying,
     upNext,
@@ -50,13 +49,25 @@ export default function HostPartyPage() {
     votingSongId,
     togglePlay,
     next,
+    endRoom,
   } = useHostRoom();
   const player = useHostPlayer();
-  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const computer = params.get(LAYOUT_PARAM) === 'computer';
   const [tab, setTab] = useState<PanelTab>('search');
   const [density, setDensity] = useState<Density>('grid');
+  const [confirmEnd, setConfirmEnd] = useState(false);
+  const [ending, setEnding] = useState(false);
+
+  async function finishRoom(): Promise<void> {
+    setEnding(true);
+    try {
+      // endRoom reports its own failures and navigates home on success.
+      await endRoom();
+    } finally {
+      setEnding(false);
+    }
+  }
 
   useLayoutEffect(() => {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
@@ -79,15 +90,6 @@ export default function HostPartyPage() {
     setParams({ [LAYOUT_PARAM]: next }, { replace: true });
   }, [setParams]);
 
-  const exitStage = useCallback((): void => {
-    const hostHref = '/room/' + roomId + '/host';
-    if (document.fullscreenElement !== null && document.fullscreenElement !== undefined) {
-      void document.exitFullscreen().finally(() => navigate(hostHref));
-      return;
-    }
-    navigate(hostHref);
-  }, [navigate, roomId]);
-
   useEffect(() => {
     const onKey = (event: KeyboardEvent): void => {
       const target = event.target;
@@ -98,11 +100,10 @@ export default function HostPartyPage() {
         return;
       }
       if (event.key === 'Escape') {
-        // On the computer layout, Escape is "go back to what the room is watching".
-        // Only from the TV layout does it leave the screen. It stays live over a
+        // Escape is "go back to what the room is watching". The stage is the room
+        // now, so there is nowhere further to leave to. It stays live over a
         // focused button, because that is where the last click leaves focus.
         if (computer) setLayout('tv');
-        else exitStage();
         return;
       }
       if (target instanceof HTMLElement && target.closest('button, a, [role="slider"]') !== null) {
@@ -135,7 +136,7 @@ export default function HostPartyPage() {
     };
     window.addEventListener('keydown', onKey);
     return () => window.removeEventListener('keydown', onKey);
-  }, [computer, exitStage, player.seekBy, player.toggleFullscreen, setLayout, togglePlay]);
+  }, [computer, player.seekBy, player.toggleFullscreen, setLayout, togglePlay]);
 
   async function playPause(): Promise<void> {
     setBusy('play');
@@ -207,14 +208,16 @@ export default function HostPartyPage() {
             {computer ? <TelevisionIcon size={16} aria-hidden="true" /> : <LaptopIcon size={16} aria-hidden="true" />}
             Switch to {computer ? 'TV' : 'computer'}
           </button>
-          <IconButton
-            icon={<SignOutIcon size={17} />}
-            label="Leave TV stage"
-            tone="ghost"
+          <Button
+            variant="danger"
             size="sm"
-            placement="bottom"
-            onClick={exitStage}
-          />
+            className="min-h-11"
+            icon={<DoorOpenIcon size={15} />}
+            onClick={() => setConfirmEnd(true)}
+            disabled={connection === 'offline'}
+          >
+            End room
+          </Button>
         </div>
       </header>
 
@@ -340,7 +343,9 @@ export default function HostPartyPage() {
                   icon={busy === 'play' ? <ArrowClockwiseIcon size={17} className="animate-spin" /> : playing ? <PauseIcon size={18} weight="fill" /> : <PlayIcon size={18} weight="fill" />}
                   label={playing ? 'Pause' : 'Play'}
                   onClick={() => void playPause()}
-                  disabled={nowPlaying === null || busy !== null}
+                  // With nothing playing, the first press starts the queue. That is
+                  // the console page's "Start the session", which retired with it.
+                  disabled={(nowPlaying === null && upNext.length === 0) || busy !== null}
                   size="md"
                   tone="primary"
                 />
@@ -485,12 +490,17 @@ export default function HostPartyPage() {
                 <>
                   <div className="flex items-center justify-between gap-2">
                     <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>
-                    <Link to={'/room/' + roomId + '/host/queue'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
-                      Full queue
-                    </Link>
+                    <div className="flex items-center gap-1">
+                      <Link to={'/room/' + roomId + '/host/settings'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink hover:underline">
+                        Room settings
+                      </Link>
+                      <Link to={'/room/' + roomId + '/host/queue'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
+                        Full queue
+                      </Link>
+                    </div>
                   </div>
                   <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
-                    {door.length > 0 ? door.length + ' guest' + (door.length === 1 ? '' : 's') + ' waiting at the door.' : 'Songs play in order, and the next one starts by itself.'}
+                    Songs play in order, and the next one starts by itself.
                   </p>
                   <div className="mt-3">
                     <UpNextList
@@ -528,6 +538,16 @@ export default function HostPartyPage() {
           </aside>
         ) : null}
       </div>
+      <ConfirmDialog
+        open={confirmEnd}
+        title="End the room?"
+        description="Playback stops, the queue closes, and every remote loses access. This cannot be undone."
+        confirmLabel="End the room"
+        cancelLabel="Keep it open"
+        busy={ending}
+        onConfirm={() => { void finishRoom(); }}
+        onCancel={() => setConfirmEnd(false)}
+      />
     </div>
   );
 }

@@ -1,7 +1,7 @@
 import type { PlayerFactory, PlayerHandle } from './playerTypes';
 
 type YouTubePlayerLike = {
-  loadVideoById(options: { videoId: string; startSeconds?: number }): void;
+  cueVideoById(options: { videoId: string; startSeconds?: number }): void;
   playVideo(): void;
   pauseVideo(): void;
   seekTo(seconds: number, allowSeekAhead: boolean): void;
@@ -15,8 +15,7 @@ type YouTubePlayerLike = {
 
 type YouTubeApi = {
   Player: new (element: HTMLElement, options: Record<string, unknown>) => YouTubePlayerLike;
-  PlayerState: { ENDED: number; PLAYING: number; PAUSED: number; BUFFERING: number; CUED: number };
-};
+  PlayerState: { ENDED: number; PLAYING: number; PAUSED: number; BUFFERING: number; CUED: number };};
 
 const API_TIMEOUT_MS = 8000;
 let apiPromise: Promise<YouTubeApi> | null = null;
@@ -115,7 +114,7 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
           height: '100%',
           width: '100%',
           playerVars: {
-            autoplay: 1,
+            autoplay: 0,
             controls: 0,
             disablekb: 1,
             fs: 0,
@@ -129,11 +128,12 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
               ready = true;
               player?.setVolume(volume);
               if (pending !== null) {
-                player?.loadVideoById(pending);
+                // Cue, never load: loadVideoById starts playback on its own, and
+                // a room that says paused must not sing before play() is called.
+                // A play requested before this point is honoured by the CUED
+                // handler below, which is the first state a cue can accept it.
+                player?.cueVideoById(pending);
                 pending = null;
-              }
-              if (wantsPlay) {
-                player?.playVideo();
               }
               callbacks.onReady?.();
             },
@@ -142,6 +142,12 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
               callbacks.onStateChange?.(event.data);
               if (player !== null && event.data === api.PlayerState.ENDED) {
                 callbacks.onEnded();
+              }
+              // A play requested while the cue was still loading is accepted
+              // but not acted on; re-issue it once the cue settles, or the room
+              // says playing while the video sits at 0:00.
+              if (player !== null && event.data === api.PlayerState.CUED && wantsPlay) {
+                player.playVideo();
               }
             },
             onError: (event: { data: number }) => {
@@ -169,7 +175,7 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
         startPlayer();
         return;
       }
-      player?.loadVideoById({ videoId, startSeconds });
+      player?.cueVideoById({ videoId, startSeconds });
     },
     play() {
       wantsPlay = true;

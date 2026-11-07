@@ -1,16 +1,14 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { createElement } from 'react';
-import { MemoryRouter, Route, Routes } from 'react-router-dom';
+import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import HostRoomPage from '../../src/app/HostRoomPage';
-import HostDiscoverPage from '../../src/app/HostDiscoverPage';
 import HostQueuePage from '../../src/app/HostQueuePage';
 import HostSettingsPage from '../../src/app/HostSettingsPage';
 import HostPartyPage from '../../src/app/HostPartyPage';
 import { HostStageRedirect } from '../../src/app/App';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
-import type { DoorEntry } from '../../src/features/rooms/roomApi';
 import { clearRoomTokens, saveGuestToken, saveHostToken } from '../../src/features/rooms/tokenStore';
 import { getHostedRoom, getLastRoom, rememberSession } from '../../src/features/rooms/sessionStore';
 import { isFavorite } from '../../src/features/library/libraryStore';
@@ -24,11 +22,22 @@ const playerClock = vi.hoisted(() => ({
   playCalls: 0,
   pauseCalls: 0,
   onEnded: null as (() => void) | null,
+  onError: null as ((code: number) => void) | null,
+  onStateChange: null as ((state: number) => void) | null,
 }));
 
 vi.mock('../../src/features/playback/youtubeIframe', () => ({
-  youtubePlayerFactory: (_element: unknown, callbacks: { onEnded: () => void }) => {
+  youtubePlayerFactory: (
+    _element: unknown,
+    callbacks: {
+      onEnded: () => void;
+      onError?: (code: number) => void;
+      onStateChange?: (state: number) => void;
+    },
+  ) => {
     playerClock.onEnded = callbacks.onEnded;
+    playerClock.onError = callbacks.onError ?? null;
+    playerClock.onStateChange = callbacks.onStateChange ?? null;
     return ({
     load: () => { playerClock.loadCalls += 1; },
     play: () => { playerClock.playCalls += 1; },
@@ -54,6 +63,8 @@ beforeEach(() => {
   playerClock.playCalls = 0;
   playerClock.pauseCalls = 0;
   playerClock.onEnded = null;
+  playerClock.onError = null;
+  playerClock.onStateChange = null;
   vi.stubGlobal('matchMedia', vi.fn(() => ({
     matches: false,
     media: '',
@@ -84,7 +95,6 @@ const liveRoom = {
     name: 'After Hours',
     status: 'live',
     guestControlLocked: false,
-    requireApproval: true,
     guestPlaybackLocked: true,
     admissionsLocked: false,
     createdAt: '2026-10-18T00:00:00Z',
@@ -128,7 +138,6 @@ const liveRoom = {
     isPlaying: false,
     updatedAt: '2026-10-18T00:00:00Z',
   },
-  door: [] as DoorEntry[],
   events: [],
 };
 
@@ -172,7 +181,7 @@ function renderHost(api: EdgeApi, path = '/room/' + roomId + '/host') {
           createElement(
             Route,
             { path: '/room/:roomId/host', element: createElement(HostRoomPage) },
-            createElement(Route, { index: true, element: createElement(HostDiscoverPage) }),
+            createElement(Route, { index: true, element: createElement(Navigate, { to: 'party', replace: true }) }),
             createElement(Route, { path: 'queue', element: createElement(HostQueuePage) }),
             createElement(Route, { path: 'settings', element: createElement(HostSettingsPage) }),
             createElement(Route, { path: 'stage', element: createElement(HostStageRedirect) }),
@@ -198,10 +207,11 @@ describe('host room workspace', () => {
     const { api } = makeApi();
     renderHost(api);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+    // The room is the stage now: its name is in the header and the invitation
+    // sits over the video.
+    expect(await screen.findByText('After Hours · TV stage')).toBeInTheDocument();
     expect(screen.getAllByText(/ABCD EFGH JKMN PQRS/).length).toBeGreaterThan(0);
-    expect(await screen.findByRole('button', { name: /copy link/i })).toBeInTheDocument();
-    expect(screen.getByRole('link', { name: /party view/i })).toBeInTheDocument();
+    expect(await screen.findByRole('img', { name: /QR code to join After Hours/i })).toBeInTheDocument();
   });
 
   it('opens the room at the top instead of inheriting the page scroll', async () => {
@@ -235,134 +245,14 @@ describe('host room workspace', () => {
     renderHost(api, '/room/' + roomId + '/host/settings');
 
     expect(await screen.findByRole('switch', { name: /guests can pause or resume/i })).not.toBeChecked();
-    expect(screen.getByRole('switch', { name: /approve each guest/i })).toBeChecked();
+    // The approval door is gone: there is no switch for it, and guests are in
+    // the room the moment they join.
+    expect(screen.queryByRole('switch', { name: /approve each guest/i })).toBeNull();
     // Guests can always add songs now, so no switch for it survives under any
     // label. Matching the concept rather than the old wording is the point: the
     // control came back once already behind a renamed label.
     expect(screen.queryByRole('switch', { name: /guests can add/i })).toBeNull();
     expect(screen.getByRole('button', { name: /leave & end room/i })).toBeInTheDocument();
-  });
-
-  it('turns approval off and says who was let in', async () => {
-    const calls: Array<{ name: string; body: unknown }> = [];
-    const api: EdgeApi = {
-      invoke: (async (name: string, body: unknown) => {
-        calls.push({ name, body });
-        if (name === 'set-approval') return { roomId, requireApproval: false, admitted: 2, door: [] };
-        if (name === 'host-room-read') return liveRoom;
-        if (name === 'touch-member') return {};
-        if (name === 'youtube-popular') return { available: false, results: [], message: 'not configured' };
-        return { ok: true };
-      }) as unknown as EdgeApi['invoke'],
-    };
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    fireEvent.click(await screen.findByRole('switch', { name: /approve each guest/i }));
-
-    await waitFor(() => {
-      expect(calls.some((call) => call.name === 'set-approval')).toBe(true);
-    });
-    expect(calls.find((call) => call.name === 'set-approval')?.body).toEqual({ roomId, requireApproval: false });
-    expect(await screen.findByText(/let 2 waiting guests in/i)).toBeInTheDocument();
-  });
-
-  it('shows who is waiting and admits them from settings', async () => {
-    const withDoor = {
-      ...liveRoom,
-      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
-    };
-    const { api, calls } = makeApi(withDoor);
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    expect(await screen.findByText('Waiting Guest')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /let waiting guest in/i }));
-    await waitFor(() => {
-      expect(calls.some((call) => call.name === 'approve-member')).toBe(true);
-    });
-  });
-
-  it('names each door answer after the guest it applies to', async () => {
-    const withDoor = {
-      ...liveRoom,
-      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
-    };
-    const { api } = makeApi(withDoor);
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    expect(await screen.findByRole('button', { name: 'Let Waiting Guest in' })).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Keep Waiting Guest out' })).toBeInTheDocument();
-    expect(screen.queryByRole('button', { name: 'Keep them out' })).not.toBeInTheDocument();
-  });
-
-  it('disables every door answer while one is already pending', async () => {
-    const withDoor = {
-      ...liveRoom,
-      door: [
-        { memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' },
-        { memberId: '7b2e', displayName: 'Second Guest', online: true, joinedAt: '2026-10-26T00:01:00Z' },
-      ],
-    };
-    let release: (value: unknown) => void = () => undefined;
-    const api: EdgeApi = {
-      invoke: (async (name: string) => {
-        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
-          return withDoor;
-        }
-        if (name === 'approve-member') {
-          return new Promise((resolve) => { release = resolve; });
-        }
-        return { ok: true };
-      }) as unknown as EdgeApi['invoke'],
-    };
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Let Waiting Guest in' }));
-
-    const otherApprove = await screen.findByRole('button', { name: 'Let Second Guest in' });
-    const otherReject = screen.getByRole('button', { name: 'Keep Second Guest out' });
-    await waitFor(() => {
-      expect(otherApprove).toBeDisabled();
-      expect(otherReject).toBeDisabled();
-    });
-
-    release({ ok: true });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Let Waiting Guest in' })).toBeEnabled();
-    });
-  });
-
-  it('does not mark the approve control busy while a rejection is running', async () => {
-    const withDoor = {
-      ...liveRoom,
-      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
-    };
-    let release: (value: unknown) => void = () => undefined;
-    const api: EdgeApi = {
-      invoke: (async (name: string) => {
-        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
-          return withDoor;
-        }
-        if (name === 'reject-member') {
-          return new Promise((resolve) => { release = resolve; });
-        }
-        return { ok: true };
-      }) as unknown as EdgeApi['invoke'],
-    };
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    fireEvent.click(await screen.findByRole('button', { name: 'Keep Waiting Guest out' }));
-
-    const approve = screen.getByRole('button', { name: 'Let Waiting Guest in' });
-    const reject = screen.getByRole('button', { name: 'Keep Waiting Guest out' });
-    await waitFor(() => {
-      expect(reject).toHaveAttribute('aria-busy', 'true');
-    });
-    expect(approve).not.toHaveAttribute('aria-busy', 'true');
-
-    release({ ok: true });
-    await waitFor(() => {
-      expect(screen.getByRole('button', { name: 'Keep Waiting Guest out' })).toBeEnabled();
-    });
   });
 
   it('closes the door to new guests from settings', async () => {
@@ -396,16 +286,6 @@ describe('host room workspace', () => {
     });
   });
 
-  it('announces the door count on every host screen', async () => {
-    const withDoor = {
-      ...liveRoom,
-      door: [{ memberId: '9d1c', displayName: 'Waiting Guest', online: true, joinedAt: '2026-10-26T00:00:00Z' }],
-    };
-    const { api } = makeApi(withDoor);
-    renderHost(api);
-    expect(await screen.findByText(/1 at the door/i)).toBeInTheDocument();
-  });
-
   it('removes a guest and their queue from settings', async () => {
     const { api, calls } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/settings');
@@ -417,6 +297,31 @@ describe('host room workspace', () => {
         body: expect.objectContaining({ memberId: 'm2' }),
       }));
     });
+  });
+
+  it('can end the room from the stage header after confirmation', async () => {
+    const { api, calls } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('button', { name: /^end room$/i }));
+    expect(await screen.findByRole('dialog')).toBeInTheDocument();
+    expect(screen.getByText(/every remote loses access/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole('button', { name: /^end the room$/i }));
+
+    expect(await screen.findByText('Back at the start')).toBeInTheDocument();
+    expect(calls.some((call) => call.name === 'host-command' && (call.body as { action?: string }).action === 'end')).toBe(true);
+  });
+
+  it('keeps the room open when the stage end dialog is cancelled', async () => {
+    const { api, calls } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('button', { name: /^end room$/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /keep it open/i }));
+
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(calls.some((call) => call.name === 'host-command' && (call.body as { action?: string }).action === 'end')).toBe(false);
+    expect(screen.getByText('After Hours · TV stage')).toBeInTheDocument();
   });
 
   it('can end the room after confirmation', async () => {
@@ -471,7 +376,9 @@ describe('host room workspace', () => {
       playback: { ...liveRoom.playback, isPlaying: true },
     };
     const { api, calls } = makeApi(playingRoom);
-    renderHost(api);
+    // The stage is the room now and carries no exit; leaving for home is an act
+    // of the console pages, which is where the shell's sign-out lives.
+    renderHost(api, '/room/' + roomId + '/host/queue');
 
     expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
     fireEvent.click(screen.getByRole('button', { name: /back to home/i }));
@@ -810,6 +717,27 @@ describe('host room workspace', () => {
     expect(screen.getByText('Autoplay on')).toBeInTheDocument();
   });
 
+  it('clears a transient player error once the video is actually playing', async () => {
+    // YouTube can report an error while a cue is still loading and then play
+    // the video anyway. The overlay and the six-second auto-skip must not
+    // punish a video that recovered.
+    const playing = { ...liveRoom, playback: { ...liveRoom.playback, isPlaying: true } };
+    const { api, calls } = makeApi(playing);
+    playerClock.state = 1;
+
+    renderHost(api, '/room/' + roomId + '/host/stage');
+    await screen.findByRole('button', { name: /switch to (tv|computer)/i });
+    await waitFor(() => expect(playerClock.onError).not.toBeNull());
+
+    act(() => { playerClock.onError?.(2); });
+    expect(await screen.findByRole('heading', { name: /this video can't play here/i })).toBeInTheDocument();
+
+    act(() => { playerClock.onStateChange?.(1); });
+    await waitFor(() => expect(screen.queryByRole('heading', { name: /this video can't play here/i })).toBeNull());
+    expect(calls.some((call) => call.name === 'playback-command'
+      && (call.body as { action?: string }).action === 'next')).toBe(false);
+  });
+
   async function confirmTransfer(fails: boolean): Promise<void> {
     const api: EdgeApi = {
       invoke: (async (name: string) => {
@@ -853,18 +781,19 @@ describe('host room workspace', () => {
     expect(await screen.findByText('Guest remote')).toBeInTheDocument();
   });
 
-  it('stays on the search screen when starting the session fails', async () => {
-    // "Start the session" is a promise that playback began: the stage is where
-    // the host goes to watch it. Navigating there after a refused command puts
-    // them in front of a silent video with nothing to retry.
+  it('stays on the stage when starting the queue fails', async () => {
+    // Starting the room used to live on the console page. The stage owns that
+    // press now, so a refused start has to leave the host where the retry is.
     const stoppedRoom = {
       ...liveRoom,
       playback: { currentSongId: null, positionSeconds: 0, isPlaying: false, updatedAt: null },
       queue: [{ ...liveRoom.queue[0], status: 'queued' }],
     };
+    let attemptedPlay = 0;
     const api: EdgeApi = {
       invoke: (async (name: string) => {
         if (name === 'playback-command') {
+          attemptedPlay += 1;
           throw new Error('The room service could not be reached');
         }
         if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
@@ -875,10 +804,15 @@ describe('host room workspace', () => {
     };
 
     renderHost(api);
-    fireEvent.click(await screen.findByRole('button', { name: /start the session/i }));
+    // Wait for the stage itself: the index route redirects, and the console
+    // shell's dock also has a Play button while that lands.
+    expect(await screen.findByRole('button', { name: /switch to computer/i })).toBeInTheDocument();
+    // Nothing is playing and one song waits, which is the state the old console
+    // page called "Start the session".
+    fireEvent.click(screen.getByRole('button', { name: /^play$/i }));
 
-    await waitFor(() => expect(screen.getByText('Playback did not change.')).toBeInTheDocument());
-    expect(screen.getByText('kara-echo song search')).toBeInTheDocument();
+    await waitFor(() => expect(attemptedPlay).toBeGreaterThan(0));
+    expect(screen.getByRole('button', { name: /switch to computer/i })).toBeInTheDocument();
   });
 
   it('coalesces repeated YouTube end events into one automatic next request', async () => {
@@ -928,7 +862,7 @@ describe('host room workspace', () => {
     const { api } = makeApi();
     renderHost(api);
 
-    expect((await screen.findAllByText('Added by Ana')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText(/Added by Ana/)).length).toBeGreaterThan(0);
   });
 
   it('lets the host drag the floating video', async () => {
@@ -939,7 +873,9 @@ describe('host room workspace', () => {
       removeEventListener: () => undefined,
     })));
     const { api } = makeApi();
-    renderHost(api);
+    // The draggable frame is the docked player on a console page; the stage owns
+    // its slot instead.
+    renderHost(api, '/room/' + roomId + '/host/queue');
 
     const handle = await screen.findByRole('button', { name: /move the video/i });
     fireEvent.pointerDown(handle, { pointerId: 1, clientX: 100, clientY: 100 });
@@ -971,13 +907,19 @@ describe('host room workspace', () => {
     expect(playerClock.playCalls).toBe(0);
   });
 
-  it('leaves the TV stage to discovery, because there is no second audience screen', async () => {
+  it('keeps the stage as the room, with no exit control', async () => {
+    // The leave control is gone on purpose: the stage is the room now, and the
+    // only move is the layout switch. Escape on the TV layout must not navigate
+    // anywhere either, because the console page it used to return to is retired.
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/party');
 
-    fireEvent.click(await screen.findByRole('button', { name: /leave tv stage/i }));
+    expect(await screen.findByRole('button', { name: /switch to computer/i })).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /leave/i })).toBeNull();
 
-    expect(await screen.findByText('kara-echo song search')).toBeInTheDocument();
+    fireEvent.keyDown(window, { key: 'Escape' });
+    expect(screen.getByText('After Hours · TV stage')).toBeInTheDocument();
+    expect(screen.queryByText('kara-echo song search')).toBeNull();
   });
 
   it('takes Escape from the computer layout back to the TV layout, not out of the room', async () => {
@@ -1158,7 +1100,8 @@ describe('host room workspace', () => {
     playerClock.currentTime = 100;
     playerClock.duration = 222;
 
-    renderHost(api);
+    // The slider under test is the docked player's, which console pages carry.
+    renderHost(api, '/room/' + roomId + '/host/queue');
     const back = await screen.findByLabelText('Back 10 seconds');
     await waitFor(() => expect(back).toBeEnabled());
     const slider = screen.getByRole('slider', { name: 'Playback position' });

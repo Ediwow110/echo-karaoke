@@ -167,7 +167,7 @@ export default function HostQueuePage() {
                   Use the arrows to reorder. The × removes a song. Skip and moderation stay host-only.
                 </p>
                 <Link
-                  to={'/room/' + roomId + '/host'}
+                  to={'/room/' + roomId + '/host/party?layout=computer'}
                   className="inline-flex min-h-6 items-center gap-1 px-1 text-[0.6875rem] font-semibold text-signal hover:underline"
                 >
                   <PlusIcon size={13} weight="bold" aria-hidden="true" />

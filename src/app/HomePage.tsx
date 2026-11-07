@@ -245,7 +245,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
       if (caught instanceof RoomApiError && caught.code === 'HOST_ALREADY_IN_ROOM') {
         const hostSession = getHostSessionByCode(joinCode);
         if (hostSession !== null) {
-          navigate('/room/' + hostSession.roomId + '/host');
+          navigate('/room/' + hostSession.roomId + '/host/party');
           return;
         }
       }
@@ -378,16 +378,6 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
                 disabled={createUncertain}
               >
                 Launch TV
-              </Button>
-              <Button
-                variant="quiet"
-                size="sm"
-                full
-                className="mt-2"
-                icon={<KeyIcon size={15} weight="duotone" />}
-                onClick={() => { navigate('/join'); }}
-              >
-                Have a room code? Join a room
               </Button>
               <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
                 The room opens on this display with its join QR on screen. Add the first song there.
@@ -542,16 +532,6 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
               disabled={createUncertain}
             >
               Launch TV
-            </Button>
-            <Button
-              variant="quiet"
-              size="sm"
-              full
-              className="mt-2"
-              icon={<KeyIcon size={15} weight="duotone" />}
-              onClick={() => { navigate('/join'); }}
-            >
-              Have a room code? Join a room
             </Button>
             <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
               Next: the stage opens with its join QR already on screen. Switch to computer view to search from this keyboard.

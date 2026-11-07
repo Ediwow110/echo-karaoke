@@ -143,12 +143,15 @@ export function UpNextList({
         {upNext.map((song, index) => {
           const busy = busySongId === song.songId;
           return (
-            <li key={song.songId} className="stagger-in flex items-center gap-3 py-3 first:pt-0 last:pb-0" style={stagger(index)}>
+            // The panel gives this list a third of the width a queue page has. The
+            // row wraps there instead of squeezing the title to a few characters,
+            // and the actions move together to a second line.
+            <li key={song.songId} className="stagger-in flex flex-wrap items-center gap-x-3 gap-y-1.5 py-3 first:pt-0 last:pb-0" style={stagger(index)}>
               <span className="w-6 shrink-0 font-display text-[0.8125rem] tabular text-signal/80">
                 {String(index + 1).padStart(2, '0')}
               </span>
               <SongArtwork src={song.thumbnailUrl} className="h-11 w-11" iconSize={16} />
-              <div className="min-w-0 flex-1">
+              <div className="min-w-[8rem] flex-1">
                 <p className="truncate text-[0.8125rem] font-semibold leading-[1.35] text-ink">{song.title}</p>
                 <p className="mt-0.5 truncate text-[0.6875rem] text-ink-2">{song.channelTitle ?? 'YouTube'}</p>
                 <p className="mt-0.5 truncate text-[0.625rem] text-ink-3">Added by {song.addedBy}</p>
@@ -156,6 +159,7 @@ export function UpNextList({
               <span className="hidden shrink-0 text-[0.6875rem] tabular text-ink-2 sm:block">
                 {song.durationSeconds === null ? '—' : formatTime(song.durationSeconds)}
               </span>
+              <div className="ml-auto flex shrink-0 items-center gap-0.5">
               {onReorder === undefined ? null : (
                 <div className="flex shrink-0 items-center gap-0.5">
                   <button
@@ -192,6 +196,7 @@ export function UpNextList({
                   <XIcon size={14} weight="bold" aria-hidden="true" />
                 </button>
               )}
+              </div>
             </li>
           );
         })}
