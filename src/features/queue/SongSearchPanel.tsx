@@ -23,6 +23,8 @@ export type SongSearchPanelProps = {
   onOpenQueue?: () => void;
   popularSlot?: ReactNode;
   className?: string;
+  /** Results density. 'grid' is for the wide stage panel; every other screen keeps 'list'. */
+  layout?: 'list' | 'grid';
 };
 
 const exampleSearches = ['The Weeknd karaoke', '80s sing-alongs', 'M83 karaoke'];
@@ -38,6 +40,7 @@ export default function SongSearchPanel({
   onOpenQueue,
   popularSlot,
   className = '',
+  layout = 'list',
 }: SongSearchPanelProps) {
   const inputRef = useRef<HTMLInputElement | null>(null);
   const fallbackInputId = useId();
@@ -202,7 +205,7 @@ export default function SongSearchPanel({
             <p className="eyebrow text-ink-2">YouTube results</p>
             <p className="text-[0.625rem] text-ink-3">Live search</p>
           </div>
-          <ul aria-label="Songs" className="flex flex-col gap-1">
+          <ul aria-label="Songs" className={layout === 'grid' ? 'grid grid-cols-2 gap-2' : 'flex flex-col gap-1'}>
             {results.map((result, index) => {
               const queued = queuedFor(result.videoId);
               const added = queued !== undefined || addedIds.includes(result.videoId);
@@ -211,15 +214,18 @@ export default function SongSearchPanel({
                 <li
                   key={result.videoId}
                   className={[
-                    'stagger-in flex flex-wrap items-center gap-3 gap-y-2 rounded-media px-1 py-2.5 transition-colors',
-                    variant === 'guest' ? 'border-b border-line last:border-b-0' : 'hover:bg-surface-2',
+                    'stagger-in transition-colors',
+                    layout === 'grid'
+                      ? 'flex flex-col gap-2 rounded-panel border border-line bg-surface-2 p-2'
+                      : 'flex flex-wrap items-center gap-3 gap-y-2 rounded-media px-1 py-2.5',
+                    layout === 'grid' ? '' : variant === 'guest' ? 'border-b border-line last:border-b-0' : 'hover:bg-surface-2',
                   ].join(' ')}
                   style={{ animationDelay: Math.min(index, 10) * 30 + 'ms' }}
                 >
                   <div className="relative shrink-0">
                     <SongArtwork
                       src={result.thumbnailUrl}
-                      className={variant === 'guest' ? 'h-[3.7rem] w-[5.5rem]' : 'h-11 w-[4.15rem]'}
+                      className={layout === 'grid' ? 'aspect-video w-full' : variant === 'guest' ? 'h-[3.7rem] w-[5.5rem]' : 'h-11 w-[4.15rem]'}
                       iconSize={18}
                     />
                     {result.durationSeconds === null ? null : (
@@ -244,7 +250,7 @@ export default function SongSearchPanel({
                   <Button
                     variant={added ? 'secondary' : 'primary'}
                     size="md"
-                    className={['min-h-11', variant === 'guest' ? 'min-w-[4.3rem]' : ''].join(' ')}
+                    className={['min-h-11', layout === 'grid' ? 'w-full justify-center' : variant === 'guest' ? 'min-w-[4.3rem]' : ''].join(' ')}
                     icon={added ? <CheckIcon size={14} weight="bold" /> : <PlusIcon size={14} weight="bold" />}
                     aria-label={added ? result.title + ' is already in the queue' : pending ? 'Adding ' + result.title : 'Add ' + result.title}
                     disabled={disabled || added || (addingId !== null && !pending)}

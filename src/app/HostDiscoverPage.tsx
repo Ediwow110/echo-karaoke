@@ -36,7 +36,7 @@ export default function HostDiscoverPage() {
   const initialQuery = searchParams.get('q') ?? '';
   const searchRef = useRef<HTMLDivElement | null>(null);
   const [starting, setStarting] = useState(false);
-  const stageHref = '/room/' + roomId + '/host/stage';
+  const stageHref = '/room/' + roomId + '/host/party';
   const queueHref = '/room/' + roomId + '/host/queue';
   const players = onlineGuestCount(roster);
 

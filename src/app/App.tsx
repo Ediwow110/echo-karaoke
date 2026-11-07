@@ -12,7 +12,6 @@ const HostRoomPage = lazy(() => import('./HostRoomPage'));
 const HostDiscoverPage = lazy(() => import('./HostDiscoverPage'));
 const HostQueuePage = lazy(() => import('./HostQueuePage'));
 const HostSettingsPage = lazy(() => import('./HostSettingsPage'));
-const HostStagePage = lazy(() => import('./HostStagePage'));
 const HostPartyPage = lazy(() => import('./HostPartyPage'));
 const HostSongbookPage = lazy(() => import('./HostSongbookPage'));
 const ScanRoomPage = lazy(() => import('../features/scan/ScanRoomPage'));
@@ -36,6 +35,15 @@ function HostRoomRoute() {
 function GuestRoomRoute() {
   const { roomId } = useParams<{ roomId: string }>();
   return <GuestRoomPage key={roomId} />;
+}
+
+// Stage and Party were two near-identical audience screens. One remains, so the
+// old stage link has to land on it rather than fall through to the catch-all
+// redirect, which would drop the host out of their room. Exported so the tests
+// mount this component rather than a copy of its target.
+export function HostStageRedirect() {
+  const { roomId } = useParams<{ roomId: string }>();
+  return <Navigate to={'/room/' + roomId + '/host/party?layout=tv'} replace />;
 }
 
 // A route change should announce the new screen to keyboard and screen-reader
@@ -119,7 +127,7 @@ export default function App() {
             <Route path="favorites" element={<HostFavoritesPage />} />
             <Route path="recent" element={<HostRecentPage />} />
             <Route path="songbook" element={<HostSongbookPage />} />
-            <Route path="stage" element={<HostStagePage />} />
+            <Route path="stage" element={<HostStageRedirect />} />
             <Route path="party" element={<HostPartyPage />} />
           </Route>
           <Route path="/library" element={<LibraryPage />} />

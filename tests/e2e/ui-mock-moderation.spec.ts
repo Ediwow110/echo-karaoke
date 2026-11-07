@@ -1,4 +1,5 @@
 import { expect, test, type Page } from '@playwright/test';
+import { openScreen } from './screen';
 
 // Moderation and the phone remote, proven against the running app. These are
 // the paths that had no browser cover before: the door a host opens, the
@@ -170,7 +171,7 @@ test('the host admits a waiting guest from room settings and the door clears', a
   await mock(page, scenario, 'host');
   page.on('pageerror', (error) => noise.push('pageerror: ' + error.message.slice(0, 140)));
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM + '/host/settings');
 
   const letIn = page.getByRole('button', { name: 'Let Sam in' });
   await expect(letIn, 'the door never offered the waiting guest').toBeVisible();
@@ -187,7 +188,7 @@ test('a waiting guest sees nothing of the room until the host admits them', asyn
   const scenario: Scenario = { admitted: false, approvedMemberIds: [] };
   await mock(page, scenario, 'guest', 'waiting');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/join/' + CODE, { waitUntil: 'networkidle' });
+  await openScreen(page, '/join/' + CODE);
   await page.getByLabel('Your name').fill('Jamie');
   await page.getByRole('button', { name: 'Join room' }).click();
 
@@ -200,7 +201,7 @@ test('the waiting screen opens by itself once the host admits the guest', async 
   const scenario: Scenario = { admitted: false, approvedMemberIds: [] };
   await mock(page, scenario, 'guest', 'waiting');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/join/' + CODE, { waitUntil: 'networkidle' });
+  await openScreen(page, '/join/' + CODE);
   await page.getByLabel('Your name').fill('Jamie');
   await page.getByRole('button', { name: 'Join room' }).click();
   await expect(page.getByText('Waiting at the door')).toBeVisible();
@@ -215,7 +216,7 @@ test('a scanned join link prefills the code and lands the guest in the room', as
   const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
   await mock(page, scenario, 'guest');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/join/' + CODE, { waitUntil: 'networkidle' });
+  await openScreen(page, '/join/' + CODE);
 
   await expect(page.getByLabel('Room code')).toHaveValue(/ABCD/);
   await page.getByLabel('Your name').fill('Jamie');
@@ -230,7 +231,7 @@ test('a locked songbook says why its controls are off', async ({ page }) => {
   const scenario: Scenario = { admitted: true, locked: true, approvedMemberIds: [] };
   await mock(page, scenario, 'guest');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/room/' + ROOM + '/songbook', { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM + '/songbook');
 
   await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
   await expect(page.getByText('The host turned off new requests.')).toBeVisible();
@@ -246,7 +247,7 @@ test('a refused add reads in the app voice from the songbook too', async ({ page
   const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
   await mock(page, scenario, 'guest', 'joined', { op: 'queue-command', status: 403, code: 'GUEST_CONTROLS_LOCKED' });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/room/' + ROOM + '/songbook', { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM + '/songbook');
 
   const add = page.getByRole('button', { name: /add halo/i }).first();
   await expect(add).toBeEnabled();
@@ -261,7 +262,7 @@ test('a host who ends the room is told that it ended', async ({ page }) => {
   const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM + '/host/settings');
 
   await page.getByRole('button', { name: /leave & end room/i }).click();
   await page.getByRole('dialog').getByRole('button', { name: /^end the room$/i }).click();
@@ -282,10 +283,10 @@ test('an open guest tab learns the room ended without reloading', async ({ page,
   await mock(page, scenario, 'guest');
   await mock(host, scenario, 'host');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM);
   await expect(page.getByRole('heading', { name: 'The room queue.' })).toBeVisible();
 
-  await host.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+  await openScreen(host, '/room/' + ROOM + '/host/settings');
   await host.getByRole('button', { name: /leave & end room/i }).click();
   await host.getByRole('dialog').getByRole('button', { name: /^end the room$/i }).click();
 
@@ -301,7 +302,7 @@ test('a guest can second a song and the row remembers it', async ({ page }) => {
   const scenario: Scenario = { admitted: true, approvedMemberIds: [], vote };
   await mock(page, scenario, 'guest');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM);
 
   const second = page.getByRole('button', { name: 'Second Midnight City' });
   await expect(second).toBeVisible();
@@ -335,10 +336,9 @@ test('the invite chip says the same head-count on every host screen', async ({ p
     '/room/' + ROOM + '/host',
     '/room/' + ROOM + '/host/settings',
     '/room/' + ROOM + '/host/queue',
-    '/room/' + ROOM + '/host/stage',
     '/room/' + ROOM + '/host/party',
   ]) {
-    await page.goto(path, { waitUntil: 'networkidle' });
+    await openScreen(page, path);
     // The mock roster is one host plus one guest, both heartbeating. Screens
     // that carry no chip are fine; ones that do must agree.
     const chips = await page.getByText(/^\d+ in$/i).allInnerTexts();
@@ -346,7 +346,7 @@ test('the invite chip says the same head-count on every host screen', async ({ p
     expect(chips.every((chip) => chip.toLowerCase() === '1 in'), path + ' chips: ' + JSON.stringify(chips)).toBe(true);
   }
   // The claim is only worth anything if at least one screen renders it.
-  await page.goto('/room/' + ROOM + '/host/settings', { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM + '/host/settings');
   await expect(page.getByText('1 in').first()).toBeVisible();
 });
 
@@ -358,7 +358,7 @@ test('the party strip names the count it actually shows', async ({ page }) => {
   const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/room/' + ROOM + '/host/party', { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM + '/host/party');
 
   // The mock queue is one song playing and none waiting. The strip beside the
   // "UP NEXT" label used to read "Queue · 0" while every phone in the room read
@@ -373,7 +373,7 @@ test('the host can clear the queue from the queue page', async ({ page }) => {
   const scenario: Scenario = { admitted: true, approvedMemberIds: [], hostActions: [] };
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/room/' + ROOM + '/host/queue', { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM + '/host/queue');
 
   await page.getByRole('button', { name: 'Clear queue' }).click();
   const dialog = page.getByRole('dialog');
@@ -392,7 +392,7 @@ test('a refused vote is announced as an error, not a success', async ({ page }) 
   const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
   await mock(page, scenario, 'guest', 'joined', { op: 'vote-command', status: 429, code: 'RATE_LIMITED' });
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM);
 
   await page.getByRole('button', { name: 'Second Midnight City' }).click();
   const alert = page.getByRole('alert');
@@ -407,7 +407,7 @@ test('a locked room does not offer an enabled vote', async ({ page }) => {
   const scenario: Scenario = { admitted: true, locked: true, approvedMemberIds: [] };
   await mock(page, scenario, 'guest');
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/room/' + ROOM, { waitUntil: 'networkidle' });
+  await openScreen(page, '/room/' + ROOM);
 
   const vote = page.getByRole('button', { name: /Second Midnight City/ });
   await expect(vote).toBeVisible();
@@ -421,7 +421,7 @@ test('a blip does not take away the way back to the room', async ({ page }) => {
   const scenario: Scenario = { admitted: true, approvedMemberIds: [], hostReadFails: true };
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/create', { waitUntil: 'networkidle' });
+  await openScreen(page, '/create');
   await expect(page.getByRole('link', { name: 'Back to the room' })).toHaveCount(0);
 
   scenario.hostReadFails = false;
@@ -434,7 +434,7 @@ test('a room that ends while the host sits here stops being offered', async ({ p
   const scenario: Scenario = { admitted: true, approvedMemberIds: [] };
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/create', { waitUntil: 'networkidle' });
+  await openScreen(page, '/create');
   await expect(page.getByRole('link', { name: 'Back to the room' })).toBeVisible();
 
   scenario.ended = true;
@@ -450,7 +450,7 @@ test('the create screen keeps the hosted room alive while it offers the way back
   const scenario: Scenario = { admitted: true, approvedMemberIds: [], beats: 0 };
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await page.goto('/create', { waitUntil: 'networkidle' });
+  await openScreen(page, '/create');
   await expect(page.getByRole('link', { name: 'Back to the room' })).toBeVisible();
   await expect.poll(() => scenario.beats ?? 0, 'the room was left without a heartbeat').toBeGreaterThan(0);
 });
@@ -468,7 +468,7 @@ for (const [name, path] of GUEST_SCREENS) {
     await mock(page, scenario, 'guest');
     page.on('pageerror', (error) => noise.push('pageerror: ' + error.message.slice(0, 140)));
     await page.setViewportSize({ width: 390, height: 844 });
-    await page.goto(path, { waitUntil: 'networkidle' });
+    await openScreen(page, path);
     await page.waitForTimeout(600);
 
     expect(noise).toEqual([]);

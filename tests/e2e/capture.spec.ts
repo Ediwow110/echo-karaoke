@@ -10,12 +10,13 @@ test('capture screens', async ({ browser }) => {
   await page.waitForTimeout(600);
   await page.screenshot({ path: 'test-results/screens/create-room.png', fullPage: true });
 
+  await page.getByText('Room details').click();
   await page.getByLabel('Room name').fill('After Hours');
   await page.getByLabel('Your name').fill('Alex');
-  await page.getByRole('button', { name: 'Create room' }).click();
-  await page.waitForURL(/\/host$/, { timeout: 20000 });
+  await page.getByRole('button', { name: 'Launch TV' }).click();
+  await page.waitForURL(/\/host\/party$/, { timeout: 20000 });
   await page.waitForTimeout(1600);
-  await page.screenshot({ path: 'test-results/screens/discover.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/screens/tv-stage.png', fullPage: true });
 
   const hostId = page.url().split('/room/')[1]?.split('/')[0] ?? '';
   await page.goto(BASE + '/room/' + hostId + '/host/queue');

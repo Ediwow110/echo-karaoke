@@ -155,9 +155,9 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
             </button>
             <div className="hidden sm:flex">
               <Link
-                to={'/room/' + roomId + '/host/stage'}
-                aria-label="Open stage"
-                className="tooltip inline-flex" data-tooltip="Open stage"
+                to={'/room/' + roomId + '/host/party?layout=tv'}
+                aria-label="Open TV stage"
+                className="tooltip inline-flex" data-tooltip="Open TV stage"
               >
                 <span className="grid size-11 place-items-center rounded-full border border-transparent text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink">
                   <ArrowsOutIcon size={17} weight="regular" aria-hidden="true" />
@@ -187,7 +187,7 @@ export default function PlayerDock({ roomId, nowPlaying, playback, onTogglePlay,
               />
             </div>
             <Link
-              to={'/room/' + roomId + '/host/stage'}
+              to={'/room/' + roomId + '/host/party?layout=tv'}
               className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface px-2.5 text-[0.6875rem] font-semibold text-ink-2 transition-colors hover:border-line-strong hover:text-ink"
             >
               Stage

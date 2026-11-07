@@ -6,13 +6,14 @@ import HostRoomPage from '../../src/app/HostRoomPage';
 import HostDiscoverPage from '../../src/app/HostDiscoverPage';
 import HostQueuePage from '../../src/app/HostQueuePage';
 import HostSettingsPage from '../../src/app/HostSettingsPage';
-import HostStagePage from '../../src/app/HostStagePage';
 import HostPartyPage from '../../src/app/HostPartyPage';
+import { HostStageRedirect } from '../../src/app/App';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
 import type { EdgeApi } from '../../src/lib/edgeApi';
 import type { DoorEntry } from '../../src/features/rooms/roomApi';
 import { clearRoomTokens, saveGuestToken, saveHostToken } from '../../src/features/rooms/tokenStore';
 import { getHostedRoom, getLastRoom, rememberSession } from '../../src/features/rooms/sessionStore';
+import { isFavorite } from '../../src/features/library/libraryStore';
 import '@testing-library/jest-dom/vitest';
 
 const playerClock = vi.hoisted(() => ({
@@ -174,7 +175,7 @@ function renderHost(api: EdgeApi, path = '/room/' + roomId + '/host') {
             createElement(Route, { index: true, element: createElement(HostDiscoverPage) }),
             createElement(Route, { path: 'queue', element: createElement(HostQueuePage) }),
             createElement(Route, { path: 'settings', element: createElement(HostSettingsPage) }),
-            createElement(Route, { path: 'stage', element: createElement(HostStagePage) }),
+            createElement(Route, { path: 'stage', element: createElement(HostStageRedirect) }),
             createElement(Route, { path: 'party', element: createElement(HostPartyPage) }),
           ),
         ),
@@ -567,7 +568,7 @@ describe('host room workspace', () => {
         (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
       )).toBe(true);
     });
-    expect((await screen.findAllByText('After Hours · Party view')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('After Hours · TV stage')).length).toBeGreaterThan(0);
   });
 
   it('takes a host on the queue page into party view when a queued song starts', async () => {
@@ -596,7 +597,7 @@ describe('host room workspace', () => {
         (call) => call.name === 'playback-command' && (call.body as { action?: string }).action === 'play'
       )).toBe(true);
     });
-    expect((await screen.findAllByText('After Hours · Party view')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('After Hours · TV stage')).length).toBeGreaterThan(0);
   });
 
   it('finishes the song five seconds before the video ends', async () => {
@@ -754,7 +755,7 @@ describe('host room workspace', () => {
     const { api } = makeApi();
 
     renderHost(api, '/room/' + roomId + '/host/stage');
-    await screen.findByRole('button', { name: /switch to (tv|laptop)/i });
+    await screen.findByRole('button', { name: /switch to (tv|computer)/i });
 
     expect(screen.queryByText('Autoplay on')).toBeNull();
     expect(screen.getByText('Ready')).toBeInTheDocument();
@@ -789,8 +790,8 @@ describe('host room workspace', () => {
     // The song ends, the advance fails, and the player stays mounted across the
     // route change, so the stage inherits the stalled flag.
     renderHost(api);
-    fireEvent.click(await screen.findByLabelText('Open stage'));
-    await screen.findByRole('button', { name: /switch to (tv|laptop)/i });
+    fireEvent.click(await screen.findByLabelText('Open TV stage'));
+    await screen.findByRole('button', { name: /switch to (tv|computer)/i });
 
     // One "Playback stalled" is the overlay over the video; the second is the
     // status pill, which used to keep reporting that all was well.
@@ -804,7 +805,7 @@ describe('host room workspace', () => {
     playerClock.state = 1;
 
     renderHost(api, '/room/' + roomId + '/host/stage');
-    await screen.findByRole('button', { name: /switch to (tv|laptop)/i });
+    await screen.findByRole('button', { name: /switch to (tv|computer)/i });
 
     expect(screen.getByText('Autoplay on')).toBeInTheDocument();
   });
@@ -970,13 +971,71 @@ describe('host room workspace', () => {
     expect(playerClock.playCalls).toBe(0);
   });
 
-  it('returns from party view to the stage, not the discovery page', async () => {
+  it('leaves the TV stage to discovery, because there is no second audience screen', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/party');
 
-    fireEvent.click(await screen.findByRole('button', { name: /leave party view/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /leave tv stage/i }));
 
-    expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
+    expect(await screen.findByText('kara-echo song search')).toBeInTheDocument();
+  });
+
+  it('takes Escape from the computer layout back to the TV layout, not out of the room', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('button', { name: /switch to computer/i }));
+    expect(await screen.findByRole('tab', { name: /search/i })).toBeInTheDocument();
+
+    fireEvent.keyDown(window, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('tab', { name: /hits/i })).toBeNull());
+    expect(screen.getByText('After Hours · TV stage')).toBeInTheDocument();
+  });
+
+  it('takes Escape from a focused control back to the TV layout', async () => {
+    // The real flow ends with a click, so focus sits on a tab or a transport
+    // button by the time a host reaches for Escape. A guard that swallowed the
+    // key over any control left the computer layout unexitable.
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('button', { name: /switch to computer/i }));
+    const hits = await screen.findByRole('tab', { name: /hits/i });
+    fireEvent.click(hits);
+    fireEvent.keyDown(hits, { key: 'Escape' });
+
+    await waitFor(() => expect(screen.queryByRole('tab', { name: /hits/i })).toBeNull());
+    expect(screen.getByText('After Hours · TV stage')).toBeInTheDocument();
+  });
+
+  it('keeps Escape to itself when a search field has focus', async () => {
+    // Typing is the one place Escape must not switch layouts: a host dismissing
+    // a dropdown or clearing a field has to stay on the panel they are in.
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party?layout=computer');
+
+    const search = await screen.findByRole('search');
+    fireEvent.keyDown(search.querySelector('input') ?? search, { key: 'Escape' });
+
+    expect(await screen.findByRole('tab', { name: /hits/i })).toBeInTheDocument();
+  });
+
+  it('saves the song the stage is playing to favorites', async () => {
+    // The stage is the only screen that shows what the room is watching, so its
+    // heart is how that song gets kept. Merging the stage into the party view
+    // dropped the control and no other test noticed, because the library page has
+    // its own.
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Save Afterglow to favorites' }));
+
+    expect(screen.getByRole('button', { name: 'Remove Afterglow from favorites' })).toHaveAttribute('aria-pressed', 'true');
+    expect(isFavorite('dQw4w9WgXcQ')).toBe(true);
+
+    fireEvent.click(screen.getByRole('button', { name: 'Remove Afterglow from favorites' }));
+    expect(isFavorite('dQw4w9WgXcQ')).toBe(false);
   });
 
   it('enters the stage at the video frame', async () => {
@@ -984,7 +1043,7 @@ describe('host room workspace', () => {
     try {
       const { api } = makeApi();
       renderHost(api, '/room/' + roomId + '/host/stage');
-      expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
+      expect((await screen.findAllByText('After Hours · TV stage')).length).toBeGreaterThan(0);
       expect(scrollSpy).toHaveBeenCalledWith({ top: 0, left: 0, behavior: 'auto' });
     } finally {
       scrollSpy.mockRestore();
@@ -995,7 +1054,7 @@ describe('host room workspace', () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/stage');
 
-    expect((await screen.findAllByText('Your private stage')).length).toBeGreaterThan(0);
+    expect((await screen.findAllByText('After Hours · TV stage')).length).toBeGreaterThan(0);
     expect(screen.queryByText('Now on the host screen')).toBeNull();
     expect(screen.getByRole('slider', { name: 'Playback position' })).toBeInTheDocument();
   });
@@ -1004,24 +1063,58 @@ describe('host room workspace', () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/stage');
 
-    const switcher = await screen.findByRole('button', { name: /switch to laptop/i });
+    const switcher = await screen.findByRole('button', { name: /switch to computer/i });
     expect(switcher).toHaveAttribute('aria-pressed', 'false');
     expect(screen.queryByRole('search')).toBeNull();
+  });
+
+  it('redirects the retired stage route onto the TV stage', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/stage');
+
+    // The stage screen no longer exists; the old link has to land on the one
+    // audience screen rather than 404 into the catch-all redirect. The header
+    // text appears in both layouts, so the layout itself is what gets asserted.
+    expect(await screen.findByRole('button', { name: /switch to computer/i })).toBeInTheDocument();
+    expect(screen.queryByRole('search')).toBeNull();
+    expect(screen.queryByRole('tab', { name: /hits/i })).toBeNull();
+    expect(screen.queryByText('Your private stage')).toBeNull();
+  });
+
+  it('gives the computer layout Search, Queue and Hits tabs', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('button', { name: /switch to computer/i }));
+
+    const tabs = screen.getAllByRole('tab');
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Search', 'Queue', 'Hits']);
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
+    expect(screen.getByRole('search')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /^queue$/i }));
+    expect(screen.queryByRole('search')).toBeNull();
+    expect(screen.getByText('Midnight City')).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /^hits$/i }));
+    expect(await screen.findByRole('region', { name: /popular karaoke/i })).toBeInTheDocument();
   });
 
   it('adds the search panel without leaving the stage route', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/stage');
 
-    fireEvent.click(await screen.findByRole('button', { name: /switch to laptop/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /switch to computer/i }));
 
     expect(await screen.findByRole('search')).toBeInTheDocument();
     expect(screen.getByRole('button', { name: /switch to tv/i })).toHaveAttribute('aria-pressed', 'true');
+    // The positive half: the stage rendered, not Discover. Its only h1 is the
+    // song the room is watching, where Discover's would name the room.
+    expect(screen.getByRole('heading', { level: 1, name: 'Afterglow' })).toBeInTheDocument();
     // The switch is a query param, not a route change: navigating would leave this
     // screen's measured slot and move the video to the floating frame, and it would
     // land on Discover, whose own heading must not appear here.
     expect(screen.queryByText('kara-echo song search')).toBeNull();
-    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Afterglow');
   });
 
   it('does not request play when a song is already playing', async () => {

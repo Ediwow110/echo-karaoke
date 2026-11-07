@@ -8,11 +8,14 @@ const BASE = resolveE2EBaseURL();
 
 async function createRoom(page: Page, roomName = 'After Hours', hostName = 'Alex'): Promise<{ code: string; joinUrl: string }> {
   await page.goto(BASE + '/');
+  await page.getByText('Room details').click();
   await page.getByLabel('Room name').fill(roomName);
   await page.getByLabel('Your name').fill(hostName);
-  await page.getByRole('button', { name: 'Create room' }).click();
-  await page.waitForURL(/\/host$/, { timeout: 20000 });
-  await expect(page.getByRole('heading', { level: 1, name: roomName })).toBeVisible();
+  await page.getByRole('button', { name: 'Launch TV' }).click();
+  await page.waitForURL(/\/host\/party$/, { timeout: 20000 });
+  // The stage has no room-name heading: its only h1 names the playing song. The
+  // header is where the room identifies itself.
+  await expect(page.locator('header')).toContainText(roomName + ' · TV stage', { timeout: 20000 });
 
   const qr = page.locator('img[data-join-url]').first();
   await expect(qr).toHaveAttribute('data-join-url', /\/join\/[0-9A-Z]{16}$/, { timeout: 20000 });

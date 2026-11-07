@@ -4,13 +4,12 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 
 ## What it does
 
-- Create a named room and share a real, scannable QR or the 80-bit room code.
+- One click on the landing screen creates the room and opens it as the TV stage, where a real, scannable QR and the 80-bit room code are already on screen. The names are optional and live behind a "Room details" disclosure (`Karaoke room` and `Host` if left blank).
 - Guest permissions have one switch: playback is host-only unless the host lets guests pause or resume. Adding and voting are always open to guests, and who gets in is moderated by the door instead.
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
 - Queue songs, reorder and remove as host, and let the next song start automatically.
-- Host stage view with play/pause, 10-second seek, fullscreen, volume, favorites and keyboard shortcuts. It opens as a full-bleed TV layout and switches to a laptop layout that puts song search and the queue beside the video, without leaving the route.
-- Full-screen party view with the room QR for new singers.
+- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume, favorites and keyboard shortcuts, and the room QR over the video for new singers. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Hits panel beside the video with the invite card above it. The TV layout carries no search, and `/host/stage` redirects here.
 - The landing and create screens carry no side navigation; the live room stays one click away in the page body.
 - Phone remote with Search and Queue tabs, duration, automatic-advance feedback, and a "you're up next" card.
 - Honest connection states: stale queue while offline, automatic recovery and a restored notice.
@@ -35,7 +34,7 @@ not configured or resting. It is not a general replacement for search.
 - Every guest or host request carries its pass to the function, which verifies the JWT against the published JWKS, then verifies the room membership and the pass inside the authorized SQL operation.
 - Row Level Security is enabled on every table. The anon and authenticated roles hold no table privileges and no execute rights on the operations. `echo_auth` reaches only the auth tables; `service_role` reaches only the room operations.
 - Realtime is not used for room data. Screens poll the token-checked read function and use visibility-aware polling.
-- The host screen owns one persistent YouTube player. It stays mounted while the host moves between Discover, Queue, Settings, Library and Favorites; the Stage and Party views dock that same player into a measured slot.
+- The host screen owns one persistent YouTube player. It stays mounted while the host moves between Discover, Queue, Settings, Library and Favorites; the TV stage docks that same player into a measured slot, and switching between its TV and computer layouts never unmounts it.
 
 Room codes use 16 Crockford Base32 characters (80 bits). Rooms live until the host ends them or 24 hours pass, whichever comes first, and abandoned rooms are swept when the next room is created.
 
@@ -95,11 +94,11 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 591 unit and component tests (jsdom)
+    npm test                 # 604 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # 440 pgTAP assertions
     npm run test:integration # 9 operation-path and runtime-role grant tests against a Neon branch
-    npm run test:e2e:ui      # 61 CI-safe Playwright UI flows with a mocked API
+    npm run test:e2e:ui      # 63 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL, plus E2E_BRANCH_TARGET_CONFIRMED=1 for a local port
 
 `vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, and it refuses the deployed production origin even when one names it. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment. A loopback target additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in `http://127.0.0.1:3000` says whether that port is backed by a branch or by production — and the default it replaced was production.

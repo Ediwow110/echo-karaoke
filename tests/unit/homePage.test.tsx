@@ -34,6 +34,7 @@ function renderHome(api: EdgeApi = { invoke: (async () => ({})) as unknown as Ed
         <Routes>
           <Route path="/" element={<HomePage />} />
           <Route path="/room/:roomId/host" element={<p>Host room</p>} />
+          <Route path="/room/:roomId/host/party" element={<p>Host room</p>} />
           <Route path="/room/:roomId" element={<p>Guest room</p>} />
           <Route path="/join" element={<p>Join by code</p>} />
         </Routes>
@@ -82,7 +83,7 @@ describe('create room workspace', () => {
 
     const field = screen.getByLabelText('Your name');
     expect(field).toHaveValue('');
-    expect(field).toHaveAttribute('placeholder', 'Alex');
+    expect(field).toHaveAttribute('placeholder', 'Host');
     expect(screen.queryByText('Qoder')).toBeNull();
   });
 
@@ -102,7 +103,7 @@ describe('create room workspace', () => {
 
     expect(screen.queryByRole('link', { name: /have a room code/i })).toBeNull();
     const join = screen.getByRole('button', { name: /have a room code\? join a room/i });
-    const create = screen.getByRole('button', { name: 'Create room' });
+    const create = screen.getByRole('button', { name: 'Launch TV' });
     expect(create.compareDocumentPosition(join) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
 
     fireEvent.click(join);
@@ -129,16 +130,16 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeDisabled();
     fireEvent.change(screen.getByLabelText('Room name'), { target: { value: 'Corrected while uncertain' } });
     fireEvent.submit(screen.getByRole('form', { name: 'Start a room' }));
     expect(calls).toBe(1);
     fireEvent.click(screen.getByRole('button', { name: /create another room anyway/i }));
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeEnabled();
     expect(calls).toBe(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(calls).toBe(2);
   });
 
@@ -151,13 +152,13 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     const first = renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
     first.unmount();
 
     renderHome(api);
     expect(screen.getByRole('alert')).toHaveTextContent(/may have been created/i);
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeDisabled();
     fireEvent.submit(screen.getByRole('form', { name: 'Start a room' }));
     expect(calls).toBe(1);
     expect(screen.getByRole('button', { name: /create another room anyway/i })).toBeInTheDocument();
@@ -172,12 +173,12 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     const first = renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(calls).toBe(1);
     first.unmount();
     renderHome(api);
     expect(screen.getByRole('alert')).toHaveTextContent(/may have been created/i);
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeDisabled();
     fireEvent.submit(screen.getByRole('form', { name: 'Start a room' }));
     expect(calls).toBe(1);
   });
@@ -187,12 +188,12 @@ describe('create room workspace', () => {
     const api: EdgeApi = { invoke: (async () => created) as EdgeApi['invoke'] };
     const first = renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     first.unmount();
     renderHome(api);
     expect(screen.queryByRole('button', { name: /create another room anyway/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeEnabled();
   });
 
   it('clears the pending create caution after an explicitly rejected request', async () => {
@@ -202,12 +203,12 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     const first = renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Too many room attempts');
     first.unmount();
     renderHome(api);
     expect(screen.queryByRole('button', { name: /create another room anyway/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeEnabled();
   });
 
   it('does not persist host credentials in the tab-local uncertainty marker', async () => {
@@ -217,7 +218,7 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
     const stored = Object.values(sessionStorage).join(' ') + [...Array(sessionStorage.length).keys()]
       .map((i) => sessionStorage.getItem(sessionStorage.key(i) ?? '')).join(' ');
@@ -232,13 +233,13 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     const first = renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
     fireEvent.click(screen.getByRole('button', { name: /create another room anyway/i }));
     first.unmount();
     renderHome(api);
     expect(screen.queryByRole('button', { name: /create another room anyway/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeEnabled();
   });
 
   it('does not describe an HTTP 5xx room-create response as a known failure', async () => {
@@ -248,9 +249,9 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeDisabled();
   });
 
   it('treats an incomplete HTTP success as uncertain without storing host credentials', async () => {
@@ -260,11 +261,11 @@ describe('create room workspace', () => {
     })) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
     expect(loadHostToken(created.roomId)).toBeNull();
     expect(loadGuestToken(created.roomId)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeDisabled();
   });
 
   it('creates a new room only after explicit acknowledgement of an uncertain result', async () => {
@@ -277,12 +278,12 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
     expect(calls).toBe(1);
     fireEvent.click(screen.getByRole('button', { name: /create another room anyway/i }));
     expect(calls).toBe(1);
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     expect(calls).toBe(2);
     expect(loadHostToken(created.roomId)).toBe(created.hostToken);
@@ -296,11 +297,11 @@ describe('create room workspace', () => {
     renderHome(api);
     fireEvent.click(screen.getByRole('button', { name: /hosting tonight/i }));
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(/may have been created/i);
     fireEvent.click(screen.getByRole('button', { name: /joining instead/i }));
     fireEvent.click(screen.getByRole('button', { name: /hosting tonight/i }));
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeDisabled();
     expect(screen.getByRole('button', { name: /create another room anyway/i })).toBeInTheDocument();
   });
 
@@ -311,10 +312,10 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Too many room attempts');
     expect(screen.queryByRole('button', { name: /create another room anyway/i })).not.toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeEnabled();
   });
 
   it('submits a pending desktop host create exactly once', () => {
@@ -330,7 +331,7 @@ describe('create room workspace', () => {
     fireEvent.submit(form);
     fireEvent.submit(form);
     expect(calls).toBe(1);
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeDisabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeDisabled();
   });
 
   it('does not save stale host/guest passes after changing from create to join', async () => {
@@ -340,7 +341,7 @@ describe('create room workspace', () => {
     renderHome(api);
     fireEvent.click(screen.getByRole('button', { name: /hosting tonight/i }));
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     fireEvent.click(screen.getByRole('button', { name: /joining instead/i }));
     await act(async () => { finish?.(created); });
     expect(screen.getByRole('heading', { name: /join the room/i })).toBeInTheDocument();
@@ -356,7 +357,7 @@ describe('create room workspace', () => {
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
     fireEvent.change(screen.getByLabelText('Room name'), { target: { value: 'First name' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     fireEvent.change(screen.getByLabelText('Room name'), { target: { value: 'Corrected name' } });
     await act(async () => { finish?.(created); });
     expect(screen.getByLabelText('Room name')).toHaveValue('Corrected name');
@@ -375,14 +376,14 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     fireEvent.change(screen.getByLabelText('Room name'), { target: { value: 'Changed during create' } });
     fireEvent.submit(screen.getByRole('form', { name: 'Start a room' }));
     expect(calls).toBe(1);
     await act(async () => { finish?.(created); });
     expect(screen.queryByText('Host room')).not.toBeInTheDocument();
     expect(loadHostToken(created.roomId)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeEnabled();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeEnabled();
   });
 
   it('ignores a create response after the home screen unmounts', async () => {
@@ -391,7 +392,7 @@ describe('create room workspace', () => {
     const api: EdgeApi = { invoke: (() => new Promise<unknown>((resolve) => { finish = resolve; })) as EdgeApi['invoke'] };
     const view = renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     view.unmount();
     await act(async () => { finish?.(created); });
     expect(loadHostToken(created.roomId)).toBeNull();
@@ -403,7 +404,7 @@ describe('create room workspace', () => {
     const api: EdgeApi = { invoke: (async () => created) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     expect(loadHostToken(created.roomId)).toBe(created.hostToken);
     expect(loadGuestToken(created.roomId)).toBe(created.guestToken);
@@ -419,10 +420,10 @@ describe('create room workspace', () => {
     }) as EdgeApi['invoke'] };
     renderHome(api);
     fireEvent.change(screen.getByLabelText('Your name'), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Room limit reached');
     expect(loadHostToken(created.roomId)).toBeNull();
-    fireEvent.click(screen.getByRole('button', { name: 'Create room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Launch TV' }));
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     expect(requests).toBe(2);
   });
@@ -433,7 +434,7 @@ describe('create room workspace', () => {
     expect(screen.getByRole('heading', { level: 2, name: /good company/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/room name/i)).toBeInTheDocument();
     expect(screen.getByLabelText(/your name/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^create room$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^launch tv$/i })).toBeInTheDocument();
   });
 
   it('states the guest defaults on the create form instead of offering toggles', () => {
@@ -460,7 +461,7 @@ describe('create room workspace', () => {
     renderHome(api);
 
     fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^launch tv$/i }));
 
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     expect(calls[0]).toMatchObject({
@@ -474,8 +475,8 @@ describe('create room workspace', () => {
     renderHome();
 
     expect(screen.getByRole('img', { name: /empty stage under a warm spotlight/i })).toHaveAttribute('src', '/images/stage-spotlight.jpg');
-    expect(screen.getByText('Create your room')).toBeInTheDocument();
-    expect(screen.getByText('Scan. Join. Pass the mic.')).toBeInTheDocument();
+    expect(screen.getByText('Launch the TV')).toBeInTheDocument();
+    expect(screen.getByText('Scan from a phone')).toBeInTheDocument();
   });
 
   it('creates the named room and moves the host to it', async () => {
@@ -500,7 +501,7 @@ describe('create room workspace', () => {
 
     fireEvent.change(screen.getByLabelText(/room name/i), { target: { value: 'After Hours' } });
     fireEvent.change(screen.getByLabelText(/your name/i), { target: { value: 'Alex' } });
-    fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^launch tv$/i }));
 
     expect(await screen.findByText('Host room')).toBeInTheDocument();
     expect(calls[0]).toMatchObject({
@@ -515,13 +516,38 @@ describe('create room workspace', () => {
     });
   });
 
-  it('asks for a host name before creating a room', async () => {
+  it('opens the room without asking for either name', async () => {
+    // The flow used to stop at a form, so nobody typed into the screen the room is
+    // already watching. One click creates the room with its defaults and lands on
+    // the TV stage, where the join QR is already painted.
     stubWide(true);
-    renderHome({ invoke: (async () => ({})) as unknown as EdgeApi['invoke'] });
+    const calls: Array<{ name: string; body: unknown }> = [];
+    const api: EdgeApi = { invoke: (async (name: string, body: unknown) => {
+      calls.push({ name, body });
+      return created;
+    }) as unknown as EdgeApi['invoke'] };
+    renderHome(api);
 
-    fireEvent.click(screen.getByRole('button', { name: /^create room$/i }));
+    fireEvent.click(screen.getByRole('button', { name: /^launch tv$/i }));
 
-    expect(await screen.findByRole('alert')).toHaveTextContent(/add the name guests will see/i);
+    expect(await screen.findByText('Host room')).toBeInTheDocument();
+    expect(calls[0]).toMatchObject({
+      name: 'create-room',
+      body: { displayName: 'Host', roomName: 'Karaoke room' },
+    });
+  });
+
+  it('keeps both names inside the Room details disclosure', () => {
+    // The disclosure is the whole point of the one-click flow; fields that drift
+    // back out of it silently put a form between the host and the stage.
+    stubWide(true);
+    renderHome();
+
+    const summary = screen.getByText('Room details');
+    const details = summary.closest('details');
+    expect(details).not.toBeNull();
+    expect(details!.querySelector('#create-room-name')).not.toBeNull();
+    expect(details!.querySelector('#create-host-name')).not.toBeNull();
   });
 
   it('opens the create form, not the join form, when the host asks to create a room', () => {
@@ -531,7 +557,7 @@ describe('create room workspace', () => {
     renderHomeAt('/create', { intent: 'create' });
 
     expect(screen.getByLabelText('Room name')).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: 'Create room' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Launch TV' })).toBeInTheDocument();
     expect(screen.queryByLabelText('Room code')).toBeNull();
   });
 
@@ -594,7 +620,7 @@ describe('create room workspace', () => {
 
     const back = await screen.findByRole('link', { name: 'Back to the room' });
     expect(back).toHaveAttribute('href', '/room/550e8400-e29b-41d4-a716-446655440000/host');
-    expect(screen.getByRole('button', { name: /create room/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /launch tv/i })).toBeEnabled();
   });
 
   it('keeps the live room on the landing page too', async () => {
@@ -633,7 +659,7 @@ describe('create room workspace', () => {
       expect(screen.queryByRole('link', { name: 'Back to the room' })).toBeNull();
     });
     expect(screen.queryByText('After Hours')).toBeNull();
-    expect(screen.getByRole('button', { name: /create room/i })).toBeEnabled();
+    expect(screen.getByRole('button', { name: /launch tv/i })).toBeEnabled();
   });
 
   it('offers no way back to a room the server says has ended', async () => {
@@ -777,6 +803,6 @@ describe('phone entry', () => {
 
     expect(screen.getByRole('heading', { level: 1, name: /make it your room/i })).toBeInTheDocument();
     expect(screen.getByLabelText(/room name/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^create room$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^launch tv$/i })).toBeInTheDocument();
   });
 });
