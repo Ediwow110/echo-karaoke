@@ -513,6 +513,33 @@ test('the stage fills the viewport in both layouts without covering its own cont
     .toBeLessThanOrEqual(1);
 });
 
+test('the computer layout stacks its panel under the video on a tablet', async ({ page }) => {
+  // The panel is a side panel at lg and a full-width section below it. Nothing
+  // measured the stacked shape, and at 768 the invite card stretches to the
+  // whole width, so a squeeze there shows up as a QR that no longer fits the card
+  // that carries it.
+  await mockApi(page);
+  await page.setViewportSize({ width: 768, height: 1024 });
+  await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
+
+  const frame = await page.locator('[data-stage-frame]').boundingBox();
+  const aside = await page.locator('aside[aria-label="Stage controls"]').boundingBox();
+  expect(aside!.y, 'the panel is still beside the video at tablet width')
+    .toBeGreaterThan(frame!.y + frame!.height - 1);
+
+  const card = page.locator('aside[aria-label="Stage controls"] section[aria-label="Invite your people"]');
+  const geometry = await card.evaluate((element) => {
+    const image = element.querySelector('img');
+    const box = element.getBoundingClientRect();
+    const qr = image?.getBoundingClientRect();
+    return { qrInside: qr === undefined ? false : qr.top >= box.top - 1 && qr.bottom <= box.bottom + 1 };
+  });
+  expect(geometry.qrInside, 'the full-width invite card clipped its QR').toBe(true);
+  await expect(page.getByRole('search')).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(1);
+});
+
 test('the stage panel keeps its invite card whole on every tab', async ({ page }) => {
   // The panel is a flex column, and a card with overflow-hidden gets no automatic
   // minimum height, so the tallest tab used to squeeze the invite card until its
@@ -869,6 +896,10 @@ test('every keyboard tab stop shows where focus landed', async ({ page }) => {
     '/room/' + ROOM + '/host',
     '/room/' + ROOM + '/host/queue',
     '/room/' + ROOM + '/host/settings',
+    // The audience screen is where a host actually stands. Both layouts have
+    // their own controls, and neither was in this sweep before.
+    '/room/' + ROOM + '/host/party',
+    '/room/' + ROOM + '/host/party?layout=computer',
     '/room/' + ROOM,
   ]) {
     await openScreen(page, path);
