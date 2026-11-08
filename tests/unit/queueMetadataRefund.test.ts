@@ -47,6 +47,12 @@ function refundCalls(): unknown[][] {
     .map(([, params]) => params);
 }
 
+function chargeCalls(): unknown[][] {
+  return (callOperation.mock.calls as [string, unknown[]][])
+    .filter(([name]) => name === 'consume_daily_rate_limit')
+    .map(([, params]) => params);
+}
+
 beforeEach(() => {
   callOperation.mockReset();
   fetchVideoMetadata.mockReset();
@@ -71,7 +77,9 @@ describe('song lookup budgets when the video cannot be read', () => {
 
   it('gives the room charge back when the global pool is already empty', async () => {
     callOperation.mockImplementation((name: string, params: unknown[]) => {
-      if (name === 'consume_daily_rate_limit' && params[0] === 'global') {
+      if (name === 'consume_daily_rate_limit'
+        && params[0] === 'global'
+        && params[1] === 'queue-metadata-day') {
         return Promise.resolve({ allowed: false });
       }
       return defaultOperation(name);
@@ -85,6 +93,44 @@ describe('song lookup budgets when the video cannot be read', () => {
       ['room:' + ROOM_ID, 'queue-metadata-day'],
       ['global', 'queue-metadata-day'],
     ]);
+    expect((callOperation.mock.calls as [string, unknown[]][])
+      .some(([name]) => name === 'queue_add')).toBe(false);
+  });
+
+  it('charges non-refundable attempt budgets when the lookup fails', async () => {
+    fetchVideoMetadata.mockResolvedValue(null);
+
+    await expect(queueCommand(addRequest(), caller)).rejects.toMatchObject({
+      code: 'METADATA_UNAVAILABLE',
+    });
+
+    expect(chargeCalls()).toEqual(expect.arrayContaining([
+      ['room:' + ROOM_ID, 'queue-metadata-attempt-day', 1000],
+      ['global', 'queue-metadata-attempt-day', 10000],
+      ['room:' + ROOM_ID, 'queue-metadata-day', 500],
+      ['global', 'queue-metadata-day', 5000],
+    ]));
+    expect(refundCalls()).toEqual([
+      ['room:' + ROOM_ID, 'queue-metadata-day'],
+      ['global', 'queue-metadata-day'],
+    ]);
+  });
+
+  it('stops before the outbound lookup when the room attempt budget is empty', async () => {
+    callOperation.mockImplementation((name: string, params: unknown[]) => {
+      if (name === 'consume_daily_rate_limit'
+        && params[0] === 'room:' + ROOM_ID
+        && params[1] === 'queue-metadata-attempt-day') {
+        return Promise.resolve({ allowed: false });
+      }
+      return defaultOperation(name);
+    });
+
+    await expect(queueCommand(addRequest(), caller)).rejects.toMatchObject({
+      code: 'LOOKUP_RATE_LIMITED',
+    });
+
+    expect(fetchVideoMetadata).not.toHaveBeenCalled();
     expect((callOperation.mock.calls as [string, unknown[]][])
       .some(([name]) => name === 'queue_add')).toBe(false);
   });

@@ -6,6 +6,8 @@ import { fetchVideoMetadata, isValidVideoId } from './metadata.js';
 const ACTIONS = new Set(['add', 'remove', 'reorder']);
 const DEFAULT_METADATA_DAILY_BUDGET = 5000;
 const DEFAULT_METADATA_ROOM_BUDGET = 500;
+const DEFAULT_METADATA_ATTEMPT_DAILY_BUDGET = 10000;
+const DEFAULT_METADATA_ATTEMPT_ROOM_BUDGET = 1000;
 
 function dailyBudget(name: string, fallback: number): number {
   const raw = Number(process.env[name] ?? String(fallback));
@@ -29,6 +31,13 @@ async function enforceLimit(
   message: string,
 ): Promise<void> {
   const result = (await callOperation(name, params)) as { allowed?: boolean };
+  if (result.allowed !== true) {
+    throw new HttpError('LOOKUP_RATE_LIMITED', 429, message);
+  }
+}
+
+async function consumeAttempt(params: unknown[], message: string): Promise<void> {
+  const result = (await callOperation('consume_daily_rate_limit', params)) as { allowed?: boolean };
   if (result.allowed !== true) {
     throw new HttpError('LOOKUP_RATE_LIMITED', 429, message);
   }
@@ -66,6 +75,26 @@ export async function queueCommand(request: Request, caller: Caller): Promise<Re
     );
 
     const roomSubject = 'room:' + roomId;
+
+    // A failed lookup refunds the success budgets below, but it still spent an
+    // outbound request. These attempt caps are deliberately not refunded, so
+    // looped dead links cannot use the add button as an unbounded amplifier.
+    await consumeAttempt(
+      [
+        roomSubject,
+        'queue-metadata-attempt-day',
+        dailyBudget('YOUTUBE_ROOM_METADATA_ATTEMPT_BUDGET', DEFAULT_METADATA_ATTEMPT_ROOM_BUDGET),
+      ],
+      "This room has reached today's song lookup attempt limit. Try again tomorrow.",
+    );
+    await consumeAttempt(
+      [
+        'global',
+        'queue-metadata-attempt-day',
+        dailyBudget('YOUTUBE_DAILY_METADATA_ATTEMPT_BUDGET', DEFAULT_METADATA_ATTEMPT_DAILY_BUDGET),
+      ],
+      'Too many song lookup attempts today. Try again tomorrow.',
+    );
 
     // A failed lookup spent no YouTube cost and added no song, so both shared
     // budgets must be given back. Otherwise looped dead links exhaust the room

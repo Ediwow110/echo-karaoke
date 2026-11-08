@@ -145,6 +145,7 @@ jobs:
           DATABASE_URL: ${{ steps.branch.outputs.database_url }}
           AUTH_DATABASE_URL: ${{ steps.branch.outputs.auth_database_url }}
           BETTER_AUTH_SECRET: ${{ secrets.BETTER_AUTH_SECRET }}
+          INTEGRATION_TARGET_CONFIRMED: '1'
         run: npm run test:integration
 
       - name: Delete the Neon branch

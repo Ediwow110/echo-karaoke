@@ -56,10 +56,10 @@ YouTube search and chart require a data API key. Without it the app explains tha
     YOUTUBE_DAILY_METADATA_BUDGET=5000
     YOUTUBE_ROOM_METADATA_BUDGET=500
 
-Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed, with a per-room daily lookup budget and a larger deployment budget. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
+Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed. Successful lookups are capped by a per-room and a larger deployment daily budget; failed lookups refund those success budgets but count against separate non-refundable attempt budgets, so a loop of dead links cannot use the add button as an outbound amplifier. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0044 before deploying this tree; queue and search now call
+migrations 0025 through 0047 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
 karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
 calls `playback_next_if_current`, and the songbook catalog tables and its retention
@@ -86,7 +86,7 @@ The hosted setup, step by step, is in `docs/deployment/hosted-setup.md`. It cove
 
 After deploying, run `npm run verify:preview -- https://your-app.example`. It checks the headers, the CSP, the SPA fallback, asset caching, a credential-free HTML and main asset, the JWKS endpoint, and that an unknown `/api` route answers JSON instead of the app shell.
 
-Rooms are cleaned up when a room is created. That request first deletes every room whose members have not sent a heartbeat for 30 minutes and every ended room older than two days; members, queue items, votes, events, and host secrets cascade. The app sends a slow heartbeat while a tab is hidden, so a background host tab is not treated as empty. Anonymous identities are intentionally retained: they contain no room content after the sweep, and Better Auth owns them. Room creation is capped at 10 rooms per session per hour; this is a per-session speed bump, not a replacement for sign-in rate limits.
+After a successful room creation, the request runs the cleanup sweeps at most once every five minutes (a deployment-wide rate-limit bucket). A denied creation no longer triggers them. The sweep deletes every room whose members have not sent a heartbeat for 30 minutes and every ended room older than two days; members, queue items, votes, events, and host secrets cascade. The app sends a slow heartbeat while a tab is hidden, so a background host tab is not treated as empty. Anonymous identities are intentionally retained: they contain no room content after the sweep, and Better Auth owns them. Room creation is capped at 10 rooms per session per hour; this is a per-session speed bump, not a replacement for sign-in rate limits.
 
 The karaoke songbook is a local catalog of embeddable karaoke videos, filled only by a host pressing Refresh. Browsing, filtering and paging read the catalog and cost zero YouTube quota. One refresh costs at most 12 `playlistItems` units (four channels, three pages) plus one more for a
 channel it has to re-resolve, against a 40-unit daily budget, no-ops while every channel synced
@@ -94,16 +94,16 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 604 unit and component tests (jsdom)
+    npm test                 # 612 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 440 pgTAP assertions
-    npm run test:integration # 9 operation-path and runtime-role grant tests against a Neon branch
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
+    npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch
     npm run test:e2e:ui      # 64 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL, plus E2E_BRANCH_TARGET_CONFIRMED=1 for a local port
 
 `vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, and it refuses the deployed production origin even when one names it. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment. A loopback target additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in `http://127.0.0.1:3000` says whether that port is backed by a branch or by production — and the default it replaced was production.
 
-The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.
+The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent; when all three are present it refuses to start unless `INTEGRATION_TARGET_CONFIRMED=1` states that they point at a disposable branch. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.
 
 The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app, so `E2E_BASE_URL` is mandatory and checked by `scripts/e2e-target.mjs` before anything launches. One E2E test decodes the rendered QR through the local Vite dev resolver.
 

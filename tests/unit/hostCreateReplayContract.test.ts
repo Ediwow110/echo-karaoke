@@ -11,6 +11,8 @@ const state = vi.hoisted(() => ({
 vi.mock('../../server/operations/sweep.js', () => ({
   sweepAbandonedRooms: async () => undefined,
   sweepEndedRooms: async () => undefined,
+  roomSweepDue: async () => false,
+  sweepIntervalSeconds: () => 300,
 }));
 vi.mock('../../server/db/client.js', async (importOriginal) => {
   const original = await importOriginal<typeof import('../../server/db/client.js')>();

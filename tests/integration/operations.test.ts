@@ -16,6 +16,10 @@ if (!runsHere) {
   console.warn('Integration suite skipped: set DATABASE_URL, AUTH_DATABASE_URL, and BETTER_AUTH_SECRET.');
 }
 
+// Keep the cleanup sweep deterministic: the suite has a test that expects the
+// abandoned-room sweep to run on the next successful create.
+process.env.ROOM_SWEEP_INTERVAL_SECONDS = '0';
+
 type Handler = (request: Request) => Promise<Response>;
 
 let handler: Handler | undefined;
