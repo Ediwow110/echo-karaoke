@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useState } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
@@ -12,22 +12,26 @@ import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
 import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
 import { TelevisionIcon } from '@phosphor-icons/react/dist/csr/Television';
 import { useHostRoom } from './useHostRoom';
+import { useRoomApi } from './RoomApiProvider';
 import { useHostPlayer } from '../features/playback/useHostPlayer';
 import { UpNextList } from '../features/queue/QueueRows';
 import SongSearchPanel from '../features/queue/SongSearchPanel';
 import PopularSongs from '../features/queue/PopularSongs';
+import SongbookList from '../features/catalog/SongbookList';
+import { CATALOG_CHANNEL_LABELS } from '../features/catalog/catalogApi';
 import InviteCard from '../features/rooms/InviteCard';
 import { isFavorite, subscribeLibrary, toggleFavorite } from '../features/library/libraryStore';
 import { formatTime, onlineGuestCount, queueSummary } from '../lib/format';
 import { Button, Chip, ConfirmDialog, Logo, SongArtwork, TransportButton } from '../ui';
 
-type PanelTab = 'search' | 'queue' | 'hits';
+type PanelTab = 'search' | 'queue' | 'hits' | 'songbook';
 type Density = 'grid' | 'list';
 
 // The layout is a query param on this route, not a second screen. Stage and Party
 // used to be two near-identical audience screens; one route with two layouts keeps
 // the measured player slot alive across the switch, which a navigation would not.
 const LAYOUT_PARAM = 'layout';
+const LAYOUT_TRANSITION_MS = 320;
 
 export default function HostPartyPage() {
   const {
@@ -51,10 +55,36 @@ export default function HostPartyPage() {
     next,
     endRoom,
   } = useHostRoom();
+  const api = useRoomApi();
   const player = useHostPlayer();
   const [params, setParams] = useSearchParams();
   const computer = params.get(LAYOUT_PARAM) === 'computer';
-  const [tab, setTab] = useState<PanelTab>('search');
+  const [panelMounted, setPanelMounted] = useState(computer);
+  const panelRef = useRef<HTMLDivElement>(null);
+  const switchRef = useRef<HTMLButtonElement>(null);
+
+  useEffect(() => {
+    if (computer) {
+      setPanelMounted(true);
+      return;
+    }
+    const timer = window.setTimeout(() => setPanelMounted(false), LAYOUT_TRANSITION_MS);
+    return () => window.clearTimeout(timer);
+  }, [computer]);
+
+  const [tab, setTab] = useState<PanelTab>(() => {
+    const requested = params.get('panel');
+    return requested === 'queue' || requested === 'hits' || requested === 'songbook' ? requested : 'search';
+  });
+
+  useEffect(() => {
+    if (params.get('panel') === null) return;
+    // A deep link names the panel it wants; after it opens, the tab is local
+    // state and the URL should not keep insisting on this one.
+    const next = new URLSearchParams(params);
+    next.delete('panel');
+    setParams(next, { replace: true });
+  }, [params, setParams]);
   const [density, setDensity] = useState<Density>('grid');
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
@@ -87,6 +117,9 @@ export default function HostPartyPage() {
   }, [player.registerStageSlot]);
 
   const setLayout = useCallback((next: 'tv' | 'computer'): void => {
+    if (next === 'tv' && panelRef.current?.contains(document.activeElement)) {
+      switchRef.current?.focus();
+    }
     setParams({ [LAYOUT_PARAM]: next }, { replace: true });
   }, [setParams]);
 
@@ -200,6 +233,7 @@ export default function HostPartyPage() {
             {onlineGuestCount(roster)} in room
           </span>
           <button
+            ref={switchRef}
             type="button"
             onClick={() => setLayout(computer ? 'tv' : 'computer')}
             aria-pressed={computer}
@@ -221,7 +255,11 @@ export default function HostPartyPage() {
         </div>
       </header>
 
-      <div className="flex min-h-0 w-full flex-1 flex-col gap-3 p-3 lg:flex-row lg:gap-4 lg:p-4">
+      <div
+        className="party-layout min-h-0 w-full flex-1 p-3 lg:p-4"
+        data-layout={computer ? 'computer' : 'tv'}
+        style={{ '--layout-duration': LAYOUT_TRANSITION_MS + 'ms' } as CSSProperties}
+      >
         <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
           {hasVideo ? (
             <>
@@ -234,20 +272,18 @@ export default function HostPartyPage() {
                   on a 320px phone and parked the video without a word. */}
               <div className="relative aspect-video min-h-[202px] w-full overflow-hidden rounded-panel border border-white/10 lg:aspect-auto lg:min-h-0 lg:flex-1" data-stage-frame>
                 <div ref={attachSlot} className="absolute inset-0" data-party-slot />
-                {computer ? null : (
-                  <div className="pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(21rem,88vw)]" data-join-overlay>
-                    <InviteCard
-                      roomName={roomName}
-                      code={code}
-                      hostName={hostName}
-                      joinUrl={joinUrl}
-                      guests={onlineGuestCount(roster)}
-                      shareReady={connection === 'live'}
-                      variant="party"
-                      className="pointer-events-auto"
-                    />
-                  </div>
-                )}
+                <div className="party-invite pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(21rem,88vw)]" data-join-overlay aria-hidden={computer} inert={computer}>
+                  <InviteCard
+                    roomName={roomName}
+                    code={code}
+                    hostName={hostName}
+                    joinUrl={joinUrl}
+                    guests={onlineGuestCount(roster)}
+                    shareReady={connection === 'live'}
+                    variant="party"
+                    className="pointer-events-auto"
+                  />
+                </div>
               </div>
             </>
           ) : (
@@ -280,20 +316,18 @@ export default function HostPartyPage() {
                   )}
                 </div>
               </div>
-              {computer ? null : (
-                <div className="pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(21rem,88vw)]" data-join-overlay>
-                  <InviteCard
-                    roomName={roomName}
-                    code={code}
-                    hostName={hostName}
-                    joinUrl={joinUrl}
-                    guests={onlineGuestCount(roster)}
-                    shareReady={connection === 'live'}
-                    variant="party"
-                    className="pointer-events-auto"
-                  />
-                </div>
-              )}
+              <div className="party-invite pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(21rem,88vw)]" data-join-overlay aria-hidden={computer} inert={computer}>
+                <InviteCard
+                  roomName={roomName}
+                  code={code}
+                  hostName={hostName}
+                  joinUrl={joinUrl}
+                  guests={onlineGuestCount(roster)}
+                  shareReady={connection === 'live'}
+                  variant="party"
+                  className="pointer-events-auto"
+                />
+              </div>
             </div>
           )}
 
@@ -399,144 +433,183 @@ export default function HostPartyPage() {
             </div>
           </section>
 
-          {computer ? null : (
-            <section className="z-30 flex shrink-0 items-center justify-between gap-3 border-t border-white/10 px-1 pt-2.5" aria-label="Up next">
-              <div className="flex min-w-0 items-center gap-3">
-                <span className="text-[0.5625rem] font-semibold uppercase tracking-[0.1em] text-ink-3">Up next</span>
-                {nextSong === null ? (
-                  <p className="text-[0.6875rem] text-ink-2">Queue empty · {queueSummary(upNext)}</p>
-                ) : (
-                  <>
-                    <SongArtwork src={nextSong.thumbnailUrl} className="h-7 w-7" iconSize={12} />
-                    <p className="min-w-0 truncate text-[0.6875rem] text-ink">{nextSong.title}</p>
-                    <p className="hidden truncate text-[0.625rem] text-ink-2 sm:block">
-                      {nextSong.channelTitle ?? 'YouTube'}
-                      {nextSong.durationSeconds === null ? '' : ' · ' + formatTime(nextSong.durationSeconds)}
-                      {' · Added by ' + nextSong.addedBy}
-                    </p>
-                  </>
-                )}
-              </div>
-              <div className="flex shrink-0 items-center gap-3 text-[0.625rem] text-ink-2">
-                <Link to={'/room/' + roomId + '/host/queue'} className="min-h-11 inline-flex items-center hover:text-ink">Up next · {upNext.length}</Link>
-                {nextSong === null ? null : <span className="hidden sm:block">Starts automatically when this video ends</span>}
-              </div>
-            </section>
-          )}
+          <div className="party-up-next z-30 shrink-0" aria-hidden={computer} inert={computer}>
+            <div className="min-h-0 overflow-hidden">
+              <section className="flex items-center justify-between gap-3 border-t border-white/10 px-1 pt-2.5" aria-label="Up next">
+                <div className="flex min-w-0 items-center gap-3">
+                  <span className="text-[0.5625rem] font-semibold uppercase tracking-[0.1em] text-ink-3">Up next</span>
+                  {nextSong === null ? (
+                    <p className="text-[0.6875rem] text-ink-2">Queue empty · {queueSummary(upNext)}</p>
+                  ) : (
+                    <>
+                      <SongArtwork src={nextSong.thumbnailUrl} className="h-7 w-7" iconSize={12} />
+                      <p className="min-w-0 truncate text-[0.6875rem] text-ink">{nextSong.title}</p>
+                      <p className="hidden truncate text-[0.625rem] text-ink-2 sm:block">
+                        {nextSong.channelTitle ?? 'YouTube'}
+                        {nextSong.durationSeconds === null ? '' : ' · ' + formatTime(nextSong.durationSeconds)}
+                        {' · Added by ' + nextSong.addedBy}
+                      </p>
+                    </>
+                  )}
+                </div>
+                <div className="flex shrink-0 items-center gap-3 text-[0.625rem] text-ink-2">
+                  <Link to={'/room/' + roomId + '/host/queue'} className="min-h-11 inline-flex items-center hover:text-ink">Up next · {upNext.length}</Link>
+                  {nextSong === null ? null : <span className="hidden sm:block">Starts automatically when this video ends</span>}
+                </div>
+              </section>
+            </div>
+          </div>
         </main>
 
-        {computer ? (
-          <aside className="flex w-full min-w-0 shrink-0 flex-col gap-3 lg:w-[26rem] lg:overflow-y-auto" aria-label="Stage controls">
-            <InviteCard
-              roomName={roomName}
-              code={code}
-              hostName={hostName}
-              joinUrl={joinUrl}
-              guests={onlineGuestCount(roster)}
-              shareReady={connection === 'live'}
-              variant="compact"
-              className="shrink-0"
-            />
+        <div ref={panelRef} className="party-panel" aria-hidden={!computer} inert={!computer}>
+          {computer || panelMounted ? (
+            <aside className="flex min-h-0 w-full min-w-0 flex-col gap-3 overflow-hidden lg:w-[26rem] lg:overflow-y-auto" aria-label="Stage controls">
+              <InviteCard
+                roomName={roomName}
+                code={code}
+                hostName={hostName}
+                joinUrl={joinUrl}
+                guests={onlineGuestCount(roster)}
+                shareReady={connection === 'live'}
+                variant="compact"
+                className="shrink-0"
+              />
 
-            <div role="tablist" aria-label="Stage panel" className="flex items-center gap-1 rounded-media border border-line bg-surface p-1">
-              {(['search', 'queue', 'hits'] as const).map((name) => (
-                <button
-                  key={name}
-                  type="button"
-                  role="tab"
-                  aria-selected={tab === name}
-                  onClick={() => setTab(name)}
-                  className={[
-                    'inline-flex min-h-11 flex-1 items-center justify-center rounded-media text-[0.75rem] font-semibold transition-colors',
-                    tab === name ? 'bg-signal-soft text-signal' : 'text-ink-2 hover:text-ink',
-                  ].join(' ')}
-                >
-                  {name[0].toUpperCase() + name.slice(1)}
-                </button>
-              ))}
-            </div>
+              <div role="tablist" aria-label="Stage panel" className="flex items-center gap-1 rounded-media border border-line bg-surface p-1">
+                {(['search', 'queue', 'hits', 'songbook'] as const).map((name) => (
+                  <button
+                    key={name}
+                    type="button"
+                    role="tab"
+                    aria-selected={tab === name}
+                    onClick={() => setTab(name)}
+                    className={[
+                      'inline-flex min-h-11 flex-1 items-center justify-center rounded-media text-[0.75rem] font-semibold transition-colors',
+                      tab === name ? 'bg-signal-soft text-signal' : 'text-ink-2 hover:text-ink',
+                    ].join(' ')}
+                  >
+                    {name[0].toUpperCase() + name.slice(1)}
+                  </button>
+                ))}
+              </div>
 
-            <section className="rounded-panel border border-line bg-surface p-4" role="tabpanel" aria-label={tab + ' panel'}>
-              {tab === 'search' ? (
-                <>
-                  <div className="mb-3 flex items-center justify-between gap-2">
-                    <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Search and queue</h2>
-                    <div className="flex items-center gap-1">
-                      {(['grid', 'list'] as const).map((mode) => (
-                        <button
-                          key={mode}
-                          type="button"
-                          onClick={() => setDensity(mode)}
-                          aria-pressed={density === mode}
-                          className={['min-h-9 rounded-media px-2 text-[0.625rem] font-semibold capitalize', density === mode ? 'bg-surface-2 text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
-                        >
-                          {mode}
-                        </button>
-                      ))}
+              <section className="rounded-panel border border-line bg-surface p-4" role="tabpanel" aria-label={tab + ' panel'}>
+                {tab === 'search' ? (
+                  <>
+                    <div className="mb-3 flex items-center justify-between gap-2">
+                      <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Search and queue</h2>
+                      <div className="flex items-center gap-1">
+                        {(['grid', 'list'] as const).map((mode) => (
+                          <button
+                            key={mode}
+                            type="button"
+                            onClick={() => setDensity(mode)}
+                            aria-pressed={density === mode}
+                            className={['min-h-9 rounded-media px-2 text-[0.625rem] font-semibold capitalize', density === mode ? 'bg-surface-2 text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
+                          >
+                            {mode}
+                          </button>
+                        ))}
+                      </div>
                     </div>
-                  </div>
-                  <SongSearchPanel
-                    roomId={roomId}
-                    queue={queue}
-                    variant="host"
-                    layout={density}
-                    onAdded={() => { void refresh(); }}
-                    onOpenQueue={() => setTab('queue')}
-                  />
-                </>
-              ) : null}
-
-              {tab === 'queue' ? (
-                <>
-                  <div className="flex items-center justify-between gap-2">
-                    <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>
-                    <div className="flex items-center gap-1">
-                      <Link to={'/room/' + roomId + '/host/settings'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink hover:underline">
-                        Room settings
-                      </Link>
-                      <Link to={'/room/' + roomId + '/host/queue'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
-                        Full queue
-                      </Link>
-                    </div>
-                  </div>
-                  <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
-                    Songs play in order, and the next one starts by itself.
-                  </p>
-                  <div className="mt-3">
-                    <UpNextList
-                      queue={queue}
-                      variant="table"
-                      emptyTitle="Queue is empty."
-                      emptyDescription="Search first, or hand the code to a phone."
-                      onRemove={(songId) => { void removeSong(songId); }}
-                      onReorder={(songId, direction) => { void reorderSong(songId, direction); }}
-                      onVote={(songId) => { void voteSong(songId); }}
-                      votingSongId={votingSongId}
-                    />
-                  </div>
-                </>
-              ) : null}
-
-              {tab === 'hits' ? (
-                <>
-                  <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Popular karaoke</h2>
-                  <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
-                    The live strip, refreshed by the songbook. No typing needed.
-                  </p>
-                  <div className="mt-3">
-                    <PopularSongs
+                    <SongSearchPanel
                       roomId={roomId}
-                      layout="vertical"
-                      queuedVideoIds={queue.map((song) => song.videoId)}
-                      moreHref={'/room/' + roomId + '/host/songbook'}
+                      queue={queue}
+                      variant="host"
+                      layout={density}
                       onAdded={() => { void refresh(); }}
+                      onOpenQueue={() => setTab('queue')}
+                      popularSlot={(
+                        <PopularSongs
+                          roomId={roomId}
+                          layout="vertical"
+                          queuedVideoIds={queue.map((song) => song.videoId)}
+                          onAdded={() => { void refresh(); }}
+                        />
+                      )}
                     />
-                  </div>
-                </>
-              ) : null}
-            </section>
-          </aside>
-        ) : null}
+                  </>
+                ) : null}
+
+                {tab === 'queue' ? (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>
+                      <div className="flex items-center gap-1">
+                        <Link to={'/room/' + roomId + '/host/settings'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink hover:underline">
+                          Room settings
+                        </Link>
+                        <Link to={'/room/' + roomId + '/host/queue'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
+                          Full queue
+                        </Link>
+                      </div>
+                    </div>
+                    <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
+                      Songs play in order, and the next one starts by itself.
+                    </p>
+                    <div className="mt-3">
+                      <UpNextList
+                        queue={queue}
+                        variant="table"
+                        emptyTitle="Queue is empty."
+                        emptyDescription="Search first, or hand the code to a phone."
+                        onRemove={(songId) => { void removeSong(songId); }}
+                        onReorder={(songId, direction) => { void reorderSong(songId, direction); }}
+                        onVote={(songId) => { void voteSong(songId); }}
+                        votingSongId={votingSongId}
+                      />
+                    </div>
+                  </>
+                ) : null}
+
+                {tab === 'hits' ? (
+                  <>
+                    <div className="flex items-center justify-between gap-2">
+                      <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Popular karaoke</h2>
+                      <button
+                        type="button"
+                        onClick={() => setTab('songbook')}
+                        className="inline-flex min-h-9 items-center text-[0.6875rem] font-semibold text-signal hover:underline"
+                      >
+                        View more
+                      </button>
+                    </div>
+                    <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
+                      The live strip, refreshed by the songbook. No typing needed.
+                    </p>
+                    <div className="mt-3">
+                      <PopularSongs
+                        roomId={roomId}
+                        layout="vertical"
+                        queuedVideoIds={queue.map((song) => song.videoId)}
+                        onAdded={() => { void refresh(); }}
+                      />
+                    </div>
+                  </>
+                ) : null}
+
+                {tab === 'songbook' ? (
+                  <>
+                    <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Karaoke songbook</h2>
+                    <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
+                      With lyrics, ready to queue. Songs play from YouTube.
+                    </p>
+                    <div className="mt-3">
+                      <SongbookList
+                        api={api}
+                        roomId={roomId}
+                        channels={CATALOG_CHANNEL_LABELS}
+                        canSync
+                        columns={1}
+                        onAdded={() => { void refresh(); }}
+                      />
+                    </div>
+                  </>
+                ) : null}
+              </section>
+            </aside>
+          ) : null}
+        </div>
       </div>
       <ConfirmDialog
         open={confirmEnd}

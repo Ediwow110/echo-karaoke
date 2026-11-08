@@ -10,6 +10,7 @@ import type { QueueEntry } from '../rooms/useRoomData';
 import type { QueueSong } from './queueApi';
 import { useSongSearch } from './useSongSearch';
 import { formatTime } from '../../lib/format';
+import type { SearchResult } from '../../types/search';
 import { Button, SongArtwork } from '../../ui';
 
 export type SongSearchPanelProps = {
@@ -27,7 +28,6 @@ export type SongSearchPanelProps = {
   layout?: 'list' | 'grid';
 };
 
-const exampleSearches = ['The Weeknd karaoke', '80s sing-alongs', 'M83 karaoke'];
 
 export default function SongSearchPanel({
   roomId,
@@ -49,6 +49,7 @@ export default function SongSearchPanel({
     query,
     setQuery,
     results,
+    songbookResults,
     loading,
     searched,
     available,
@@ -92,6 +93,67 @@ export default function SongSearchPanel({
     return index < 0 ? null : index + 1;
   };
   const noticeIndex = notice === null ? null : queueIndex(notice.videoId);
+
+  const renderSong = (result: SearchResult, index: number) => {
+    const queued = queuedFor(result.videoId);
+    const added = queued !== undefined || addedIds.includes(result.videoId);
+    const pending = addingId === result.videoId;
+    return (
+      <li
+        key={result.videoId}
+        className={[
+          'stagger-in transition-colors',
+          layout === 'grid'
+            ? 'flex flex-col gap-2 rounded-panel border border-line bg-surface-2 p-2'
+            : 'flex flex-wrap items-center gap-3 gap-y-2 rounded-media px-1 py-2.5',
+          layout === 'grid' ? '' : variant === 'guest' ? 'border-b border-line last:border-b-0' : 'hover:bg-surface-2',
+        ].join(' ')}
+        style={{ animationDelay: Math.min(index, 10) * 30 + 'ms' }}
+      >
+        <div className="relative shrink-0">
+          <SongArtwork
+            src={result.thumbnailUrl}
+            className={layout === 'grid' ? 'aspect-video w-full' : variant === 'guest' ? 'h-[3.7rem] w-[5.5rem]' : 'h-11 w-[4.15rem]'}
+            iconSize={18}
+          />
+          {result.durationSeconds === null ? null : (
+            <span className="absolute bottom-1 right-1 rounded bg-graphite-deep/80 px-1 py-0.5 text-[0.5625rem] tabular text-ink">
+              {formatTime(result.durationSeconds)}
+            </span>
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className={['truncate text-[0.8125rem] font-semibold leading-[1.4]', added ? 'text-signal' : 'text-ink'].join(' ')}>
+            {result.title}
+          </p>
+          <p className="mt-0.5 truncate text-[0.6875rem] text-ink-2">
+            {result.channelTitle ?? 'YouTube'}
+          </p>
+          {queued === undefined ? null : (
+            <p className="mt-0.5 text-[0.625rem] text-signal">
+              Already in queue{queueIndex(result.videoId) === null ? '' : ' · #' + queueIndex(result.videoId)}
+            </p>
+          )}
+        </div>
+        <Button
+          variant={added ? 'secondary' : 'primary'}
+          size="md"
+          className={['min-h-11', layout === 'grid' ? 'w-full justify-center' : variant === 'guest' ? 'min-w-[4.3rem]' : ''].join(' ')}
+          icon={added ? <CheckIcon size={14} weight="bold" /> : <PlusIcon size={14} weight="bold" />}
+          aria-label={added ? result.title + ' is already in the queue' : pending ? 'Adding ' + result.title : 'Add ' + result.title}
+          disabled={disabled || added || (addingId !== null && !pending)}
+          busy={pending}
+          onClick={() => {
+            if (!added) {
+              void add(result);
+            }
+          }}
+        >
+          {pending ? 'Adding' : added ? 'Added' : 'Add'}
+        </Button>
+      </li>
+    );
+  };
 
   return (
     <div className={['flex flex-col gap-4', className].join(' ')}>
@@ -146,7 +208,7 @@ export default function SongSearchPanel({
         </div>
       ) : null}
 
-      {message !== null && (available === false || results.length > 0) ? (
+      {message !== null && (available === false || results.length > 0 || songbookResults.length > 0) ? (
         <div role="status" className="rounded-media border border-line bg-surface-2 px-4 py-3 text-[0.75rem] leading-[1.6] text-ink-2">
           {message}
         </div>
@@ -199,6 +261,18 @@ export default function SongSearchPanel({
         <SearchSkeleton variant={variant} />
       ) : null}
 
+      {!loading && songbookResults.length > 0 ? (
+        <div>
+          <div className="mb-2 flex items-center justify-between gap-3">
+            <p className="eyebrow text-ink-2">Songbook</p>
+            <p className="text-[0.625rem] text-ink-3">Karaoke-ready</p>
+          </div>
+          <ul aria-label="Songbook matches" className={layout === 'grid' ? 'grid grid-cols-2 gap-2' : 'flex flex-col gap-1'}>
+            {songbookResults.map(renderSong)}
+          </ul>
+        </div>
+      ) : null}
+
       {!loading && results.length > 0 ? (
         <div>
           <div className="mb-2 flex items-center justify-between gap-3">
@@ -206,78 +280,19 @@ export default function SongSearchPanel({
             <p className="text-[0.625rem] text-ink-3">Live search</p>
           </div>
           <ul aria-label="Songs" className={layout === 'grid' ? 'grid grid-cols-2 gap-2' : 'flex flex-col gap-1'}>
-            {results.map((result, index) => {
-              const queued = queuedFor(result.videoId);
-              const added = queued !== undefined || addedIds.includes(result.videoId);
-              const pending = addingId === result.videoId;
-              return (
-                <li
-                  key={result.videoId}
-                  className={[
-                    'stagger-in transition-colors',
-                    layout === 'grid'
-                      ? 'flex flex-col gap-2 rounded-panel border border-line bg-surface-2 p-2'
-                      : 'flex flex-wrap items-center gap-3 gap-y-2 rounded-media px-1 py-2.5',
-                    layout === 'grid' ? '' : variant === 'guest' ? 'border-b border-line last:border-b-0' : 'hover:bg-surface-2',
-                  ].join(' ')}
-                  style={{ animationDelay: Math.min(index, 10) * 30 + 'ms' }}
-                >
-                  <div className="relative shrink-0">
-                    <SongArtwork
-                      src={result.thumbnailUrl}
-                      className={layout === 'grid' ? 'aspect-video w-full' : variant === 'guest' ? 'h-[3.7rem] w-[5.5rem]' : 'h-11 w-[4.15rem]'}
-                      iconSize={18}
-                    />
-                    {result.durationSeconds === null ? null : (
-                      <span className="absolute bottom-1 right-1 rounded bg-graphite-deep/80 px-1 py-0.5 text-[0.5625rem] tabular text-ink">
-                        {formatTime(result.durationSeconds)}
-                      </span>
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className={['truncate text-[0.8125rem] font-semibold leading-[1.4]', added ? 'text-signal' : 'text-ink'].join(' ')}>
-                      {result.title}
-                    </p>
-                    <p className="mt-0.5 truncate text-[0.6875rem] text-ink-2">
-                      {result.channelTitle ?? 'YouTube'}
-                    </p>
-                    {queued === undefined ? null : (
-                      <p className="mt-0.5 text-[0.625rem] text-signal">
-                        Already in queue{queueIndex(result.videoId) === null ? '' : ' · #' + queueIndex(result.videoId)}
-                      </p>
-                    )}
-                  </div>
-                  <Button
-                    variant={added ? 'secondary' : 'primary'}
-                    size="md"
-                    className={['min-h-11', layout === 'grid' ? 'w-full justify-center' : variant === 'guest' ? 'min-w-[4.3rem]' : ''].join(' ')}
-                    icon={added ? <CheckIcon size={14} weight="bold" /> : <PlusIcon size={14} weight="bold" />}
-                    aria-label={added ? result.title + ' is already in the queue' : pending ? 'Adding ' + result.title : 'Add ' + result.title}
-                    disabled={disabled || added || (addingId !== null && !pending)}
-                    busy={pending}
-                    onClick={() => {
-                      if (!added) {
-                        void add(result);
-                      }
-                    }}
-                  >
-                    {pending ? 'Adding' : added ? 'Added' : 'Add'}
-                  </Button>
-                </li>
-              );
-            })}
+            {results.map(renderSong)}
           </ul>
         </div>
       ) : null}
 
-      {!loading && searched && results.length === 0 && error === null && available !== false ? (
+      {!loading && searched && results.length === 0 && songbookResults.length === 0 && error === null && available !== false ? (
         <div className="rounded-panel border border-line bg-surface px-5 py-7 text-center">
           <span aria-hidden="true" className="mx-auto grid size-10 place-items-center rounded-full bg-surface-2 text-ink-2">
             <MagnifyingGlassIcon size={18} />
           </span>
           <h3 className="mt-3 font-display text-[1.25rem] font-bold tracking-[-0.02em] text-ink">No matches this time.</h3>
           <p className="mx-auto mt-1.5 max-w-[34ch] text-[0.75rem] leading-[1.6] text-ink-2">
-            No YouTube results for “{query.trim()}”. Try a shorter title, or add “karaoke”.
+            Nothing in the songbook or on YouTube for “{query.trim()}”. Try a shorter title, or add “karaoke”.
           </p>
           <div className="mt-4 flex flex-wrap justify-center gap-2">
             <Button variant="secondary" size="sm" className="min-h-11" onClick={() => inputRef.current?.focus()}>Edit search</Button>
@@ -286,24 +301,7 @@ export default function SongSearchPanel({
         </div>
       ) : null}
 
-      {!loading && !searched && error === null ? (
-        <>
-          <div className="flex flex-wrap items-center gap-2">
-            <span className="text-[0.625rem] font-medium uppercase tracking-[0.06em] text-ink-3">Try</span>
-            {exampleSearches.map((example) => (
-              <button
-                key={example}
-                type="button"
-                onClick={() => setQuery(example)}
-                className="inline-flex min-h-11 items-center rounded-full border border-line bg-surface-2 px-3 text-[0.6875rem] text-ink-2 transition-[background-color,border-color,color,transform,scale] active:scale-95 hover:border-signal/40 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-              >
-                {example}
-              </button>
-            ))}
-          </div>
-          {popularSlot}
-        </>
-      ) : null}
+      {!loading && !searched && error === null ? popularSlot : null}
 
       {addError !== null ? (
         <div role="alert" className="flex items-start justify-between gap-3 rounded-media border border-danger/30 bg-danger-soft/50 px-3.5 py-3 text-[0.75rem] leading-[1.5] text-danger">

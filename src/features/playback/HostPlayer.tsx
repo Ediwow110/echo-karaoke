@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
@@ -435,7 +436,8 @@ export default function HostPlayer({
       });
     };
     measure();
-    const observer = new ResizeObserver(schedule);
+    // Match an animating slot before paint, not one animation frame behind it.
+    const observer = new ResizeObserver(() => flushSync(measure));
     observer.observe(element);
     window.addEventListener('resize', schedule);
     window.addEventListener('scroll', schedule, true);

@@ -13,7 +13,6 @@ const HostRoomPage = lazyRoute(() => import('./HostRoomPage'));
 const HostQueuePage = lazyRoute(() => import('./HostQueuePage'));
 const HostSettingsPage = lazyRoute(() => import('./HostSettingsPage'));
 const HostPartyPage = lazyRoute(() => import('./HostPartyPage'));
-const HostSongbookPage = lazyRoute(() => import('./HostSongbookPage'));
 const ScanRoomPage = lazyRoute(() => import('../features/scan/ScanRoomPage'));
 const HostLibraryPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostLibraryPage })));
 const HostFavoritesPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostFavoritesPage })));
@@ -44,6 +43,13 @@ function GuestRoomRoute() {
 export function HostStageRedirect() {
   const { roomId } = useParams<{ roomId: string }>();
   return <Navigate to={'/room/' + roomId + '/host/party?layout=tv'} replace />;
+}
+
+// The full-page host songbook retired into the party panel. Old links and
+// bookmarks land on that panel instead of resurrecting the console shell.
+export function HostSongbookRedirect() {
+  const { roomId } = useParams<{ roomId: string }>();
+  return <Navigate to={'/room/' + roomId + '/host/party?layout=computer&panel=songbook'} replace />;
 }
 
 // A route change should announce the new screen to keyboard and screen-reader
@@ -119,6 +125,9 @@ export default function App() {
           <Route path="/room/:roomId" element={<GuestRoomRoute />} />
           <Route path="/room/:roomId/search" element={<GuestRoomRoute />} />
           <Route path="/room/:roomId/songbook" element={<GuestRoomRoute />} />
+          {/* Outside the shell on purpose: the retired songbook must redirect
+              without mounting the old sidebar for a tick. */}
+          <Route path="/room/:roomId/host/songbook" element={<HostSongbookRedirect />} />
           <Route path="/room/:roomId/host" element={<HostRoomRoute />}>
             {/* The console page is retired: the room opens on the stage, and the
                 computer layout carries search, queue and hits. */}
@@ -128,7 +137,6 @@ export default function App() {
             <Route path="library" element={<HostLibraryPage />} />
             <Route path="favorites" element={<HostFavoritesPage />} />
             <Route path="recent" element={<HostRecentPage />} />
-            <Route path="songbook" element={<HostSongbookPage />} />
             <Route path="stage" element={<HostStageRedirect />} />
             <Route path="party" element={<HostPartyPage />} />
           </Route>

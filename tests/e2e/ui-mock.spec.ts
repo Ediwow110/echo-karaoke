@@ -472,6 +472,93 @@ test('the stage switches between TV and computer on one route', async ({ page })
   await expect(page).toHaveURL(/\/host\/party\?layout=tv$/);
 });
 
+test('layout switching animates both ways without detaching or misaligning the player', async ({ page }) => {
+  await mockApi(page);
+  await stubYouTube(page, 1, 100);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openScreen(page, '/room/' + ROOM + '/host/party');
+  await expect(page.locator('[data-host-player]')).toHaveAttribute('data-stage-visible', 'true');
+
+  for (const layout of ['computer', 'TV']) {
+    const motion = await page.evaluate(async (nextLayout) => {
+      const slot = document.querySelector<HTMLElement>('[data-party-slot]')!;
+      const player = document.querySelector<HTMLElement>('[data-host-player]')!;
+      const mount = document.querySelector('[data-youtube-frame]')!;
+      const button = [...document.querySelectorAll('button')].find((node) => node.textContent?.includes('Switch to ' + nextLayout))!;
+      const before = slot.getBoundingClientRect().width;
+      const samples: Array<{ width: number; alignment: number }> = [];
+      // Observe after the player's resize callback, in the same pre-paint phase.
+      const observer = new ResizeObserver(() => {
+        const box = slot.getBoundingClientRect();
+        const video = player.getBoundingClientRect();
+        samples.push({ width: box.width, alignment: Math.max(Math.abs(box.right - video.right), Math.abs(box.bottom - video.bottom)) });
+      });
+      observer.observe(slot);
+      button.click();
+      await new Promise((resolve) => setTimeout(resolve, 550));
+      observer.disconnect();
+      return {
+        before,
+        after: slot.getBoundingClientRect().width,
+        samples,
+        samePlayer: player === document.querySelector('[data-host-player]') && mount === document.querySelector('[data-youtube-frame]'),
+        sameSlot: slot === document.querySelector('[data-party-slot]'),
+      };
+    }, layout);
+
+    expect(motion.samePlayer).toBe(true);
+    expect(motion.sameSlot).toBe(true);
+    expect(Math.abs(motion.after - motion.before)).toBeGreaterThan(300);
+    expect(motion.samples.filter(({ width }) => width > Math.min(motion.before, motion.after) + 5 && width < Math.max(motion.before, motion.after) - 5).length,
+      'the stage should pass through intermediate widths, not snap to its new layout').toBeGreaterThan(3);
+    expect(Math.max(...motion.samples.map(({ alignment }) => alignment)), 'the video must follow the frame throughout the transition').toBeLessThanOrEqual(3);
+  }
+});
+
+test('layout switching disables hidden panel controls and survives rapid keyboard reversals', async ({ page }) => {
+  await mockApi(page);
+  await stubYouTube(page, 1, 100);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openScreen(page, '/room/' + ROOM + '/host/party');
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
+  await page.getByRole('tab', { name: 'Queue', exact: true }).focus();
+  await page.keyboard.press('Escape');
+  await expect(page.getByRole('button', { name: 'Switch to computer' })).toBeFocused();
+  await expect(page.getByRole('complementary', { name: 'Stage controls' })).toHaveCount(0);
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
+  await page.getByRole('button', { name: 'Switch to TV' }).click();
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
+  await expect(page.getByRole('tab', { name: 'Search', exact: true })).toBeVisible();
+  await expect(page.locator('[data-host-player]')).toHaveAttribute('data-stage-visible', 'true');
+  await expect(page.getByRole('button', { name: 'End room', exact: true })).toBeEnabled();
+});
+
+test('layout switching settles immediately with reduced motion on desktop and phone', async ({ page }) => {
+  await page.emulateMedia({ reducedMotion: 'reduce' });
+  await mockApi(page);
+  await stubYouTube(page, 1, 100);
+  for (const width of [1440, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    await openScreen(page, '/room/' + ROOM + '/host/party');
+    for (const layout of ['computer', 'TV']) {
+      await page.getByRole('button', { name: 'Switch to ' + layout }).click();
+      const moving = await page.evaluate(async () => {
+        await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
+        return document.getAnimations().filter((animation) => {
+          const target = (animation.effect as KeyframeEffect).target;
+          return target instanceof Element && target.matches('.party-layout, .party-panel, .party-up-next, .party-invite');
+        }).filter((animation) => animation.playState === 'running').map((animation) => ({
+          target: ((animation.effect as KeyframeEffect).target as Element).className,
+          timing: animation.effect?.getTiming(),
+        }));
+      });
+      expect(moving).toEqual([]);
+      await expect(page.getByRole('search')).toHaveCount(layout === 'computer' ? 1 : 0);
+      expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth)).toBeLessThanOrEqual(1);
+    }
+  }
+});
+
 test('the stage fills the viewport in both layouts without covering its own controls', async ({ page }) => {
   // The redesign's whole claim is a full-bleed screen with the invitation
   // overlaid on the video. Two ways that goes wrong: horizontal overflow at
@@ -683,6 +770,18 @@ test('host can refresh a populated songbook without losing existing songs', asyn
   await expect(refresh).toBeEnabled();
 });
 
+test('the retired host songbook URL opens the party songbook panel', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openScreen(page, '/room/' + ROOM + '/host/songbook');
+
+  await expect(page).toHaveURL(new RegExp('/host/party\\?layout=computer$'));
+  await expect(page.getByRole('tab', { name: 'Songbook' })).toHaveAttribute('aria-selected', 'true');
+  await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
+  await expect(page.locator('ul[aria-label="Songbook songs"] li').first()).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Primary' })).toHaveCount(0);
+});
+
 async function undersized(page: Page) {
   return page.evaluate(() => [...document.querySelectorAll('button, input, a[href], [role="button"]')]
     .filter((element) => {
@@ -875,7 +974,6 @@ test('every host sidebar destination lands where its label says', async ({ page 
   const destinations: Array<{ label: string; path: string }> = [
     { label: 'TV stage', path: '/room/' + ROOM + '/host/party' },
     { label: 'Song library', path: '/room/' + ROOM + '/host/library' },
-    { label: 'Songbook', path: '/room/' + ROOM + '/host/songbook' },
     { label: 'Room queue', path: '/room/' + ROOM + '/host/queue' },
     { label: 'Favorites', path: '/room/' + ROOM + '/host/favorites' },
     { label: 'Recently sung', path: '/room/' + ROOM + '/host/recent' },
@@ -1169,7 +1267,7 @@ test('popular karaoke strip slides with previous and next controls', async ({ pa
   await expect(previous).toBeDisabled();
 });
 
-test('host opens the songbook from the karaoke strip and queues a song', async ({ page }) => {
+test('host opens the songbook inside the party panel and queues a song', async ({ page }) => {
   const popular = [1, 2, 3].map((index) => ({
     videoId: 'popular' + index,
     title: 'Karaoke Song ' + index,
@@ -1184,8 +1282,9 @@ test('host opens the songbook from the karaoke strip and queues a song', async (
   await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
   await page.getByRole('tab', { name: 'Hits' }).click();
 
-  await page.getByRole('link', { name: 'View more' }).click();
-  await expect(page).toHaveURL(new RegExp('/host/songbook$'));
+  await page.getByRole('button', { name: 'View more' }).click();
+  await expect(page).toHaveURL(/\/host\/party\?layout=computer$/);
+  await expect(page.getByRole('tab', { name: 'Songbook' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
 
   const rows = page.locator('ul[aria-label="Songbook songs"] li');

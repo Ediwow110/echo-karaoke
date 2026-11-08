@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter, Navigate, Route, Routes } from 'react-router-dom';
 import HostRoomPage from '../../src/app/HostRoomPage';
@@ -1023,20 +1023,20 @@ describe('host room workspace', () => {
     expect(screen.queryByText('Your private stage')).toBeNull();
   });
 
-  it('gives the computer layout Search, Queue and Hits tabs', async () => {
+  it('gives the computer layout Search, Queue, Hits and Songbook tabs', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/party');
 
     fireEvent.click(await screen.findByRole('button', { name: /switch to computer/i }));
 
     const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Search', 'Queue', 'Hits']);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Search', 'Queue', 'Hits', 'Songbook']);
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('search')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: /^queue$/i }));
     expect(screen.queryByRole('search')).toBeNull();
-    expect(screen.getByText('Midnight City')).toBeInTheDocument();
+    expect(within(screen.getByRole('tabpanel', { name: 'queue panel' })).getByText('Midnight City')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: /^hits$/i }));
     expect(await screen.findByRole('region', { name: /popular karaoke/i })).toBeInTheDocument();
