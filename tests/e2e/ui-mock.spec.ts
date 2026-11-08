@@ -1438,22 +1438,23 @@ test('host floating video stays clear of header controls', async ({ page }) => {
   // The dock and the shell header coexist on the console pages; the stage has no
   // floating frame to clear.
   await openScreen(page, '/room/' + ROOM + '/host/queue');
-  await expect(page.getByRole('link', { name: 'Party view' })).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Back to home' })).toBeVisible();
   await page.waitForSelector('[data-host-player]', { state: 'visible' });
   const geometry = await page.evaluate(() => {
     const frame = document.querySelector<HTMLElement>('[data-host-player]');
-    const party = [...document.querySelectorAll('a')].find((link) => link.textContent?.trim() === 'Party view');
+    const control = [...document.querySelectorAll('button')]
+      .find((button) => button.getAttribute('aria-label') === 'Back to home');
     const frameRect = frame?.getBoundingClientRect();
-    const partyRect = party?.getBoundingClientRect();
-    if (frameRect === undefined || partyRect === undefined) return null;
-    const top = document.elementFromPoint(partyRect.x + partyRect.width / 2, partyRect.y + partyRect.height / 2);
+    const controlRect = control?.getBoundingClientRect();
+    if (frameRect === undefined || controlRect === undefined) return null;
+    const top = document.elementFromPoint(controlRect.x + controlRect.width / 2, controlRect.y + controlRect.height / 2);
     return {
-      overlaps: !(frameRect.right < partyRect.left || frameRect.left > partyRect.right
-        || frameRect.bottom < partyRect.top || frameRect.top > partyRect.bottom),
-      topIsParty: top === party || party?.contains(top) === true,
+      overlaps: !(frameRect.right < controlRect.left || frameRect.left > controlRect.right
+        || frameRect.bottom < controlRect.top || frameRect.top > controlRect.bottom),
+      topIsControl: top === control || control?.contains(top) === true,
     };
   });
-  expect(geometry).toEqual({ overlaps: false, topIsParty: true });
+  expect(geometry).toEqual({ overlaps: false, topIsControl: true });
 });
 
 test('the host console keeps 44 pixel touch targets', async ({ page }) => {

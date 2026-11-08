@@ -1,8 +1,6 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
 import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
-import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import {
@@ -15,7 +13,8 @@ import { removeSong as removeQueueSong, reorderSong as reorderQueueSong, voteSon
 import { sendPlaybackCommand, reportPlaybackPosition } from '../features/playback/playbackApi';
 import HostPlayer from '../features/playback/HostPlayer';
 import PlayerDock from '../features/playback/PlayerDock';
-import Sidebar, { type SidebarNav } from '../features/rooms/Sidebar';
+import type { SidebarNav } from '../features/rooms/Sidebar';
+import AppShell from '../features/rooms/AppShell';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
 import { loadHostToken } from '../features/rooms/tokenStore';
 import { rememberSession, forgetSession } from '../features/rooms/sessionStore';
@@ -551,13 +550,11 @@ export default function HostRoomPage() {
       onReport={onReport}
       onFindAlternative={onFindAlternative}
     >
-      <div className="min-h-dvh bg-graphite lg:flex">
-        <Sidebar
-          activeNav={activeNav}
-          activeRoom={{ roomId, name: roomName, code, hostName }}
-          hostName={hostName}
-        />
-        <div className="min-w-0 flex-1">
+      <AppShell
+        activeNav={activeNav}
+        activeRoom={{ roomId, name: roomName, code, hostName }}
+        hostName={hostName}
+        header={(
           <header className="relative z-30 border-b border-line bg-graphite/95 backdrop-blur">
             <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
@@ -580,20 +577,6 @@ export default function HostRoomPage() {
                     {groupRoomCode(code)} · {presenceSummary(roster)}
                   </span>
                 )}
-                <Link
-                  to={'/room/' + roomId + '/host/party'}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
-                >
-                  <ArrowsOutIcon size={14} aria-hidden="true" />
-                  Party view
-                </Link>
-                <Link
-                  to={'/room/' + roomId + '/host/settings'}
-                  className="inline-flex min-h-11 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
-                >
-                  <SlidersHorizontalIcon size={14} aria-hidden="true" />
-                  Room settings
-                </Link>
                 <IconButton
                   icon={<SignOutIcon size={17} weight="regular" />}
                   label="Back to home"
@@ -612,6 +595,7 @@ export default function HostRoomPage() {
                   { label: 'Library', href: '/room/' + roomId + '/host/library' },
                   { label: 'Favorites', href: '/room/' + roomId + '/host/favorites' },
                   { label: 'Recent', href: '/room/' + roomId + '/host/recent' },
+                  { label: 'Settings', href: '/room/' + roomId + '/host/settings' },
                 ].map((link) => {
                   const isActive = location.pathname === link.href;
                   return (
@@ -631,22 +615,22 @@ export default function HostRoomPage() {
               </div>
             </nav>
           </header>
+        )}
+      >
+        <main className="mx-auto w-full max-w-[1240px] px-4 pb-36 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+          <div key={location.pathname} className="page-enter">
+            <Outlet context={context} />
+          </div>
+        </main>
 
-          <main className="mx-auto w-full max-w-[1240px] px-4 pb-36 pt-6 sm:px-6 lg:px-8 lg:pt-8">
-            <div key={location.pathname} className="page-enter">
-              <Outlet context={context} />
-            </div>
-          </main>
-
-          <PlayerDock
-            roomId={roomId}
-            nowPlaying={nowPlaying}
-            playback={data.playback}
-            onTogglePlay={togglePlay}
-            onNext={next}
-          />
-        </div>
-      </div>
+        <PlayerDock
+          roomId={roomId}
+          nowPlaying={nowPlaying}
+          playback={data.playback}
+          onTogglePlay={togglePlay}
+          onNext={next}
+        />
+      </AppShell>
       {toastNode}
     </HostPlayer>
   );

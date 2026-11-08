@@ -132,7 +132,7 @@ test('a host reopening the invite returns to the host screen', async ({ page }) 
   await page.waitForURL(/\/host$/, { timeout: 20000 });
   await expect(page.getByRole('heading', { level: 1, name: 'Host Guard' })).toBeVisible();
   await expect(page.getByText('Hosted by Host Mia')).toBeVisible();
-  await expect(page.getByRole('banner').getByRole('link', { name: 'Room settings' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Room settings' })).toBeVisible();
 });
 
 test('a guest adds a song and the host sees it in the queue', async ({ page, browser }) => {
