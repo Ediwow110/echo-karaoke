@@ -9,6 +9,7 @@ import { LaptopIcon } from '@phosphor-icons/react/dist/csr/Laptop';
 import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
+import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
 import { TelevisionIcon } from '@phosphor-icons/react/dist/csr/Television';
 import { useHostRoom } from './useHostRoom';
@@ -225,13 +226,21 @@ export default function HostPartyPage() {
         </p>
         <div className="ml-auto flex items-center gap-2">
           {connection === 'offline' ? <Chip tone="gold">Reconnecting</Chip> : null}
-          <span className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-white/15 bg-graphite-deep/70 px-2.5 text-[0.6875rem] text-ink-2">
+          <span className="hidden min-h-9 items-center gap-1.5 rounded-media border border-white/15 bg-graphite-deep/70 px-2.5 text-[0.6875rem] text-ink-2 sm:inline-flex">
             <span
               aria-hidden="true"
               className={['size-1.5 rounded-full', connection === 'offline' ? 'bg-gold' : 'bg-live'].join(' ')}
             />
             {onlineGuestCount(roster)} in room
           </span>
+          <Link
+            to={'/room/' + roomId + '/host/settings'}
+            aria-label="Room settings"
+            title="Room settings"
+            className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
+          >
+            <SlidersHorizontalIcon size={17} aria-hidden="true" />
+          </Link>
           <button
             ref={switchRef}
             type="button"
