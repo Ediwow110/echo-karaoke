@@ -18,7 +18,7 @@ import {
   touchMember,
   voteCommand,
 } from './room.js';
-import { youtubePopular, youtubeSearch, youtubeSuggest } from './youtube.js';
+import { youtubePopular, youtubeSearch } from './youtube.js';
 
 const OPERATIONS = new Set([
   'create-room',
@@ -33,7 +33,6 @@ const OPERATIONS = new Set([
   'host-remove-member',
   'queue-command',
   'youtube-search',
-  'youtube-suggest',
   'youtube-popular',
   'catalog-page',
   'catalog-sync',
@@ -89,8 +88,6 @@ export async function handleOperation(request: Request): Promise<Response> {
         return await queueCommand(request, caller);
       case 'youtube-search':
         return await youtubeSearch(request, caller);
-      case 'youtube-suggest':
-        return await youtubeSuggest(request, caller);
       case 'youtube-popular':
         return await youtubePopular(request, caller);
       case 'catalog-page':

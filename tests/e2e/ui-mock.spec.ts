@@ -637,7 +637,7 @@ test('the stage panel keeps its invite card whole on every tab', async ({ page }
   await openScreen(page, '/room/' + ROOM + '/host/party');
   await page.getByRole('button', { name: 'Switch to computer' }).click();
 
-  for (const tab of ['Search', 'Queue', 'Hits']) {
+  for (const tab of ['Search', 'Queue', 'Songbook']) {
     await page.getByRole('tab', { name: tab }).click();
     const card = page.locator('aside[aria-label="Stage controls"] section[aria-label="Invite your people"]');
     const geometry = await card.evaluate((element) => {
@@ -1280,9 +1280,7 @@ test('host opens the songbook inside the party panel and queues a song', async (
   await mockApi(page, true, commands, () => false, popular, catalogQueries);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
-  await page.getByRole('tab', { name: 'Hits' }).click();
-
-  await page.getByRole('button', { name: 'View more' }).click();
+  await page.getByRole('tab', { name: 'Songbook' }).click();
   await expect(page).toHaveURL(/\/host\/party\?layout=computer$/);
   await expect(page.getByRole('tab', { name: 'Songbook' })).toHaveAttribute('aria-selected', 'true');
   await expect(page.getByRole('heading', { name: 'Karaoke songbook' })).toBeVisible();
@@ -1302,7 +1300,7 @@ test('host opens the songbook inside the party panel and queues a song', async (
   expect(adds[0]).toMatchObject({ action: 'add', videoId: 'video000000', roomId: ROOM });
 });
 
-test('the stage shows one invite and the Hits panel keeps a scrollable vertical list', async ({ page }) => {
+test('the stage shows one invite and the search panel keeps a scrollable vertical list', async ({ page }) => {
   const popular = Array.from({ length: 8 }, (_, index) => ({
     videoId: 'karaoke' + String(index).padStart(4, '0'),
     title: 'Karaoke Pick ' + (index + 1),
@@ -1322,7 +1320,6 @@ test('the stage shows one invite and the Hits panel keeps a scrollable vertical 
 
   await page.getByRole('button', { name: 'Switch to computer' }).click();
   await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(1);
-  await page.getByRole('tab', { name: 'Hits' }).click();
   const list = page.getByRole('list', { name: 'Popular karaoke songs' });
   await expect(list).toHaveAttribute('data-layout', 'vertical');
   await expect.poll(async () => list.evaluate((node) => node.scrollHeight > node.clientHeight)).toBe(true);
@@ -1344,7 +1341,7 @@ test('host QR payload points to the actual guest join route with its live room c
   await expect(page.getByLabel('Your name')).toBeVisible();
 });
 
-test('the stage invite and the Hits panel fit narrow widths and 200 percent text', async ({ page }) => {
+test('the stage invite and the search panel fit narrow widths and 200 percent text', async ({ page }) => {
   const popular = Array.from({ length: 8 }, (_, index) => ({
     videoId: 'karaoke' + String(index).padStart(4, '0'),
     title: 'A long karaoke suggestion title to test narrow screens ' + index,
@@ -1363,7 +1360,6 @@ test('the stage invite and the Hits panel fit narrow widths and 200 percent text
   // The panel is the other half of the stage; give it the same treatment.
   await page.setViewportSize({ width: 1024, height: 768 });
   await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
-  await page.getByRole('tab', { name: 'Hits' }).click();
   await expect(page.getByRole('list', { name: 'Popular karaoke songs' })).toHaveAttribute('data-layout', 'vertical');
   await page.evaluate(() => { document.documentElement.style.fontSize = '200%'; });
   await expect(page.getByRole('region', { name: 'Invite your people' })).toBeVisible();

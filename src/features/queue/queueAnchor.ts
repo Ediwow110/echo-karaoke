@@ -12,13 +12,3 @@ export function scrollToElement(
     && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
   element.scrollIntoView({ behavior: reduce ? 'auto' : 'smooth', block });
 }
-
-// Brings the shared song queue into view so adding a song lands the singer
-// on the queue they just changed.
-export function scrollToQueue(): void {
-  if (typeof document === 'undefined') {
-    return;
-  }
-
-  scrollToElement(document.getElementById(QUEUE_ELEMENT_ID), 'start');
-}

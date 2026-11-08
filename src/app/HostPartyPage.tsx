@@ -24,7 +24,7 @@ import { isFavorite, subscribeLibrary, toggleFavorite } from '../features/librar
 import { formatTime, onlineGuestCount, queueSummary } from '../lib/format';
 import { Button, Chip, ConfirmDialog, Logo, SongArtwork, TransportButton } from '../ui';
 
-type PanelTab = 'search' | 'queue' | 'hits' | 'songbook';
+type PanelTab = 'search' | 'queue' | 'songbook';
 type Density = 'grid' | 'list';
 
 // The layout is a query param on this route, not a second screen. Stage and Party
@@ -74,7 +74,7 @@ export default function HostPartyPage() {
 
   const [tab, setTab] = useState<PanelTab>(() => {
     const requested = params.get('panel');
-    return requested === 'queue' || requested === 'hits' || requested === 'songbook' ? requested : 'search';
+    return requested === 'queue' || requested === 'songbook' ? requested : 'search';
   });
 
   useEffect(() => {
@@ -476,7 +476,7 @@ export default function HostPartyPage() {
               />
 
               <div role="tablist" aria-label="Stage panel" className="flex items-center gap-1 rounded-media border border-line bg-surface p-1">
-                {(['search', 'queue', 'hits', 'songbook'] as const).map((name) => (
+                {(['search', 'queue', 'songbook'] as const).map((name) => (
                   <button
                     key={name}
                     type="button"
@@ -557,32 +557,6 @@ export default function HostPartyPage() {
                         onReorder={(songId, direction) => { void reorderSong(songId, direction); }}
                         onVote={(songId) => { void voteSong(songId); }}
                         votingSongId={votingSongId}
-                      />
-                    </div>
-                  </>
-                ) : null}
-
-                {tab === 'hits' ? (
-                  <>
-                    <div className="flex items-center justify-between gap-2">
-                      <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Popular karaoke</h2>
-                      <button
-                        type="button"
-                        onClick={() => setTab('songbook')}
-                        className="inline-flex min-h-9 items-center text-[0.6875rem] font-semibold text-signal hover:underline"
-                      >
-                        View more
-                      </button>
-                    </div>
-                    <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
-                      The live strip, refreshed by the songbook. No typing needed.
-                    </p>
-                    <div className="mt-3">
-                      <PopularSongs
-                        roomId={roomId}
-                        layout="vertical"
-                        queuedVideoIds={queue.map((song) => song.videoId)}
-                        onAdded={() => { void refresh(); }}
                       />
                     </div>
                   </>

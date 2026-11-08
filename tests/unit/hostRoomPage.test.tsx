@@ -931,7 +931,7 @@ describe('host room workspace', () => {
 
     fireEvent.keyDown(window, { key: 'Escape' });
 
-    await waitFor(() => expect(screen.queryByRole('tab', { name: /hits/i })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('tab', { name: /songbook/i })).toBeNull());
     expect(screen.getByText('After Hours · TV stage')).toBeInTheDocument();
   });
 
@@ -943,11 +943,11 @@ describe('host room workspace', () => {
     renderHost(api, '/room/' + roomId + '/host/party');
 
     fireEvent.click(await screen.findByRole('button', { name: /switch to computer/i }));
-    const hits = await screen.findByRole('tab', { name: /hits/i });
-    fireEvent.click(hits);
-    fireEvent.keyDown(hits, { key: 'Escape' });
+    const queueTab = await screen.findByRole('tab', { name: /queue/i });
+    fireEvent.click(queueTab);
+    fireEvent.keyDown(queueTab, { key: 'Escape' });
 
-    await waitFor(() => expect(screen.queryByRole('tab', { name: /hits/i })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('tab', { name: /songbook/i })).toBeNull());
     expect(screen.getByText('After Hours · TV stage')).toBeInTheDocument();
   });
 
@@ -960,7 +960,7 @@ describe('host room workspace', () => {
     const search = await screen.findByRole('search');
     fireEvent.keyDown(search.querySelector('input') ?? search, { key: 'Escape' });
 
-    expect(await screen.findByRole('tab', { name: /hits/i })).toBeInTheDocument();
+    expect(await screen.findByRole('tab', { name: /songbook/i })).toBeInTheDocument();
   });
 
   it('saves the song the stage is playing to favorites', async () => {
@@ -1019,27 +1019,24 @@ describe('host room workspace', () => {
     // text appears in both layouts, so the layout itself is what gets asserted.
     expect(await screen.findByRole('button', { name: /switch to computer/i })).toBeInTheDocument();
     expect(screen.queryByRole('search')).toBeNull();
-    expect(screen.queryByRole('tab', { name: /hits/i })).toBeNull();
+    expect(screen.queryByRole('tab', { name: /songbook/i })).toBeNull();
     expect(screen.queryByText('Your private stage')).toBeNull();
   });
 
-  it('gives the computer layout Search, Queue, Hits and Songbook tabs', async () => {
+  it('gives the computer layout Search, Queue and Songbook tabs', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/party');
 
     fireEvent.click(await screen.findByRole('button', { name: /switch to computer/i }));
 
     const tabs = screen.getAllByRole('tab');
-    expect(tabs.map((tab) => tab.textContent)).toEqual(['Search', 'Queue', 'Hits', 'Songbook']);
+    expect(tabs.map((tab) => tab.textContent)).toEqual(['Search', 'Queue', 'Songbook']);
     expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
     expect(screen.getByRole('search')).toBeInTheDocument();
 
     fireEvent.click(screen.getByRole('tab', { name: /^queue$/i }));
     expect(screen.queryByRole('search')).toBeNull();
     expect(within(screen.getByRole('tabpanel', { name: 'queue panel' })).getByText('Midnight City')).toBeInTheDocument();
-
-    fireEvent.click(screen.getByRole('tab', { name: /^hits$/i }));
-    expect(await screen.findByRole('region', { name: /popular karaoke/i })).toBeInTheDocument();
   });
 
   it('adds the search panel without leaving the stage route', async () => {

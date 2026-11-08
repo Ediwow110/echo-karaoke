@@ -14,7 +14,6 @@ export type SearchResult = {
 
 const VIDEO_ID_PATTERN = /^[A-Za-z0-9_-]{11}$/;
 const MAX_RESULTS = 10;
-export const MAX_SUGGESTIONS = 10;
 const MEMBER_SEARCH_LIMIT = 20;
 const USER_DAILY_SEARCH_LIMIT = 30;
 const ROOM_DAILY_SEARCH_LIMIT = 60;
@@ -29,11 +28,8 @@ const POPULAR_CACHE_KEY = '__popular_karaoke_v2';
 const POPULAR_CACHE_TTL_SECONDS = 12 * 60 * 60;
 const POPULAR_CACHE_TTL_MS = POPULAR_CACHE_TTL_SECONDS * 1000;
 const COMPILATION_PATTERN = /\b(medley|non-?stop|compilation|playlist|full album|1 hour|one hour)\b/i;
-const SUGGEST_CACHE_TTL_MS = 60_000;
-const SUGGEST_CACHE_MAX = 500;
 
 let popularCached: { at: number; results: SearchResult[] } | null = null;
-const suggestCache = new Map<string, { at: number; suggestions: string[] }>();
 
 function text(value: unknown, limit: number): string | null {
   return typeof value === 'string' && value.trim().length > 0 ? value.trim().slice(0, limit) : null;
@@ -123,21 +119,6 @@ export function pickPopularCards(
     [shuffled[index], shuffled[swap]] = [shuffled[swap], shuffled[index]];
   }
   return shuffled.slice(0, limit);
-}
-
-export function parseSuggestions(payload: unknown): string[] {
-  if (!Array.isArray(payload) || payload.length < 2) return [];
-  const items = payload[1];
-  if (!Array.isArray(items)) return [];
-  const suggestions: string[] = [];
-  for (const item of items) {
-    if (typeof item !== 'string') continue;
-    const value = item.trim().slice(0, 100);
-    if (value.length === 0 || suggestions.includes(value)) continue;
-    suggestions.push(value);
-    if (suggestions.length === MAX_SUGGESTIONS) break;
-  }
-  return suggestions;
 }
 
 function requireQuery(value: unknown, minimum = 1): string {
@@ -470,64 +451,3 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
   return jsonResponse({ available: true, results: pickPopularCards(pool) });
 }
 
-async function fetchSuggestions(query: string): Promise<string[]> {
-  const cached = suggestCache.get(query);
-  if (cached !== undefined && Date.now() - cached.at < SUGGEST_CACHE_TTL_MS) {
-    return cached.suggestions;
-  }
-
-  const target = 'https://suggestqueries.google.com/complete/search?client=firefox&ds=yt&q=' +
-    encodeURIComponent(query);
-
-  let response: Response;
-  try {
-    response = await fetch(target, {
-      headers: { Accept: 'application/json' },
-      signal: AbortSignal.timeout(4000),
-    });
-  } catch {
-    return [];
-  }
-  if (!response.ok) return [];
-
-  let payload: unknown;
-  try {
-    payload = await response.json();
-  } catch {
-    return [];
-  }
-
-  const suggestions = parseSuggestions(payload);
-  if (!suggestCache.has(query) && suggestCache.size >= SUGGEST_CACHE_MAX) {
-    const oldest = suggestCache.keys().next().value;
-    if (oldest !== undefined) suggestCache.delete(oldest);
-  }
-  suggestCache.set(query, { at: Date.now(), suggestions });
-  return suggestions;
-}
-
-export async function youtubeSuggest(request: Request, caller: Caller): Promise<Response> {
-  const body = await readJsonObject(request);
-  const roomId = requireRoomId(body.roomId);
-  const query = requireQuery(body.query, 2);
-  await requireRoomAccess(request, caller, roomId);
-
-  await enforceLimit('consume_rate_limit', [
-    caller.userId,
-    'youtube-suggest-member',
-    60,
-    60,
-  ], 'Suggestions are busy. Try again in a moment.');
-
-  const daily = await queryAllowNull('consume_daily_rate_limit', [
-    'global',
-    'youtube-suggest-day',
-    3000,
-  ]) as { allowed?: boolean } | null;
-  if (daily?.allowed !== true) {
-    return jsonResponse({ suggestions: [] });
-  }
-
-  const suggestions = await fetchSuggestions(query);
-  return jsonResponse({ suggestions });
-}

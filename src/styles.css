@@ -115,7 +115,6 @@
   --animate-list-in: list-in 320ms var(--ease-console) both;
   --animate-modal-in: modal-in 240ms var(--ease-console) both;
   --animate-backdrop-in: backdrop-in 180ms var(--ease-console) both;
-  --animate-stage-drift: stage-drift 26s ease-in-out infinite alternate;
 }
 
 /* ---------------------------------------------------------------------------
@@ -167,12 +166,6 @@
 @keyframes list-in {
   from { opacity: 0; transform: translateY(7px); }
   to { opacity: 1; transform: translateY(0); }
-}
-
-/* A slow, almost imperceptible camera move on still stage imagery. */
-@keyframes stage-drift {
-  from { transform: scale(1.025) translate3d(-0.6%, -0.35%, 0); }
-  to { transform: scale(1.065) translate3d(0.6%, 0.35%, 0); }
 }
 
 /* The logo bars answer like a quiet room mic rather than a loading spinner. */
@@ -343,33 +336,14 @@
     color: var(--color-ink-2);
   }
 
-  .hairline {
-    border-color: var(--color-line);
-  }
-
   .stage-sheen {
     background:
       linear-gradient(180deg, rgba(16, 13, 24, 0.12) 0%, rgba(16, 13, 24, 0.65) 62%, rgba(16, 13, 24, 0.96) 100%),
       radial-gradient(120% 90% at 70% 0%, rgba(182, 160, 255, 0.18), transparent 60%);
   }
 
-  .card-hover {
-    transition: background-color var(--duration-fast) var(--ease-console),
-      border-color var(--duration-fast) var(--ease-console),
-      transform var(--duration-fast) var(--ease-console);
-  }
-
-  .card-hover:hover {
-    border-color: var(--color-line-strong);
-    background-color: var(--color-surface-2);
-  }
-
   .tabular {
     font-variant-numeric: tabular-nums;
-  }
-
-  .balance {
-    text-wrap: balance;
   }
 
   .page-enter {
@@ -456,11 +430,6 @@
     .party-layout[data-layout='computer'] .party-panel {
       margin-top: 0;
     }
-  }
-
-  .stage-drift {
-    animation: var(--animate-stage-drift);
-    transform-origin: 50% 50%;
   }
 
   .stage-smoke {

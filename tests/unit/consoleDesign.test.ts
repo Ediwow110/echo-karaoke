@@ -60,12 +60,10 @@ describe('console design system', () => {
     expect(css).toMatch(/focus-visible[^{]*\{[^}]*outline:\s*2px solid var\(--color-signal\)/);
   });
 
-  it('reveals route content, list rows and still stage imagery', () => {
+  it('reveals route content and list rows', () => {
     expect(css).toContain('@keyframes page-in');
     expect(css).toContain('@keyframes list-in');
-    expect(css).toContain('@keyframes stage-drift');
     expect(css).toContain('.page-enter');
     expect(css).toContain('.stagger-in');
-    expect(css).toContain('.stage-drift');
   });
 });

@@ -7,7 +7,6 @@ export type EdgeFunctionName =
   | 'host-remove-member'
   | 'queue-command'
   | 'youtube-search'
-  | 'youtube-suggest'
   | 'youtube-popular'
   | 'catalog-page'
   | 'catalog-sync'

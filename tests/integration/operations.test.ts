@@ -275,14 +275,6 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
     const popularBody = (await popular.json()) as { available?: boolean; results?: unknown[] };
     expect(popularBody.available).toBe(false);
     expect(popularBody.results).toEqual([]);
-
-    const suggest = await call('youtube-suggest', guestAuth, {
-      roomId,
-      query: 'a',
-    }, {
-      'x-room-guest-token': guestToken,
-    });
-    expect(suggest.status).toBe(400);
   });
 
   it('serves auth and operations through the Vercel rewrite', async () => {
