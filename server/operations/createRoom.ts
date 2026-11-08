@@ -1,6 +1,6 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
 import { HttpError, jsonResponse, logFailure, mapDatabaseError } from './errors.js';
-import { sweepAbandonedRooms, sweepEndedRooms } from './sweep.js';
+import { roomSweepDue, sweepAbandonedRooms, sweepEndedRooms, sweepIntervalSeconds } from './sweep.js';
 import {
   generateRoomCode,
   generateToken,
@@ -18,12 +18,6 @@ export async function createRoom(request: Request, caller: Caller): Promise<Resp
   const roomName = normalizeRoomName(body.roomName);
   const guestsCanAdd = readOptionalBoolean(body.guestsCanAdd, true);
   const guestsCanControlPlayback = readOptionalBoolean(body.guestsCanControlPlayback, false);
-  const sweeps = await Promise.allSettled([sweepAbandonedRooms(), sweepEndedRooms()]);
-  for (const sweep of sweeps) {
-    if (sweep.status === 'rejected') {
-      logFailure('create-room/sweep', sweep.reason, 500, request);
-    }
-  }
   const database = serviceDatabase();
 
   for (let attempt = 0; attempt < 4; attempt += 1) {
@@ -45,6 +39,21 @@ export async function createRoom(request: Request, caller: Caller): Promise<Resp
       const result = (rows[0] as { result?: unknown } | undefined)?.result;
       if (result === undefined || result === null) {
         throw new HttpError('INTERNAL_ERROR', 500, 'The room could not be created');
+      }
+      // Sweeps are deployment-wide work. Run them only after the room exists,
+      // and at most once per interval, so a rejected create cannot trigger
+      // them and successful creates do not scan the whole schema each time.
+      try {
+        if (await roomSweepDue(sweepIntervalSeconds())) {
+          const sweeps = await Promise.allSettled([sweepAbandonedRooms(), sweepEndedRooms()]);
+          for (const sweep of sweeps) {
+            if (sweep.status === 'rejected') {
+              logFailure('create-room/sweep', sweep.reason, 500, request);
+            }
+          }
+        }
+      } catch (error) {
+        logFailure('create-room/sweep', error, 500, request);
       }
       return jsonResponse(result, 201);
     } catch (error) {

@@ -28,7 +28,8 @@ and deployment contract.
   branch. Point it at a branch-backed server.
 - `npm run test:integration`: router/auth/operation path against a disposable Neon
   branch. It skips without `DATABASE_URL`, `AUTH_DATABASE_URL`, and
-  `BETTER_AUTH_SECRET`.
+  `BETTER_AUTH_SECRET`; when all three are present it also requires
+  `INTEGRATION_TARGET_CONFIRMED=1` after you verify they point at a disposable branch.
 - `npx supabase test db --db-url "$NEON_DATABASE_URL"`: pgTAP suite.
 - `npm run verify:deploy`: the production environment guard used by Vercel.
 - `npm run verify:preview -- <url>`: deployment header, CSP, asset, and API checks.

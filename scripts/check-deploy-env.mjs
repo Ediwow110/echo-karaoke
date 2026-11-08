@@ -3,6 +3,14 @@ import { pathToFileURL } from 'node:url';
 
 const CONNECTION_STRING = /^postgres(ql)?:\/\//i;
 
+function normalizedHost(hostname) {
+  // Neon serves the same branch through <endpoint> and <endpoint>-pooler.
+  // Compare the underlying endpoint, not the connection alias.
+  return hostname.endsWith('.neon.tech')
+    ? hostname.replace(/-pooler(?=\.)/, '')
+    : hostname;
+}
+
 /**
  * Vite copies every VITE_ variable into the browser bundle. A database URL in
  * that namespace is a credential leak that no later runtime check can undo.
@@ -44,7 +52,7 @@ function checkBackend(env, errors) {
     const identity = (value) => {
       try {
         const url = new URL(value);
-        return url.hostname + url.pathname;
+        return normalizedHost(url.hostname) + url.pathname;
       } catch {
         return null;
       }
@@ -75,6 +83,8 @@ function checkBackend(env, errors) {
   budget('YOUTUBE_DAILY_POPULAR_BUDGET', 1, 100);
   budget('YOUTUBE_DAILY_METADATA_BUDGET', 1, 100000);
   budget('YOUTUBE_ROOM_METADATA_BUDGET', 1, 100000);
+  budget('YOUTUBE_DAILY_METADATA_ATTEMPT_BUDGET', 1, 100000);
+  budget('YOUTUBE_ROOM_METADATA_ATTEMPT_BUDGET', 1, 100000);
 
   const searchRaw = String(env.YOUTUBE_DAILY_SEARCH_BUDGET ?? '').trim();
   const popularRaw = String(env.YOUTUBE_DAILY_POPULAR_BUDGET ?? '').trim();

@@ -118,6 +118,35 @@ describe('deployment environment guard', () => {
     })).toContain('PREVIEW_DATABASE_URL must point at a different database than DATABASE_URL.');
   });
 
+  it('treats a Neon -pooler alias as the same database', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+      DATABASE_URL: 'postgresql://service@ep-cool-name-123.ap-southeast-1.aws.neon.tech/db',
+      AUTH_DATABASE_URL: 'postgresql://auth@ep-cool-auth-123.ap-southeast-1.aws.neon.tech/db',
+      PREVIEW_DATABASE_URL: 'postgresql://service@ep-cool-name-123-pooler.ap-southeast-1.aws.neon.tech/db',
+      PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@ep-cool-auth-123-pooler.ap-southeast-1.aws.neon.tech/db',
+    });
+    expect(errors).toContain('PREVIEW_DATABASE_URL must point at a different database than DATABASE_URL.');
+    expect(errors).toContain('PREVIEW_AUTH_DATABASE_URL must point at a different database than AUTH_DATABASE_URL.');
+  });
+
+  it('does not conflate non-Neon pooler-looking hosts', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+      PREVIEW_DATABASE_URL: 'postgresql://service@db-pooler.example/db',
+      PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@auth-pooler.example/db',
+    })).toEqual([]);
+  });
+
+  it('validates the metadata attempt budgets', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      YOUTUBE_DAILY_METADATA_ATTEMPT_BUDGET: '0',
+    })).toContain('YOUTUBE_DAILY_METADATA_ATTEMPT_BUDGET must be an integer between 1 and 100000.');
+  });
+
   it('rejects insecure, wildcard, and path-bearing origins', () => {
     const errors = checkDeployEnv({
       ALLOWED_ORIGINS: 'http://app.example/,*,https://app.example/path',
