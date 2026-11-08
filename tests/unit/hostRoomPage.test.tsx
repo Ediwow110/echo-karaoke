@@ -1022,6 +1022,15 @@ describe('host room workspace', () => {
     expect(screen.queryByText('Your private stage')).toBeNull();
   });
 
+  it('opens Room settings from the stage header', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party');
+
+    fireEvent.click(await screen.findByRole('link', { name: 'Room settings' }));
+
+    expect(await screen.findByRole('heading', { name: /a room that feels like yours/i })).toBeInTheDocument();
+  });
+
   it('gives the computer layout Search, Queue and Songbook tabs', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/party');

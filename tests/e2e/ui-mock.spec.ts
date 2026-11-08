@@ -451,6 +451,21 @@ test('the stage says Ready on an idle room, never Autoplay on', async ({ page })
   await expect(page.getByText('Autoplay on')).toHaveCount(0);
 });
 
+test('the party header opens Room settings on a phone without overflowing', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 390, height: 844 });
+  await openScreen(page, '/room/' + ROOM + '/host/party');
+
+  const settings = page.getByRole('link', { name: 'Room settings' });
+  await expect(settings).toBeVisible();
+  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
+    .toBeLessThanOrEqual(1);
+
+  await settings.click();
+  await expect(page).toHaveURL(/\/host\/settings$/);
+  await expect(page.getByRole('switch', { name: /guests can pause or resume/i })).toBeVisible();
+});
+
 test('the stage switches between TV and computer on one route', async ({ page }) => {
   // The switch is a query param, so the stage screen and its measured slot stay
   // mounted; a navigation would move the video to the floating frame. The URL is
