@@ -181,7 +181,7 @@ export default function PopularSongs({ roomId, layout = 'horizontal', disabled =
       <ul id={listId} ref={listRef} aria-label="Popular karaoke songs" data-layout={layout} tabIndex={layout === 'vertical' ? 0 : undefined} className={layout === 'vertical'
         ? 'flex max-h-[27rem] flex-col gap-2 overflow-y-auto overscroll-contain rounded-media pr-2 focus-visible:outline-2 focus-visible:outline-signal'
         : 'no-scrollbar -mx-1 flex gap-2 overflow-x-auto px-1 pb-1 pt-1'}>
-        {songs.slice(0, 8).map((song) => {
+        {songs.map((song) => {
           const isQueued = queuedVideoIds.includes(song.videoId) || added.includes(song.videoId);
           const busy = queued === song.videoId;
           return (

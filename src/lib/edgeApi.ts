@@ -7,7 +7,6 @@ export type EdgeFunctionName =
   | 'host-remove-member'
   | 'queue-command'
   | 'youtube-search'
-  | 'youtube-suggest'
   | 'youtube-popular'
   | 'catalog-page'
   | 'catalog-sync'
@@ -17,10 +16,7 @@ export type EdgeFunctionName =
   | 'touch-member'
   | 'transfer-host'
   | 'claim-host'
-  | 'approve-member'
-  | 'reject-member'
-  | 'set-admissions'
-  | 'set-approval';
+  | 'set-admissions';
 
 export type RoomTokens = {
   guestToken?: string;

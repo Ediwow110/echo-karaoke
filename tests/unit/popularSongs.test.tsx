@@ -79,6 +79,33 @@ describe('popular songs', () => {
     expect(screen.queryByRole('button', { name: /^queue /i })).not.toBeInTheDocument();
   });
 
+  it('renders every suggestion the room returns so the vertical list can scroll', async () => {
+    const suggestions = Array.from({ length: 12 }, (_, index) => ({
+      videoId: 'popular' + String(index + 1).padStart(3, '0'),
+      title: 'Karaoke Pick ' + (index + 1),
+      channelTitle: 'Karaoke Channel',
+      thumbnailUrl: null,
+      durationSeconds: null,
+    }));
+    const api: EdgeApi = {
+      invoke: (async (name: string) => (
+        name === 'youtube-popular' ? { available: true, results: suggestions } : {}
+      )) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    render(
+      createElement(RoomApiProvider, {
+        api,
+        children: createElement(MemoryRouter, null,
+          createElement(PopularSongs, { roomId, layout: 'vertical' })),
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getAllByRole('button', { name: /^Queue / })).toHaveLength(12);
+    });
+  });
+
   it('supports a keyboard-scrollable vertical host suggestion list', async () => {
     localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
     const { container } = render(

@@ -20,8 +20,12 @@ describe('application shell', () => {
   });
 
   it('keeps each screen in its own bundle chunk', () => {
-    expect(app).toContain('lazy(');
+    // lazyRoute wraps React.lazy with a retry for a chunk request that a quick
+    // navigation aborted; the gate is that the screens are still dynamic imports
+    // and the first paint does not pull them in.
+    expect(app).toContain('lazyRoute(() => import(');
     expect(app).toContain('Suspense');
+    expect(app).not.toMatch(/^import .*from '\.\/(Host|Guest|JoinRoomPage|Scan)/m);
   });
 
   it('boots without a client-side environment check', () => {

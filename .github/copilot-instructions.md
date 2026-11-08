@@ -2,6 +2,14 @@
 
 > Sauron Universal Harness v1.0.0
 
+## Project Stack
+
+- Runtime: Node.js 24, TypeScript 5.9, ESM
+- App: React 19 and Vite 8 SPA (`src/`)
+- Server: one Vercel Function (`api/router.ts`), Better Auth, Neon Postgres, authorized SQL operations in `supabase/migrations`
+- Tests: Vitest (unit and integration), Playwright (mocked UI and real host/guest flows), pgTAP through the Supabase CLI
+- Authoritative workflow and commands: `CLAUDE.md` and `README.md`
+
 ## Coding and Architectural Guidelines
 
 - Present tense, active voice, English language exclusively.

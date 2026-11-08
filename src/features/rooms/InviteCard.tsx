@@ -89,15 +89,18 @@ export default function InviteCard({
 
   if (variant === 'party') {
     return (
-      <div className={['flex items-center gap-3 rounded-panel border border-white/15 bg-graphite-deep/70 p-3 backdrop-blur', className].join(' ')}>
+      <section className={['flex items-center gap-3 rounded-panel border border-white/15 bg-graphite-deep/70 p-3 backdrop-blur', className].join(' ')} aria-label="Invite your people">
         <QrCode value={joinUrl} label={'QR code to join ' + roomName} size={104} />
         <div className="min-w-0">
-          <p className="eyebrow text-ink-2">Join the room</p>
+          <div className="flex items-center gap-2">
+            <p className="eyebrow text-ink-2">Join the room</p>
+            <Chip tone={guests > 0 ? 'live' : 'default'}>{guests} in</Chip>
+          </div>
           <p className="mt-1 font-display text-[1.05rem] font-bold tracking-[-0.01em] text-ink">{roomName}</p>
           <p className="mt-0.5 text-[0.625rem] text-ink-2">Hosted by {hostName}</p>
           <p className="mt-1 font-mono text-[0.6875rem] tracking-[0.08em] text-signal">{groupRoomCode(code)}</p>
         </div>
-      </div>
+      </section>
     );
   }
 

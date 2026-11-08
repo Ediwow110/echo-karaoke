@@ -1,6 +1,6 @@
 import { requireAnonymousCaller } from '../auth/identity.js';
 import { enforceApiRequestLimit } from './apiThrottle.js';
-import { approveMember, rejectMember, setAdmissions, setApproval } from './admission.js';
+import { setAdmissions } from './admission.js';
 import { catalogPage } from './catalogBrowse.js';
 import { catalogSync } from './catalogSync.js';
 import { claimHost, transferHost } from './transferHost.js';
@@ -18,7 +18,7 @@ import {
   touchMember,
   voteCommand,
 } from './room.js';
-import { youtubePopular, youtubeSearch, youtubeSuggest } from './youtube.js';
+import { youtubePopular, youtubeSearch } from './youtube.js';
 
 const OPERATIONS = new Set([
   'create-room',
@@ -33,16 +33,12 @@ const OPERATIONS = new Set([
   'host-remove-member',
   'queue-command',
   'youtube-search',
-  'youtube-suggest',
   'youtube-popular',
   'catalog-page',
   'catalog-sync',
   'transfer-host',
   'claim-host',
-  'approve-member',
-  'reject-member',
   'set-admissions',
-  'set-approval',
 ]);
 
 function isAuthFailure(error: unknown): boolean {
@@ -92,8 +88,6 @@ export async function handleOperation(request: Request): Promise<Response> {
         return await queueCommand(request, caller);
       case 'youtube-search':
         return await youtubeSearch(request, caller);
-      case 'youtube-suggest':
-        return await youtubeSuggest(request, caller);
       case 'youtube-popular':
         return await youtubePopular(request, caller);
       case 'catalog-page':
@@ -104,14 +98,8 @@ export async function handleOperation(request: Request): Promise<Response> {
         return await transferHost(request, caller);
       case 'claim-host':
         return await claimHost(request, caller);
-      case 'approve-member':
-        return await approveMember(request, caller);
-      case 'reject-member':
-        return await rejectMember(request, caller);
       case 'set-admissions':
         return await setAdmissions(request, caller);
-      case 'set-approval':
-        return await setApproval(request, caller);
       default:
         throw new HttpError('NOT_IMPLEMENTED', 501, 'That operation is not available');
     }

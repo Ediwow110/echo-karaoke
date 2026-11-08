@@ -43,7 +43,7 @@ describe('karaoke home screen', () => {
 
     fireEvent.click(screen.getByRole('button', { name: /hosting tonight/i }));
     expect(screen.getByLabelText(/room name/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^create room$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^launch tv$/i })).toBeInTheDocument();
   });
 
   it('answers the create route with the create form, not the join form', () => {
@@ -51,7 +51,7 @@ describe('karaoke home screen', () => {
     renderHome();
 
     expect(screen.getByLabelText(/room name/i)).toBeInTheDocument();
-    expect(screen.getByRole('button', { name: /^create room$/i })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: /^launch tv$/i })).toBeInTheDocument();
     expect(screen.queryByLabelText(/room code/i)).toBeNull();
   });
 

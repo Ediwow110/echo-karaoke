@@ -5,15 +5,20 @@
 ## Project Overview & Tech Stack
 
 Production codebase governed by Sauron Universal Agent Harness.
-- Target: Node.js 20+, TypeScript 7+, ESM
-- Test Runner: Native Node.js test runner
+- Runtime: Node.js 24, TypeScript 5.9, ESM
+- App: React 19 and Vite 8 SPA in `src/`
+- Server: one Vercel Function at `api/router.ts`, Better Auth, Neon Postgres, and authorized SQL operations in `supabase/migrations`
+- Tests: Vitest (unit), Playwright (mocked UI and real host/guest flows), pgTAP through the Supabase CLI, and Vitest integration against a disposable Neon branch
 
 ## Essential Commands
 
-- Build: `npm run build`
-- Test All: `npm test`
-- Lint & Typecheck: `npx tsc --noEmit`
-- Single Test: `node --test tests/<filename>.test.mjs`
+- Build and typecheck: `npm run build`
+- Unit and component tests: `npm test`
+- Mocked UI flows: `npm run test:e2e:ui`
+- Real host/guest flows: `npm run test:e2e` (needs `vercel dev` or `E2E_BASE_URL`)
+- Integration: `npm run test:integration` (needs a disposable Neon branch)
+- Database: `npx supabase test db --db-url "$NEON_DATABASE_URL"`
+- Single unit test: `npx vitest run tests/unit/<filename>.test.ts`
 
 ## Architectural & Coding Guidelines
 

@@ -64,7 +64,7 @@ export default function JoinRoomPage() {
       if (caught instanceof RoomApiError && caught.code === 'HOST_ALREADY_IN_ROOM') {
         const hostSession = getHostSessionByCode(code);
         if (hostSession !== null) {
-          navigate('/room/' + hostSession.roomId + '/host');
+          navigate('/room/' + hostSession.roomId + '/host/party');
           return;
         }
       }

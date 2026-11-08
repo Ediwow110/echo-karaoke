@@ -7,7 +7,7 @@ import '@testing-library/jest-dom/vitest';
 
 const read = (path: string) => require('node:fs').readFileSync(process.cwd() + '/' + path, 'utf8');
 const logoSource = read('src/ui/Logo.tsx');
-const stageSource = read('src/app/HostStagePage.tsx');
+const stageSource = read('src/app/HostPartyPage.tsx');
 
 function lockup(container: HTMLElement) {
   return container.querySelector('span[aria-label="kara-echo"]') as HTMLElement;
@@ -49,7 +49,7 @@ describe('the brand lockup in a narrow header', () => {
     expect(bars(container)).not.toHaveClass('hidden');
   });
 
-  it('drops the wordmark from the stage header while the back and party actions need the room', () => {
+  it('drops the wordmark from the stage header', () => {
     expect(stageSource).toMatch(/<Logo[^>]*wordmarkClassName="hidden sm:inline"/);
   });
 });

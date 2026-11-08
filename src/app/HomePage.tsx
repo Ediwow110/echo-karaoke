@@ -4,9 +4,9 @@ import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { KeyIcon } from '@phosphor-icons/react/dist/csr/Key';
 import { MicrophoneStageIcon } from '@phosphor-icons/react/dist/csr/MicrophoneStage';
 import { MonitorPlayIcon } from '@phosphor-icons/react/dist/csr/MonitorPlay';
-import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { QrCodeIcon } from '@phosphor-icons/react/dist/csr/QrCode';
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
+import { TelevisionIcon } from '@phosphor-icons/react/dist/csr/Television';
 import { useRoomApi } from './RoomApiProvider';
 import { createRoom, joinRoom } from '../features/rooms/roomApi';
 import { isValidRoomCode, normalizeRoomCode } from '../features/rooms/roomCode';
@@ -14,11 +14,9 @@ import { getHostSessionByCode, rememberSession } from '../features/rooms/session
 import { RoomApiError } from '../lib/edgeApi';
 import { saveGuestToken, saveHostToken } from '../features/rooms/tokenStore';
 import { useMediaQuery } from '../lib/useMediaQuery';
-import AppShell from '../features/rooms/AppShell';
+import { Avatar, Button, Field, Logo } from '../ui';
 import ReturnToRoom from '../features/rooms/ReturnToRoom';
 import { useHostedRoom } from '../features/rooms/useHostedRoom';
-import type { ActiveRoom } from '../features/rooms/Sidebar';
-import { Avatar, Button, Field, Logo } from '../ui';
 
 function describeError(error: unknown): string {
   return error instanceof Error ? error.message : 'Something went wrong. Try again.';
@@ -90,11 +88,16 @@ function CreateFeedback({ error, uncertain, onAcknowledge }: {
 }
 
 const steps = [
-  { number: '01', title: 'Create your room', body: 'Give the night a name. You stay in control.' },
-  { number: '02', title: 'Pick a song. Click play.', body: 'Search YouTube, then start playback on this host screen.' },
-  { number: '03', title: 'Scan. Join. Pass the mic.', body: 'Guests scan the room QR and immediately get a phone remote.' },
+  { number: '01', title: 'Launch the TV', body: 'One click opens the room on this screen. The QR is already on it.' },
+  { number: '02', title: 'Scan from a phone', body: 'Guests scan the room QR and immediately get a phone remote.' },
+  { number: '03', title: 'Switch to computer to search', body: 'Search, queue and popular songs live in the stage side panel.' },
   { number: '04', title: 'Let the queue take over', body: 'Phones search and add songs. The shared queue advances automatically.' },
 ];
+
+// The flow opens the room without a form first: names are optional and live behind
+// the "Room details" disclosure, so nobody stands at the TV typing to start a night.
+const DEFAULT_ROOM_NAME = 'Karaoke room';
+const DEFAULT_HOST_NAME = 'Host';
 
 function hostNameDefault(): string {
   // On a TV or shared laptop the landing screen should not announce whoever last
@@ -129,7 +132,6 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
   const [hostName, setHostName] = useState(hostNameDefault);
   const [joinCode, setJoinCode] = useState('');
   const [guestName, setGuestName] = useState(hostNameDefault);
-  const [hostNameError, setHostNameError] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [createUncertain, setCreateUncertain] = useState(readCreateUncertainty);
   const [busy, setBusy] = useState<'create' | 'join' | null>(null);
@@ -167,11 +169,6 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
     event.preventDefault();
     if (createSubmitting.current || createUncertain) return;
     setError(null);
-    setHostNameError(null);
-    if (hostName.trim().length === 0) {
-      setHostNameError('Add the name guests will see.');
-      return;
-    }
     createSubmitting.current = true;
     const generation = ++createGeneration.current;
     setBusy('create');
@@ -180,8 +177,8 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
     // second room creation.
     persistCreateUncertainty();
     try {
-      const finalName = roomName.trim().length > 0 ? roomName.trim() : hostName.trim() + "'s room";
-      const created = await createRoom({ api }, hostName, {
+      const finalName = roomName.trim().length > 0 ? roomName.trim() : DEFAULT_ROOM_NAME;
+      const created = await createRoom({ api }, hostName.trim().length > 0 ? hostName.trim() : DEFAULT_HOST_NAME, {
         roomName: finalName,
       }, { storeTokens: false });
       if (createGeneration.current !== generation) return;
@@ -196,7 +193,9 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
         hostName: created.displayName,
         role: 'host',
       });
-      navigate('/room/' + created.roomId + '/host');
+      // The TV stage is the room: it shows the QR the moment it opens, so the
+      // first song is the only thing left to do.
+      navigate('/room/' + created.roomId + '/host/party');
     } catch (caught) {
       if (createGeneration.current !== generation) return;
       if (isUncertainCreateError(caught)) {
@@ -246,7 +245,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
       if (caught instanceof RoomApiError && caught.code === 'HOST_ALREADY_IN_ROOM') {
         const hostSession = getHostSessionByCode(joinCode);
         if (hostSession !== null) {
-          navigate('/room/' + hostSession.roomId + '/host');
+          navigate('/room/' + hostSession.roomId + '/host/party');
           return;
         }
       }
@@ -335,54 +334,53 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
             </form>
           ) : (
             <form onSubmit={handleCreate} className="mt-7 flex flex-col gap-4" data-start-card aria-label="Start a room">
-              <Field
-                id="mobile-room-name"
-                label="Room name"
-                value={roomName}
-                onChange={(event) => {
-                  invalidatePendingCreate();
-                  setRoomName(event.target.value);
-                }}
-                placeholder="After Hours"
-                maxLength={48}
-                hint="Guests see this on their phone."
-              />
-              <Field
-                id="mobile-host-name"
-                label="Your name"
-                value={hostName}
-                onChange={(event) => {
-                  invalidatePendingCreate();
-                  setHostName(event.target.value);
-                }}
-                placeholder="Alex"
-                autoComplete="nickname"
-                maxLength={32}
-                error={hostNameError}
-              />
+              <details className="rounded-media border border-line bg-surface p-4">
+                <summary className="cursor-pointer text-[0.8125rem] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal">
+                  Room details
+                </summary>
+                <p className="mt-1 text-[0.6875rem] leading-[1.6] text-ink-2">
+                  Optional. Blank names open as {DEFAULT_ROOM_NAME} with {DEFAULT_HOST_NAME} as the host.
+                </p>
+                <div className="mt-4 flex flex-col gap-4">
+                  <Field
+                    id="mobile-room-name"
+                    label="Room name"
+                    value={roomName}
+                    onChange={(event) => {
+                      invalidatePendingCreate();
+                      setRoomName(event.target.value);
+                    }}
+                    placeholder={DEFAULT_ROOM_NAME}
+                    maxLength={48}
+                    hint="Guests see this on their phone."
+                  />
+                  <Field
+                    id="mobile-host-name"
+                    label="Your name"
+                    value={hostName}
+                    onChange={(event) => {
+                      invalidatePendingCreate();
+                      setHostName(event.target.value);
+                    }}
+                    placeholder={DEFAULT_HOST_NAME}
+                    autoComplete="nickname"
+                    maxLength={32}
+                  />
+                </div>
+              </details>
               <Button
                 type="submit"
                 variant="primary"
                 size="lg"
                 full
-                icon={<PlusIcon size={16} weight="bold" />}
+                icon={<TelevisionIcon size={16} weight="duotone" />}
                 busy={busy === 'create'}
                 disabled={createUncertain}
               >
-                Create room
-              </Button>
-              <Button
-                variant="quiet"
-                size="sm"
-                full
-                className="mt-2"
-                icon={<KeyIcon size={15} weight="duotone" />}
-                onClick={() => { navigate('/join'); }}
-              >
-                Have a room code? Join a room
+                Launch TV
               </Button>
               <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
-                The host screen plays video and audio. Add the first song after the room opens.
+                The room opens on this display with its join QR on screen. Add the first song there.
               </p>
               </form>
             )}
@@ -416,32 +414,26 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
     );
   }
 
-  const resolvedHost = hostName.trim().length > 0 ? hostName.trim() : 'You';
-  const activeRoom: ActiveRoom | null = hostedRoom === null
-    ? null
-    : {
-        roomId: hostedRoom.roomId,
-        name: hostedRoom.roomName,
-        code: hostedRoom.code,
-        hostName: hostedRoom.hostName,
-      };
+  const resolvedHost = hostName.trim().length > 0 ? hostName.trim() : DEFAULT_HOST_NAME;
+  const resolvedRoom = roomName.trim().length > 0 ? roomName.trim() : DEFAULT_ROOM_NAME;
 
   return (
-    <AppShell
-      activeNav="create"
-      activeRoom={activeRoom}
-      hostName={hostName.trim()}
-      mobileAction={<Link to="/scan" className="inline-flex min-h-11 items-center text-[0.75rem] font-semibold text-signal">Scan a code</Link>}
-    >
+    <div className="min-h-dvh bg-graphite text-ink">
       <main className="mx-auto w-full max-w-[1240px] px-4 pb-12 pt-6 sm:px-6 lg:px-8 lg:pt-8">
         <header className="flex flex-wrap items-center justify-between gap-3 border-b border-line pb-5 animate-console-in">
           <div>
             <p className="eyebrow text-gold">YouTube karaoke room</p>
             <h1 className="mt-1 font-display text-[1.55rem] font-bold tracking-[-0.02em] text-ink">Create room</h1>
           </div>
-          <span className="rounded-full border border-signal/25 bg-signal-soft px-3 py-1.5 text-[0.625rem] font-semibold text-signal">
-            {hostName.trim().length > 0 ? hostName.trim() + ' · Host setup' : 'Host setup'}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="rounded-full border border-signal/25 bg-signal-soft px-3 py-1.5 text-[0.625rem] font-semibold text-signal">
+              {hostName.trim().length > 0 ? hostName.trim() + ' · Host setup' : 'Host setup'}
+            </span>
+            <Link to="/scan" className="inline-flex min-h-11 items-center gap-1.5 px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
+              <QrCodeIcon size={14} aria-hidden="true" />
+              Scan a code
+            </Link>
+          </div>
         </header>
 
         <section className="mt-8 animate-console-in" style={{ animationDelay: '60ms' }} aria-labelledby="create-title">
@@ -474,7 +466,15 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
               <SlidersHorizontalIcon size={19} className="text-signal" aria-hidden="true" />
             </div>
 
-            <div className="mt-5 flex flex-col gap-4">
+            <details className="mt-5 rounded-media border border-line bg-graphite/40 p-4">
+              <summary className="flex cursor-pointer list-none items-center justify-between gap-3 text-[0.8125rem] font-semibold text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal">
+                <span>Room details</span>
+                <span className="truncate text-[0.6875rem] font-normal text-ink-2">{resolvedRoom} · {resolvedHost}</span>
+              </summary>
+              <p className="mt-1.5 text-[0.6875rem] leading-[1.6] text-ink-2">
+                Optional. Leave both blank and the room opens as {DEFAULT_ROOM_NAME} with {DEFAULT_HOST_NAME} hosting.
+              </p>
+              <div className="mt-4 flex flex-col gap-4">
               <Field
                 id="create-room-name"
                 label="Room name"
@@ -483,7 +483,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
                   invalidatePendingCreate();
                   setRoomName(event.target.value);
                 }}
-                placeholder="After Hours"
+                placeholder={DEFAULT_ROOM_NAME}
                 maxLength={48}
                 hint="This is the name guests see on their phone."
               />
@@ -494,20 +494,19 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
                 onChange={(event) => {
                   invalidatePendingCreate();
                   setHostName(event.target.value);
-                  setHostNameError(null);
                 }}
-                placeholder="Alex"
+                placeholder={DEFAULT_HOST_NAME}
                 autoComplete="nickname"
                 maxLength={32}
-                error={hostNameError}
               />
-            </div>
+              </div>
+            </details>
 
             <div className="mt-5 flex items-center gap-3 rounded-media border border-line bg-graphite/50 px-3.5 py-3">
               <Avatar name={resolvedHost} size="md" />
               <div className="min-w-0 flex-1">
                 <p className="truncate text-[0.8125rem] font-semibold text-ink">
-                  {hostName.trim().length > 0 ? hostName.trim() + " · You're the host" : "You're the host"}
+                  {resolvedHost} · You're the host
                 </p>
                 <p className="mt-0.5 text-[0.6875rem] text-ink-2">Video and audio will play on this display.</p>
               </div>
@@ -528,24 +527,14 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
               size="lg"
               full
               className="mt-5"
-              icon={<ArrowRightIcon size={16} weight="bold" />}
+              icon={<TelevisionIcon size={16} weight="duotone" />}
               busy={busy === 'create'}
               disabled={createUncertain}
             >
-              Create room
-            </Button>
-            <Button
-              variant="quiet"
-              size="sm"
-              full
-              className="mt-2"
-              icon={<KeyIcon size={15} weight="duotone" />}
-              onClick={() => { navigate('/join'); }}
-            >
-              Have a room code? Join a room
+              Launch TV
             </Button>
             <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
-              Next: search for your first song, start YouTube playback and share your room QR. The host screen owns the music.
+              Next: the stage opens with its join QR already on screen. Switch to computer view to search from this keyboard.
             </p>
             <CreateFeedback
               error={error}
@@ -602,6 +591,6 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
           More room settings are available after creation. Change guest permissions whenever you need.
         </p>
       </main>
-    </AppShell>
+    </div>
   );
 }

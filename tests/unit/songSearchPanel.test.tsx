@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { createElement } from 'react';
 import SongSearchPanel from '../../src/features/queue/SongSearchPanel';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
@@ -56,6 +56,9 @@ function makeApi(available = true): { api: EdgeApi; calls: string[] } {
         return available
           ? { available: true, results: [result] }
           : { available: false, results: [] };
+      }
+      if (name === 'catalog-page') {
+        return { total: 0, items: [] };
       }
       if (name === 'queue-command') {
         return { ...queued, position: 3 };
@@ -137,6 +140,97 @@ describe('song search panel', () => {
       expect(calls).toContain('youtube-search');
     });
     expect(await screen.findByText(/dancing queen added/i)).toBeInTheDocument();
+  });
+
+  it('shows songbook matches before YouTube results without repeating the same video', async () => {
+    const shared = {
+      videoId: 'dQw4w9WgXcQ', title: 'Dancing Queen (Songbook)', channelTitle: 'Songbook',
+      thumbnailUrl: null, durationSeconds: null,
+    };
+    const songbookOnly = {
+      videoId: 'bookOnly001', title: 'Dancing Queen - ABBA (Karaoke)', channelTitle: 'Songbook',
+      thumbnailUrl: null, durationSeconds: null,
+    };
+    const youtubeOnly = {
+      videoId: 'ytOnly00001', title: 'Dancing Queen live', channelTitle: 'Live Band',
+      thumbnailUrl: null, durationSeconds: null,
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'youtube-search') {
+          return { available: true, results: [shared, youtubeOnly] };
+        }
+        if (name === 'catalog-page') {
+          return { total: 2, items: [shared, songbookOnly] };
+        }
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderPanel(api);
+
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), { target: { value: 'dancing queen' } });
+    fireEvent.submit(screen.getByRole('search'));
+
+    const songbook = await screen.findByRole('list', { name: 'Songbook matches' });
+    const youtube = await screen.findByRole('list', { name: 'Songs' });
+    expect(within(songbook).getAllByRole('listitem')).toHaveLength(2);
+    expect(within(youtube).getAllByRole('listitem')).toHaveLength(1);
+    expect(within(youtube).getByText('Dancing Queen live')).toBeInTheDocument();
+    expect(within(youtube).queryByText('Dancing Queen (Songbook)')).not.toBeInTheDocument();
+    expect(songbook.compareDocumentPosition(youtube) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(screen.getAllByRole('button', { name: /^add dancing queen \(songbook\)$/i })).toHaveLength(1);
+  });
+
+  it('keeps songbook matches when YouTube search fails', async () => {
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'catalog-page') {
+          return {
+            total: 1,
+            items: [{
+              videoId: 'bookOnly001', title: 'Dancing Queen - ABBA (Karaoke)', channelTitle: 'Songbook',
+              thumbnailUrl: null, publishedAt: null,
+            }],
+          };
+        }
+        throw new RoomApiError('NETWORK_ERROR', 0, 'Network failed');
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderPanel(api);
+    await search();
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('YouTube search is unreachable right now. Try again.');
+    const songbook = screen.getByRole('list', { name: 'Songbook matches' });
+    expect(within(songbook).getByText('Dancing Queen - ABBA (Karaoke)')).toBeInTheDocument();
+    expect(screen.queryByRole('list', { name: 'Songs' })).not.toBeInTheDocument();
+  });
+
+  it('renders the server songbook fallback in the songbook group, not as YouTube results', async () => {
+    const fallback = {
+      videoId: 'fallback001', title: 'Dancing Queen fallback', channelTitle: 'Songbook',
+      thumbnailUrl: null, durationSeconds: null,
+    };
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        if (name === 'youtube-search') {
+          return {
+            available: true, source: 'songbook', results: [fallback],
+            message: 'YouTube search is at its limit. Showing recent songbook entries instead.',
+          };
+        }
+        if (name === 'catalog-page') {
+          return { total: 1, items: [{ ...fallback, publishedAt: null }] };
+        }
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderPanel(api);
+    await search();
+
+    const songbook = await screen.findByRole('list', { name: 'Songbook matches' });
+    expect(within(songbook).getAllByRole('listitem')).toHaveLength(1);
+    expect(screen.queryByRole('list', { name: 'Songs' })).not.toBeInTheDocument();
+    expect(screen.getByRole('status')).toHaveTextContent(/songbook entries instead/i);
   });
 
   it('marks a song that is already active as queued and disables adding it', async () => {

@@ -4,19 +4,19 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 
 ## What it does
 
-- Create a named room and share a real, scannable QR or the 80-bit room code.
-- Split guest permissions: requests can stay open while playback stays host-only, or either can be switched independently.
+- One click on the landing screen creates the room and opens it as the TV stage, where a real, scannable QR and the 80-bit room code are already on screen. The names are optional and live behind a "Room details" disclosure (`Karaoke room` and `Host` if left blank).
+- Guest permissions have one switch: playback is host-only unless the host lets guests pause or resume. Adding and voting are always open to guests, and who gets in is moderated by the door instead.
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
 - Queue songs, reorder and remove as host, and let the next song start automatically.
-- Host stage view with play/pause, 10-second seek, fullscreen, volume, favorites and keyboard shortcuts.
-- Full-screen party view with the room QR for new singers.
+- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume, favorites and keyboard shortcuts, and the room QR over the video for new singers. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Hits panel beside the video with the invite card above it. The TV layout carries no search. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
+- The landing and create screens carry no side navigation; the live room stays one click away in the page body.
 - Phone remote with Search and Queue tabs, duration, automatic-advance feedback, and a "you're up next" card.
 - Honest connection states: stale queue while offline, automatic recovery and a restored notice.
 - Local Song library, Favorites and Recently sung, plus remembered room sessions.
 - Ended-room and unavailable-video states that do not leave dead controls.
 
-Host-only controls: skip, remove, reorder, guest removal, lock and clear. Link rotation, turn rotation and room expiry are not implemented; the UI does not pretend they exist.
+Host-only controls: skip, remove, reorder, guest removal, closing the door, and clearing the queue. Link rotation and turn rotation are not implemented; the UI does not pretend they exist. Room expiry is: a hard 24-hour ceiling ends a room even if nobody does.
 
 ## Architecture
 
@@ -34,9 +34,9 @@ not configured or resting. It is not a general replacement for search.
 - Every guest or host request carries its pass to the function, which verifies the JWT against the published JWKS, then verifies the room membership and the pass inside the authorized SQL operation.
 - Row Level Security is enabled on every table. The anon and authenticated roles hold no table privileges and no execute rights on the operations. `echo_auth` reaches only the auth tables; `service_role` reaches only the room operations.
 - Realtime is not used for room data. Screens poll the token-checked read function and use visibility-aware polling.
-- The host screen owns one persistent YouTube player. It stays mounted while the host moves between Discover, Queue, Settings, Library and Favorites; the Stage and Party views dock that same player into a measured slot.
+- The host screen owns one persistent YouTube player. It stays mounted while the host moves between the Queue, Settings, Library, Favorites and Songbook pages reachable from the stage panel; the stage docks that same player into a measured slot, and switching between its TV and computer layouts never unmounts it.
 
-Room codes use 16 Crockford Base32 characters (80 bits). Rooms live until the host ends them, and abandoned rooms are swept when the next room is created.
+Room codes use 16 Crockford Base32 characters (80 bits). Rooms live until the host ends them or 24 hours pass, whichever comes first, and abandoned rooms are swept when the next room is created.
 
 ## Local setup
 
@@ -59,11 +59,14 @@ YouTube search and chart require a data API key. Without it the app explains tha
 Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed, with a per-room daily lookup budget and a larger deployment budget. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0033 before deploying this tree; queue and search now call
+migrations 0025 through 0044 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
 karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
 calls `playback_next_if_current`, and the songbook catalog tables and its retention
-function must exist before the sync and the daily cron run.
+function must exist before the sync and the daily cron run. 0042 gives a room a hard
+24-hour ceiling and 0043 grants the sweep that enforces it, so a tree older than those
+two still ends rooms lazily inside the room read but leaves expired rows uncollected;
+0044 adds the daily sweep that keeps the rate-limit ledger from growing without bound.
 
     npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
     npx supabase test db --db-url "$NEON_DATABASE_URL"
@@ -91,30 +94,30 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 447 unit and component tests (jsdom)
+    npm test                 # 604 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 328 pgTAP assertions
-    npm run test:integration # 8 router/auth/operation tests against a Neon branch
-    npm run test:e2e:ui      # 16 CI-safe Playwright UI flows with a mocked API
-    npm run test:e2e         # real Playwright flows against vercel dev on port 3000
+    npx supabase test db --db-url "$NEON_DATABASE_URL"   # 440 pgTAP assertions
+    npm run test:integration # 9 operation-path and runtime-role grant tests against a Neon branch
+    npm run test:e2e:ui      # 64 CI-safe Playwright UI flows with a mocked API
+    npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL, plus E2E_BRANCH_TARGET_CONFIRMED=1 for a local port
 
-`vercel dev` reads `.env.local`, whose database URLs name production Neon, so `npm run test:e2e` with no `E2E_BASE_URL` creates real rooms in production. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
+`vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, and it refuses the deployed production origin even when one names it. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment. A loopback target additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in `http://127.0.0.1:3000` says whether that port is backed by a branch or by production — and the default it replaced was production.
 
 The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.
 
-The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app; start `vercel dev` first or set `E2E_BASE_URL`. One E2E test decodes the rendered QR through the local Vite dev resolver.
+The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app, so `E2E_BASE_URL` is mandatory and checked by `scripts/e2e-target.mjs` before anything launches. One E2E test decodes the rendered QR through the local Vite dev resolver.
 
 ## Security notes
 
 - Guest and host passes live in localStorage, so any same-origin script can read them. An XSS bug can take over a session.
 - Losing the host pass leaves a live room without host controls. There is no recovery flow.
 - The `service_role` and `echo_auth` connection strings exist only in the function environment. They must never reach the browser bundle, logs, or the repository. The browser has no database credential at all.
-- The function connects as `echo_service`. A new SQL function must be granted to `echo_service` as well as `service_role`, or the feature 500s in production while every owner-run database test passes; `supabase/tests/role_grant_parity_test.sql` fails if the two roles' surfaces drift.
+- The function connects as `echo_service`. A new SQL function must be granted to `echo_service` as well as `service_role`, or the feature 500s in production while every owner-run database test passes; `supabase/tests/role_grant_parity_test.sql` fails if the two roles' surfaces drift, and `tests/unit/runtimeRoleGrants.test.ts` checks the same rule offline from the migration text, so the drift surfaces in `npm test` instead of only on a CI branch.
 - The owner connection string is used only for migrations and CI. It is never set on Vercel.
 - `ALLOWED_ORIGINS` is a trusted auth origin, not a CORS policy. The function is same-origin, so a browser on another origin cannot call it through CORS.
 - Rotating `BETTER_AUTH_SECRET` requires deleting `public.jwks` first; otherwise the stored private key cannot be decrypted.
 - Room codes gate joining only. Do not treat a room as secret.
-- Guest request and playback permissions are independent. Skip, remove and reorder are always host-only.
+- Guest adds and votes share one SQL lock (`require_guest_controls`, consulted by `queue_add`, `queue_add_preflight` and `vote_toggle`), and playback has its own. The adds lock is not exposed: nothing sends `lock` or `unlock` and no server path sets the column, so it stays false and the door is what moderates a room. Skip, remove and reorder are always host-only.
 - A partial unique index prevents two active copies of the same video in one room. Played songs may return.
 - A song cap of five per minute per member is enforced. Room creation is capped at 10 rooms per session per hour, and a room is capped at 50 present members including the host (`ROOM_MEMBER_LIMIT`, 2–500). Inactive guest rows stop counting after 30 seconds; the host can remove a guest, which also removes that guest's queue and votes. Anonymous sign-in is capped at 120 per hour per network address (`ANON_SIGNIN_LIMIT_PER_HOUR`, 1–1000), stored as an HMAC, not a raw IP. These are speed bumps; a large venue should set the sign-in cap for its expected crowd.
 
@@ -122,7 +125,7 @@ The UI suite needs no database or YouTube key. The real E2E suite creates rooms 
 
     api/router.ts           the only Vercel Function: auth routes and operations
     server/auth             Better Auth configuration, token verification, JWKS
-    server/operations       the fourteen operations, the sweep, error mapping
+    server/operations       the twenty-two operations, the sweep, error mapping
     server/db               Neon serverless client and operation calls
     src/app                 screens and routing
     src/features/rooms      create, join, passes, roster, sessions, invitations

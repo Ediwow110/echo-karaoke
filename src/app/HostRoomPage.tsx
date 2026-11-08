@@ -1,24 +1,20 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
 import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
-import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import {
-  approveMember,
-  rejectMember,
   removeRoomMember,
   sendHostCommand,
   transferRoomTo,
-  type DoorAnswer,
   type HostAction,
 } from '../features/rooms/roomApi';
 import { removeSong as removeQueueSong, reorderSong as reorderQueueSong, voteSong as castVote, describeVoteError } from '../features/queue/queueApi';
 import { sendPlaybackCommand, reportPlaybackPosition } from '../features/playback/playbackApi';
 import HostPlayer from '../features/playback/HostPlayer';
 import PlayerDock from '../features/playback/PlayerDock';
-import Sidebar, { type SidebarNav } from '../features/rooms/Sidebar';
+import type { SidebarNav } from '../features/rooms/Sidebar';
+import AppShell from '../features/rooms/AppShell';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
 import { loadHostToken } from '../features/rooms/tokenStore';
 import { rememberSession, forgetSession } from '../features/rooms/sessionStore';
@@ -35,7 +31,6 @@ function navFor(pathname: string): SidebarNav {
   if (pathname.endsWith('/host/library')) return 'library';
   if (pathname.endsWith('/host/favorites')) return 'favorites';
   if (pathname.endsWith('/host/recent')) return 'recent';
-  if (pathname.endsWith('/host/songbook')) return 'songbook';
   return 'discover';
 }
 
@@ -47,7 +42,6 @@ export default function HostRoomPage() {
   const location = useLocation();
   const { data, error, loading, connection, restoredAt, refresh } = useRoomData(roomId, 'host');
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone: ToastTone } | null>(null);
-  const [doorPending, setDoorPending] = useState<DoorAnswer | null>(null);
   const playbackBusy = useRef(false);
   const advanceBusy = useRef(false);
   const playbackSettled = useRef<Promise<void> | null>(null);
@@ -139,7 +133,6 @@ export default function HostRoomPage() {
   }, [data, live, queue]);
   const upNext = useMemo(() => queue.filter((song) => song.status !== 'playing'), [queue]);
   const roster = live ? (data.roster ?? []) : [];
-  const door = live ? (data.door ?? []) : [];
   const hostName = roster.find((member) => member.role === 'host')?.displayName?.trim() || 'Host';
   const roomName = room?.name ?? 'Karaoke room';
   const code = room?.code ?? '';
@@ -278,40 +271,6 @@ export default function HostRoomPage() {
       notify('Guest removed.', 'Their queued songs and votes were removed too.', 'info');
     } catch (caught) {
       notify('The guest could not be removed.', caught instanceof Error ? caught.message : undefined, 'error');
-    }
-  }, [api, notify, refresh, roomId]);
-
-  const doorBusy = useRef(false);
-
-  const approveGuest = useCallback(async (memberId: string): Promise<void> => {
-    if (doorBusy.current) return;
-    doorBusy.current = true;
-    setDoorPending({ memberId, action: 'approve' });
-    try {
-      await approveMember(api, roomId, memberId);
-      notify('They are in.');
-      await refresh();
-    } catch (caught) {
-      notify('That guest could not be admitted.', caught instanceof Error ? caught.message : undefined, 'error');
-    } finally {
-      doorBusy.current = false;
-      setDoorPending(null);
-    }
-  }, [api, notify, refresh, roomId]);
-
-  const rejectGuest = useCallback(async (memberId: string): Promise<void> => {
-    if (doorBusy.current) return;
-    doorBusy.current = true;
-    setDoorPending({ memberId, action: 'reject' });
-    try {
-      await rejectMember(api, roomId, memberId);
-      notify('They were turned away.');
-      await refresh();
-    } catch (caught) {
-      notify('That guest could not be turned away.', caught instanceof Error ? caught.message : undefined, 'error');
-    } finally {
-      doorBusy.current = false;
-      setDoorPending(null);
     }
   }, [api, notify, refresh, roomId]);
 
@@ -535,8 +494,6 @@ export default function HostRoomPage() {
     hostName,
     joinUrl,
     roster,
-    door,
-    doorPending,
     queue,
     nowPlaying,
     upNext,
@@ -552,8 +509,6 @@ export default function HostRoomPage() {
     voteSong,
     votingSongId,
     removeMember,
-    approveGuest,
-    rejectGuest,
     transferRoom,
     endRoom,
   };
@@ -595,13 +550,11 @@ export default function HostRoomPage() {
       onReport={onReport}
       onFindAlternative={onFindAlternative}
     >
-      <div className="min-h-dvh bg-graphite lg:flex">
-        <Sidebar
-          activeNav={activeNav}
-          activeRoom={{ roomId, name: roomName, code, hostName }}
-          hostName={hostName}
-        />
-        <div className="min-w-0 flex-1">
+      <AppShell
+        activeNav={activeNav}
+        activeRoom={{ roomId, name: roomName, code, hostName }}
+        hostName={hostName}
+        header={(
           <header className="relative z-30 border-b border-line bg-graphite/95 backdrop-blur">
             <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
               <div className="flex min-w-0 items-center gap-3">
@@ -624,23 +577,6 @@ export default function HostRoomPage() {
                     {groupRoomCode(code)} · {presenceSummary(roster)}
                   </span>
                 )}
-                {door.length === 0 ? null : (
-                  <Chip tone="gold">{door.length} at the door</Chip>
-                )}
-                <Link
-                  to={'/room/' + roomId + '/host/party'}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
-                >
-                  <ArrowsOutIcon size={14} aria-hidden="true" />
-                  Party view
-                </Link>
-                <Link
-                  to={'/room/' + roomId + '/host/settings'}
-                  className="inline-flex min-h-9 items-center gap-1.5 rounded-media border border-line bg-surface px-3 text-[0.75rem] font-semibold text-ink transition-colors hover:border-line-strong hover:bg-surface-2"
-                >
-                  <SlidersHorizontalIcon size={14} aria-hidden="true" />
-                  Room settings
-                </Link>
                 <IconButton
                   icon={<SignOutIcon size={17} weight="regular" />}
                   label="Back to home"
@@ -654,11 +590,12 @@ export default function HostRoomPage() {
             <nav aria-label="Room sections" className="lg:hidden">
               <div className="no-scrollbar mx-auto flex max-w-[1240px] gap-1 overflow-x-auto px-4 pb-2 sm:px-6">
                 {[
-                  { label: 'Discover', href: '/room/' + roomId + '/host' },
+                  { label: 'TV stage', href: '/room/' + roomId + '/host/party' },
                   { label: 'Queue', href: '/room/' + roomId + '/host/queue' },
                   { label: 'Library', href: '/room/' + roomId + '/host/library' },
                   { label: 'Favorites', href: '/room/' + roomId + '/host/favorites' },
                   { label: 'Recent', href: '/room/' + roomId + '/host/recent' },
+                  { label: 'Settings', href: '/room/' + roomId + '/host/settings' },
                 ].map((link) => {
                   const isActive = location.pathname === link.href;
                   return (
@@ -667,7 +604,7 @@ export default function HostRoomPage() {
                       to={link.href}
                       aria-current={isActive ? 'page' : undefined}
                       className={[
-                        'flex min-h-9 shrink-0 items-center rounded-media px-3 text-[0.6875rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
+                        'flex min-h-11 shrink-0 items-center rounded-media px-3 text-[0.6875rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
                         isActive ? 'bg-surface text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
                       ].join(' ')}
                     >
@@ -678,22 +615,22 @@ export default function HostRoomPage() {
               </div>
             </nav>
           </header>
+        )}
+      >
+        <main className="mx-auto w-full max-w-[1240px] px-4 pb-36 pt-6 sm:px-6 lg:px-8 lg:pt-8">
+          <div key={location.pathname} className="page-enter">
+            <Outlet context={context} />
+          </div>
+        </main>
 
-          <main className="mx-auto w-full max-w-[1240px] px-4 pb-36 pt-6 sm:px-6 lg:px-8 lg:pt-8">
-            <div key={location.pathname} className="page-enter">
-              <Outlet context={context} />
-            </div>
-          </main>
-
-          <PlayerDock
-            roomId={roomId}
-            nowPlaying={nowPlaying}
-            playback={data.playback}
-            onTogglePlay={togglePlay}
-            onNext={next}
-          />
-        </div>
-      </div>
+        <PlayerDock
+          roomId={roomId}
+          nowPlaying={nowPlaying}
+          playback={data.playback}
+          onTogglePlay={togglePlay}
+          onNext={next}
+        />
+      </AppShell>
       {toastNode}
     </HostPlayer>
   );

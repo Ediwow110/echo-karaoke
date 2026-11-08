@@ -1,17 +1,16 @@
 import { Link, useLocation } from 'react-router-dom';
 import { ClockCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ClockCounterClockwise';
-import { CompassIcon } from '@phosphor-icons/react/dist/csr/Compass';
 import { HeartIcon } from '@phosphor-icons/react/dist/csr/Heart';
 import { MusicNotesIcon } from '@phosphor-icons/react/dist/csr/MusicNotes';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { QueueIcon } from '@phosphor-icons/react/dist/csr/Queue';
 import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
+import { TelevisionIcon } from '@phosphor-icons/react/dist/csr/Television';
 import { Avatar, Logo } from '../../ui';
 
 export type SidebarNav =
   | 'discover'
   | 'library'
-  | 'songbook'
   | 'queue'
   | 'favorites'
   | 'recent'
@@ -35,14 +34,13 @@ type NavItem = {
   key: SidebarNav;
   label: string;
   href: string;
-  icon: typeof CompassIcon;
+  icon: typeof TelevisionIcon;
   requiresRoom?: boolean;
 };
 
 const items: NavItem[] = [
-  { key: 'discover', label: 'Discover', href: '/', icon: CompassIcon, requiresRoom: true },
+  { key: 'discover', label: 'TV stage', href: '/', icon: TelevisionIcon, requiresRoom: true },
   { key: 'library', label: 'Song library', href: '/library', icon: MusicNotesIcon },
-  { key: 'songbook', label: 'Songbook', href: '/songbook', icon: MusicNotesIcon, requiresRoom: true },
   { key: 'queue', label: 'Room queue', href: '/queue', icon: QueueIcon, requiresRoom: true },
   { key: 'favorites', label: 'Favorites', href: '/favorites', icon: HeartIcon },
   { key: 'recent', label: 'Recently sung', href: '/recent', icon: ClockCounterClockwiseIcon },
@@ -52,16 +50,13 @@ const items: NavItem[] = [
 
 function hrefFor(item: NavItem, activeRoom: ActiveRoom | null | undefined): string {
   if (item.key === 'discover') {
-    return activeRoom === null || activeRoom === undefined ? '/' : '/room/' + activeRoom.roomId + '/host';
+    return activeRoom === null || activeRoom === undefined ? '/' : '/room/' + activeRoom.roomId + '/host/party';
   }
   if (item.key === 'queue') {
     return activeRoom === null || activeRoom === undefined ? '/' : '/room/' + activeRoom.roomId + '/host/queue';
   }
   if (item.key === 'settings') {
     return activeRoom === null || activeRoom === undefined ? '/' : '/room/' + activeRoom.roomId + '/host/settings';
-  }
-  if (item.key === 'songbook') {
-    return activeRoom === null || activeRoom === undefined ? '/' : '/room/' + activeRoom.roomId + '/host/songbook';
   }
   if ((item.key === 'library' || item.key === 'favorites' || item.key === 'recent')
     && activeRoom !== null && activeRoom !== undefined) {
@@ -96,11 +91,10 @@ export default function Sidebar({ activeNav, activeRoom, hostName }: Props) {
         {visibleItems(activeNav, activeRoom).map((item) => {
           const href = hrefFor(item, activeRoom);
           const active = activeNav === item.key
-            || (item.key === 'discover' && location.pathname.endsWith('/host'))
+            || (item.key === 'discover' && location.pathname.endsWith('/host/party'))
             || (item.key === 'queue' && location.pathname.endsWith('/host/queue'))
             || (item.key === 'settings' && location.pathname.endsWith('/host/settings'))
             || (item.key === 'library' && location.pathname.endsWith('/host/library'))
-            || (item.key === 'songbook' && location.pathname.endsWith('/host/songbook'))
             || (item.key === 'favorites' && (location.pathname.endsWith('/host/favorites') || location.pathname === '/favorites'))
             || (item.key === 'recent' && (location.pathname.endsWith('/host/recent') || location.pathname === '/recent'))
             || (item.key === 'library' && location.pathname === '/library');

@@ -1,4 +1,5 @@
 import { defineConfig, devices } from '@playwright/test';
+import { resolveE2EBaseURL } from './scripts/e2e-target.mjs';
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -12,7 +13,9 @@ export default defineConfig({
   workers: 1,
   reporter: [['list']],
   use: {
-    baseURL: process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000',
+    // Resolved at config load, so a run without E2E_BASE_URL stops here instead
+    // of writing real rooms into production through `vercel dev`'s defaults.
+    baseURL: resolveE2EBaseURL(),
     viewport: { width: 1440, height: 1000 },
     trace: 'off',
     video: 'off',

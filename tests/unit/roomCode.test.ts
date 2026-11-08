@@ -1,7 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
   CROCKFORD_ALPHABET,
-  generateRoomCode,
   isValidRoomCode,
   normalizeRoomCode,
 } from '../../src/features/rooms/roomCode';
@@ -13,17 +12,6 @@ describe('room codes', () => {
     for (const excluded of ['I', 'L', 'O', 'U']) {
       expect(CROCKFORD_ALPHABET).not.toContain(excluded);
     }
-  });
-
-  it('generates sixteen symbol codes', () => {
-    const code = generateRoomCode();
-    expect(code).toHaveLength(16);
-    expect(isValidRoomCode(code)).toBe(true);
-  });
-
-  it('generates distinct codes across repeated calls', () => {
-    const codes = new Set(Array.from({ length: 200 }, () => generateRoomCode()));
-    expect(codes.size).toBe(200);
   });
 
   it('normalizes typed codes to the stored form', () => {

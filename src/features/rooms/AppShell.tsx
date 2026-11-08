@@ -9,19 +9,24 @@ type Props = {
   hostName?: string;
   children: ReactNode;
   mobileAction?: ReactNode;
+  // A room header carries its own mobile navigation, so it replaces the
+  // collection pages' bare logo bar instead of stacking under it.
+  header?: ReactNode;
 };
 
-export default function AppShell({ activeNav, activeRoom, hostName, children, mobileAction }: Props) {
+export default function AppShell({ activeNav, activeRoom, hostName, children, mobileAction, header }: Props) {
   return (
     <div className="min-h-dvh bg-graphite text-ink lg:flex">
       <Sidebar activeNav={activeNav} activeRoom={activeRoom} hostName={hostName} />
       <div className="min-w-0 flex-1">
-        <header className="flex h-16 items-center justify-between gap-3 border-b border-line px-4 lg:hidden">
-          <Link to="/" aria-label="kara-echo home">
-            <Logo size="sm" />
-          </Link>
-          {mobileAction}
-        </header>
+        {header ?? (
+          <header className="flex h-16 items-center justify-between gap-3 border-b border-line px-4 lg:hidden">
+            <Link to="/" aria-label="kara-echo home">
+              <Logo size="sm" />
+            </Link>
+            {mobileAction}
+          </header>
+        )}
         {children}
       </div>
     </div>

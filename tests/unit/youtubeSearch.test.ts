@@ -180,6 +180,21 @@ describe('per-screen popular picks', () => {
     }
   });
 
+  it('serves the whole twenty-song pool by default', () => {
+    const large = Array.from({ length: 20 }, (_, index) => ({
+      videoId: 'karaoke3' + String(index).padStart(3, '0'),
+      title: 'Karaoke Pick ' + index,
+      channelTitle: 'Channel',
+      thumbnailUrl: null,
+      durationSeconds: null,
+    }));
+
+    const results = pickPopularCards(large);
+
+    expect(results).toHaveLength(20);
+    expect(new Set(results.map((song) => song.videoId)).size).toBe(20);
+  });
+
   it('serves the whole pool when it cannot fill a screen', () => {
     const small = pool.slice(0, 4);
     expect(pickPopularCards(small, 8)).toEqual(small);

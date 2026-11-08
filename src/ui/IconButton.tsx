@@ -19,7 +19,7 @@ const tones = {
 } as const;
 
 const sizes = {
-  sm: 'size-8',
+  sm: 'size-11',
   md: 'size-10',
   lg: 'size-14',
 } as const;

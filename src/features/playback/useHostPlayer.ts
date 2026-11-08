@@ -16,10 +16,16 @@ export type HostPlayerValue = {
   volume: number;
   fullscreen: boolean;
   stageActive: boolean;
+  /** True when this screen is actually driving the video, so local transport is not paused again. */
+  playbackSurfaceReady: boolean;
   registerStageSlot: (element: HTMLElement | null) => void;
   requestPlay: () => void;
   seekBy: (seconds: number) => void;
   seekTo: (seconds: number) => void;
+  /** Move the player without telling the room; pair with commitSeek on release. */
+  previewSeek: (seconds: number) => void;
+  /** Send the player's current position once a previewed seek is released. */
+  commitSeek: () => void;
   setVolume: (volume: number) => void;
   toggleFullscreen: () => void;
   skipFailed: () => void;

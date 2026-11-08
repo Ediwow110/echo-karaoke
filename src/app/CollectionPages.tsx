@@ -23,7 +23,7 @@ function GlobalCollection({ mode, activeNav }: { mode: CollectionMode; activeNav
   const searchHref = roomId === null
     ? null
     : hostToken
-      ? '/room/' + roomId + '/host'
+      ? '/room/' + roomId + '/host/party?layout=computer'
       : '/room/' + roomId + '/search';
 
   if (hostToken && last !== null) {

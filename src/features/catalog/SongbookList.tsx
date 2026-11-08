@@ -29,6 +29,8 @@ export type SongbookListProps = {
   // Only the host page sets this: refreshing the catalog spends YouTube quota,
   // so the operation refuses a guest pass.
   canSync?: boolean;
+  // The party panel is narrow; one column keeps each row readable inside it.
+  columns?: 1 | 2;
   onAdded?: () => void;
 };
 
@@ -47,7 +49,7 @@ function syncOutcome(result: CatalogSyncResult): string | null {
   return 'The channels have nothing new yet. Try again in a few hours.';
 }
 
-export default function SongbookList({ api, roomId, channels, disabled = false, canSync = false, onAdded }: SongbookListProps) {
+export default function SongbookList({ api, roomId, channels, disabled = false, canSync = false, columns = 2, onAdded }: SongbookListProps) {
   const [query, setQuery] = useState('');
   const [channel, setChannel] = useState('');
   const [items, setItems] = useState<CatalogSong[]>([]);
@@ -215,7 +217,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
       ) : (
         // Refetches keep the rows already on screen and mark them busy instead
         // of flashing an empty list.
-        <ul className="grid grid-cols-1 gap-2 sm:grid-cols-2" aria-label="Songbook songs" aria-busy={busy}>
+        <ul className={['grid grid-cols-1 gap-2', columns === 2 ? 'sm:grid-cols-2' : ''].join(' ')} aria-label="Songbook songs" aria-busy={busy}>
           {items.map((song) => {
             const isAdded = added.includes(song.videoId);
             return (

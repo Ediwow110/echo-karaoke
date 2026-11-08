@@ -5,6 +5,7 @@ import type { RoomTokens } from '../../lib/edgeApi';
 import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
 import { addSong, describeAddError, type QueueSong } from './queueApi';
 import { parseYouTubeVideoId } from './youtubeVideo';
+import { readCatalogPage, type CatalogSong } from '../catalog/catalogApi';
 import type { SearchResult } from '../../types/search';
 
 type SearchResponse = { available: boolean; results: SearchResult[]; message?: string; source?: 'songbook' };
@@ -24,10 +25,35 @@ type Options = {
 
 const DEBOUNCE_MS = 380;
 
+function mapCatalog(page: { items?: CatalogSong[] } | null): SearchResult[] {
+  if (page === null || typeof page !== 'object' || !Array.isArray(page.items)) return [];
+  return page.items.flatMap((song) => (
+    song !== null && typeof song === 'object'
+      && typeof song.videoId === 'string' && song.videoId.length > 0
+      && typeof song.title === 'string' && song.title.trim().length > 0
+      ? [{
+        videoId: song.videoId, title: song.title,
+        channelTitle: song.channelTitle ?? null, thumbnailUrl: song.thumbnailUrl ?? null,
+        durationSeconds: null,
+      }]
+      : []
+  ));
+}
+
+function dedupe(songs: SearchResult[]): SearchResult[] {
+  const seen = new Set<string>();
+  return songs.filter((song) => {
+    if (seen.has(song.videoId)) return false;
+    seen.add(song.videoId);
+    return true;
+  });
+}
+
 export function useSongSearch({ roomId, initialQuery = '', disabled = false, onAdded }: Options) {
   const api = useRoomApi();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
+  const [songbookResults, setSongbookResults] = useState<SearchResult[]>([]);
   const [loading, setLoading] = useState(false);
   const [searched, setSearched] = useState(false);
   const [available, setAvailable] = useState(true);
@@ -63,6 +89,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     setAddError(null);
     if (term.length < 2) {
       setResults([]);
+      setSongbookResults([]);
       setSearched(false);
       setLoading(false);
       setAvailable(true);
@@ -85,20 +112,38 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     setLoading(true);
     setSearched(true);
     try {
-      const response = await api.invoke<SearchResponse>(
-        'youtube-search',
-        { roomId, query: term },
-        tokens,
-      );
+      const [youtubeOutcome, catalogOutcome] = await Promise.allSettled([
+        api.invoke<SearchResponse>('youtube-search', { roomId, query: term }, tokens),
+        readCatalogPage(api, roomId, { query: term, limit: 8 }),
+      ]);
       if (!mounted.current || requestId.current !== current) {
         return;
       }
+      const catalog = catalogOutcome.status === 'fulfilled' ? mapCatalog(catalogOutcome.value) : [];
+      if (youtubeOutcome.status === 'rejected') {
+        setSongbookResults(catalog);
+        throw youtubeOutcome.reason;
+      }
+      const response = youtubeOutcome.value;
       const ready = response.available !== false;
       setAvailable(ready);
       setSearchBlocked(!ready);
-      setResults(ready ? (response.results ?? []) : []);
-      setMessage(ready ? (response.source === 'songbook' ? response.message ?? 'Recent songbook matches' : null)
-        : (response.message ?? 'Search is not configured. Ask the host to enable YouTube search.'));
+      if (!ready) {
+        setResults([]);
+        setSongbookResults(catalog);
+        setMessage(response.message ?? 'Search is not configured. Ask the host to enable YouTube search.');
+      } else if (response.source === 'songbook') {
+        // The server already answered from the songbook; show it once, never as YouTube hits.
+        setResults([]);
+        setSongbookResults(dedupe([...catalog, ...(response.results ?? [])]));
+        setMessage(response.message ?? 'Recent songbook matches');
+      } else {
+        const book = dedupe(catalog);
+        const bookIds = new Set(book.map((song) => song.videoId));
+        setSongbookResults(book);
+        setResults((response.results ?? []).filter((song) => !bookIds.has(song.videoId)));
+        setMessage(null);
+      }
     } catch (caught) {
       if (!mounted.current || requestId.current !== current) {
         return;
@@ -124,6 +169,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     if (term.length < 2) {
       requestId.current += 1;
       setResults([]);
+      setSongbookResults([]);
       setLoading(false);
       setSearched(false);
       setAvailable(true);
@@ -137,6 +183,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       setLoading(false);
       setSearched(false);
       setResults([]);
+      setSongbookResults([]);
       // A link is not a search: leaving the last search's failure or fallback
       // note up would claim an outage beside an add that works.
       setError(null);
@@ -225,6 +272,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
   const clear = useCallback(() => {
     setQuery('');
     setResults([]);
+    setSongbookResults([]);
     setSearched(false);
     setError(null);
     setSearchBlocked(false);
@@ -240,6 +288,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
     query,
     setQuery,
     results,
+    songbookResults,
     loading,
     searched,
     available,

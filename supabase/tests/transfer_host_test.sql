@@ -146,5 +146,47 @@ select is(
     'public.room_transfer_host(uuid, text, text, uuid, text)', 'execute'),
   true, 'the runtime role can transfer a room');
 
+-- The host pass decides who hosts, not the anonymous identity behind it. A host
+-- tab's identity can be replaced while its pass keeps working; 0037's heartbeat
+-- and 0040's vote already rely on that. Binding the transfer to the old id made
+-- this the one host privilege a replaced identity could never use, stranding
+-- the room on a tab that could not hand it over.
+create temp table replaced_ctx on commit drop as
+select
+  (created ->> 'roomId')::uuid as room_id,
+  (created ->> 'roomCode') as room_code
+from (select public.create_room(
+  'TH00000000000002', 'th-old-identity', 'Replaced Identity Host',
+  repeat('i', 40), repeat('j', 40)
+) as created) c;
+
+select public.join_room(
+  (select room_code from replaced_ctx), 'th-next-host', 'Next Host', repeat('k', 40), 50
+);
+
+create temp table replaced_done on commit drop as
+select (public.room_transfer_host(
+  (select room_id from replaced_ctx), 'th-new-identity', repeat('j', 40),
+  (select m.id from public.members m
+    where m.room_id = (select room_id from replaced_ctx)
+      and m.user_id = 'th-next-host'),
+  repeat('l', 40)
+) ->> 'role') as caller_role;
+
+select is((select caller_role from replaced_done), 'guest',
+  'a host whose anonymous identity was replaced can still transfer the room');
+
+select lives_ok(
+  format('select public.read_room_guest(%L::uuid, %L, %L)',
+    (select room_id from replaced_ctx), 'th-new-identity', repeat('l', 40)),
+  'the guest pass returned to the demoted host works under their current identity');
+
+select is(
+  (select role from public.members m
+    where m.room_id = (select room_id from replaced_ctx)
+      and m.user_id = 'th-next-host'),
+  'host',
+  'the chosen guest still becomes host after an identity replacement');
+
 select * from finish();
 rollback;

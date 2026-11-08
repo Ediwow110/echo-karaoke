@@ -1,47 +1,32 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CrownIcon } from '@phosphor-icons/react/dist/csr/Crown';
-import { DoorOpenIcon } from '@phosphor-icons/react/dist/csr/DoorOpen';
 import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
-import { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck';
-import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { useHostRoom } from './useHostRoom';
 import { useRoomApi } from './RoomApiProvider';
-import DoorList from '../features/rooms/DoorList';
-import InviteCard from '../features/rooms/InviteCard';
-import { setAdmissions, setApproval as requestApproval } from '../features/rooms/roomApi';
-import { onlineGuestCount, presenceSummary } from '../lib/format';
-import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
+import { setAdmissions } from '../features/rooms/roomApi';
+import { presenceSummary } from '../lib/format';
+import { Avatar, Chip, ConfirmDialog, Toggle } from '../ui';
 
 export default function HostSettingsPage() {
   const {
     roomId,
     roomName,
     hostName,
-    code,
     joinUrl,
     roster,
-    door,
-    doorPending,
     room,
     connection,
     notify,
     refresh,
     runHost,
-    approveGuest,
-    rejectGuest,
     transferRoom,
-    endRoom,
     removeMember,
   } = useHostRoom();
   const api = useRoomApi();
-  const navigate = useNavigate();
-  const [pending, setPending] = useState<'playback' | 'door' | 'approval' | null>(null);
+  const [pending, setPending] = useState<'playback' | 'door' | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [confirmEnd, setConfirmEnd] = useState(false);
-  const [ending, setEnding] = useState(false);
   const [confirmTransfer, setConfirmTransfer] = useState<{ memberId: string; displayName: string } | null>(null);
   const [transferring, setTransferring] = useState(false);
   const offline = connection === 'offline';
@@ -71,24 +56,6 @@ export default function HostSettingsPage() {
     }
   }
 
-  async function changeApproval(next: boolean): Promise<void> {
-    if (pending !== null) return;
-    setPending('approval');
-    try {
-      const result = await requestApproval(api, roomId, next);
-      // Turning approval off admits whoever was waiting; say so rather than let
-      // the door list quietly empty itself.
-      if (result.admitted > 0) {
-        notify(result.admitted === 1 ? 'Let the waiting guest in.' : 'Let ' + result.admitted + ' waiting guests in.');
-      }
-      await refresh();
-    } catch (caught) {
-      notify('The approval setting could not be changed.', caught instanceof Error ? caught.message : undefined, 'error');
-    } finally {
-      setPending(null);
-    }
-  }
-
   async function setGuestPlayback(next: boolean): Promise<void> {
     if (pending !== null) return;
     setPending('playback');
@@ -113,16 +80,6 @@ export default function HostSettingsPage() {
       );
     } finally {
       setPending(null);
-    }
-  }
-
-  async function finishRoom(): Promise<void> {
-    setEnding(true);
-    try {
-      await endRoom();
-    } finally {
-      setEnding(false);
-      setConfirmEnd(false);
     }
   }
 
@@ -159,15 +116,6 @@ export default function HostSettingsPage() {
               />
               <div className="h-px bg-line" aria-hidden="true" />
               <Toggle
-                checked={room.requireApproval === true}
-                onChange={(next) => { void changeApproval(next); }}
-                label="Approve each guest"
-                description="On by default. New guests wait at the door; turning this off lets whoever is already waiting in."
-                disabled={offline || pending !== null}
-                busy={pending === 'approval'}
-              />
-              <div className="h-px bg-line" aria-hidden="true" />
-              <Toggle
                 checked={room.admissionsLocked === true}
                 onChange={(next) => { void setDoorLock(next); }}
                 label="Close the door to new guests"
@@ -194,21 +142,6 @@ export default function HostSettingsPage() {
             </div>
           </section>
 
-          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="door-title">
-            <div className="flex flex-wrap items-center justify-between gap-3">
-              <div className="flex items-center gap-2">
-                <DoorOpenIcon size={18} className="text-signal" aria-hidden="true" />
-                <h3 id="door-title" className="font-display text-[1.35rem] font-bold tracking-[-0.02em] text-ink">At the door</h3>
-              </div>
-              <span className="text-[0.6875rem] text-ink-2">
-                {door.length} {door.length === 1 ? 'guest waiting' : 'guests waiting'}
-              </span>
-            </div>
-            <div className="mt-4">
-              <DoorList door={door} pending={doorPending} onApprove={approveGuest} onReject={rejectGuest} />
-            </div>
-          </section>
-
           <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="people-title">
             <div className="flex items-center justify-between gap-3">
               <div className="flex items-center gap-2">
@@ -226,7 +159,9 @@ export default function HostSettingsPage() {
                     <p className="mt-0.5 text-[0.6875rem] text-ink-2">Host · This screen</p>
                   </div>
                   <Chip tone="gold">Host</Chip>
-                  <span className="size-1.5 rounded-full bg-live" aria-label="Online" />
+                  {/* The row already says who is connected; a label on a bare span is invalid
+                      ARIA and repeats the text. */}
+                  <span className="size-1.5 rounded-full bg-live" aria-hidden="true" />
                 </li>
               )}
               {guests.map((member, index) => (
@@ -242,7 +177,7 @@ export default function HostSettingsPage() {
                       Guest · {member.online ? 'Phone remote connected' : 'Away'}
                     </p>
                   </div>
-                  <span className={['size-1.5 rounded-full', member.online ? 'bg-live' : 'bg-ink-3'].join(' ')} aria-label={member.online ? 'Online' : 'Away'} />
+                  <span className={['size-1.5 rounded-full', member.online ? 'bg-live' : 'bg-ink-3'].join(' ')} aria-hidden="true" />
                   <button
                     type="button"
                     onClick={() => setConfirmTransfer({ memberId: member.memberId, displayName: member.displayName })}
@@ -277,49 +212,9 @@ export default function HostSettingsPage() {
             </p>
           </section>
 
-          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="end-title">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="max-w-[38ch]">
-                <div className="flex items-center gap-2">
-                  <ShieldCheckIcon size={18} className="text-signal" aria-hidden="true" />
-                  <h3 id="end-title" className="font-display text-[1.3rem] font-bold tracking-[-0.02em] text-ink">Done for the night?</h3>
-                </div>
-                <p className="mt-2 text-[0.75rem] leading-[1.65] text-ink-2">
-                  Ending the room stops playback and closes the queue for every remote. Leaving this screen keeps the room open.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  icon={<SignOutIcon size={15} />}
-                  onClick={() => navigate('/')}
-                >
-                  Leave screen
-                </Button>
-                <Button
-                  variant="danger"
-                  size="md"
-                  icon={<DoorOpenIcon size={15} />}
-                  onClick={() => setConfirmEnd(true)}
-                  disabled={offline}
-                >
-                  Leave & end room
-                </Button>
-              </div>
-            </div>
-          </section>
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4">
-          <InviteCard
-            roomName={roomName}
-            code={code}
-            hostName={hostName}
-            joinUrl={joinUrl}
-            guests={onlineGuestCount(roster)}
-            variant="compact"
-          />
           <section className="rounded-panel border border-line bg-surface p-5">
             <p className="eyebrow text-ink-2">Room access</p>
             <dl className="mt-3 flex flex-col gap-3 text-[0.75rem]">
@@ -330,10 +225,6 @@ export default function HostSettingsPage() {
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-ink-2">Room link</dt>
                 <dd className="text-ink">{joinUrl.length > 0 ? 'Live' : 'Unavailable'}</dd>
-              </div>
-              <div className="flex items-center justify-between gap-3">
-                <dt className="text-ink-2">Guest adds</dt>
-                <dd className={room.guestControlLocked ? 'text-ink-2' : 'text-live'}>{room.guestControlLocked ? 'Off' : 'On'}</dd>
               </div>
               <div className="flex items-center justify-between gap-3">
                 <dt className="text-ink-2">Guest playback</dt>
@@ -357,16 +248,6 @@ export default function HostSettingsPage() {
         busy={transferring}
         onConfirm={() => { void finishTransfer(); }}
         onCancel={() => setConfirmTransfer(null)}
-      />
-      <ConfirmDialog
-        open={confirmEnd}
-        title="End the room?"
-        description="Playback stops, the queue closes, and every remote loses access. This cannot be undone."
-        confirmLabel="End the room"
-        cancelLabel="Keep it open"
-        busy={ending}
-        onConfirm={() => { void finishRoom(); }}
-        onCancel={() => setConfirmEnd(false)}
       />
       <p className="sr-only" aria-live="polite">Room ID {roomId}</p>
     </div>

@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type PointerEvent as ReactPointerEvent, type ReactNode } from 'react';
+import { flushSync } from 'react-dom';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
@@ -193,7 +194,16 @@ export default function HostPlayer({
         onReady: () => {
           playerRef.current?.setVolume(volumeRef.current);
         },
-        onStateChange: (state) => setPlayerState(state),
+        onStateChange: (state) => {
+          setPlayerState(state);
+          // A transient API error (one thrown while a cue is still loading, for
+          // example) must not blacken the stage or auto-skip a video that is in
+          // fact playing. Recovery clears it; a real failure never reaches these
+          // states and keeps the overlay.
+          if (state === PLAYER_STATE.playing || state === PLAYER_STATE.buffering) {
+            setPlayerError(null);
+          }
+        },
       });
     }
     setFactoryReady(true);
@@ -426,7 +436,8 @@ export default function HostPlayer({
       });
     };
     measure();
-    const observer = new ResizeObserver(schedule);
+    // Match an animating slot before paint, not one animation frame behind it.
+    const observer = new ResizeObserver(() => flushSync(measure));
     observer.observe(element);
     window.addEventListener('resize', schedule);
     window.addEventListener('scroll', schedule, true);
@@ -468,7 +479,23 @@ export default function HostPlayer({
     }, 1600);
   }, []);
 
-  const seekTo = useCallback((seconds: number) => {
+  const reportPosition = useCallback(() => {
+    const player = playerRef.current;
+    if (player === null) {
+      return;
+    }
+    const seconds = reportablePosition(player);
+    if (seconds === null) {
+      return;
+    }
+    onReportRef.current(
+      Math.floor(seconds),
+      Math.floor(player.getDuration()),
+      playbackRef.current?.currentSongId ?? null,
+    );
+  }, []);
+
+  const seekToPosition = useCallback((seconds: number, report: boolean) => {
     const player = playerRef.current;
     if (player === null) {
       return;
@@ -478,7 +505,7 @@ export default function HostPlayer({
     setCurrentTime(target);
     // A player that has not started cannot confirm the seek, and reporting one
     // it never made would move every phone to a place this video never reached.
-    if (reportablePosition(player) === null) {
+    if (!report || reportablePosition(player) === null) {
       return;
     }
     onReportRef.current(
@@ -487,6 +514,11 @@ export default function HostPlayer({
       playbackRef.current?.currentSongId ?? null,
     );
   }, []);
+
+  const seekTo = useCallback((seconds: number) => seekToPosition(seconds, true), [seekToPosition]);
+  // A dragged slider fires an input event per pixel; only the release reports.
+  const previewSeek = useCallback((seconds: number) => seekToPosition(seconds, false), [seekToPosition]);
+  const commitSeek = reportPosition;
 
   const seekBy = useCallback((seconds: number) => {
     const player = playerRef.current;
@@ -559,10 +591,13 @@ export default function HostPlayer({
     volume,
     fullscreen,
     stageActive: slot !== null,
+    playbackSurfaceReady: playerVisible,
     registerStageSlot,
     requestPlay,
     seekBy,
     seekTo,
+    previewSeek,
+    commitSeek,
     setVolume: changeVolume,
     toggleFullscreen,
     skipFailed,
@@ -571,6 +606,7 @@ export default function HostPlayer({
   }), [
     advanceStalled,
     changeVolume,
+    commitSeek,
     currentTime,
     effectiveDuration,
     findAlternative,
@@ -578,6 +614,8 @@ export default function HostPlayer({
     loading,
     needsTap,
     playerError,
+    playerVisible,
+    previewSeek,
     registerStageSlot,
     requestPlay,
     retryAdvance,

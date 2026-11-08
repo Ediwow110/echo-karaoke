@@ -47,6 +47,8 @@ export async function verifyBearerToken(
     sub?: string;
     isAnonymous?: boolean;
     exp?: number;
+    iss?: unknown;
+    aud?: unknown;
   };
 
   if (header.alg !== 'EdDSA') {
@@ -60,6 +62,15 @@ export async function verifyBearerToken(
   }
   if (typeof payload.exp !== 'number' || payload.exp * 1000 <= Date.now()) {
     throw new Error('the token has expired');
+  }
+
+  // Pinning iss and aud keeps a deployment that shares BETTER_AUTH_SECRET from
+  // accepting another environment's tokens. Better Auth signs both with its
+  // base URL, and aud may be an array.
+  const deployment = resolveBaseUrl();
+  const audience = Array.isArray(payload.aud) ? payload.aud : [payload.aud];
+  if (payload.iss !== deployment || !audience.includes(deployment)) {
+    throw new Error('the token was issued for a different deployment');
   }
 
   let key = (await fetchJwks(source)).find((entry) => entry.kid === header.kid);

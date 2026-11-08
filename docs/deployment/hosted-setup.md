@@ -17,7 +17,7 @@ possible.
 - A Neon Postgres database with the full migration chain and the two login roles.
 - A Better Auth service inside the same Vercel Function, with anonymous sessions and
   Ed25519 JWTs.
-- One Vercel Function at `/api/*` that serves auth and the fourteen room operations.
+- One Vercel Function at `/api/*` that serves auth and the twenty-two registered operations.
 - A production deployment whose browser bundle holds no database credential.
 - A CI workflow that runs the database and operation suites on throwaway Neon branches.
 
@@ -60,12 +60,14 @@ Four connection strings exist, and they are not interchangeable.
 
 | Name | Role | Path | Used by |
 |---|---|---|---|
-| `DATABASE_URL` | `service_role` | pooled | The Vercel Function for room operations |
+| `DATABASE_URL` | `echo_service` | pooled | The Vercel Function for room operations |
 | `AUTH_DATABASE_URL` | `echo_auth` | direct | Better Auth for identity tables |
 | `NEON_DATABASE_URL` | `neondb_owner` | direct | Migrations, pgTAP, branch cleanup |
 | `BETTER_AUTH_SECRET` | secret | n/a | Better Auth cookie and JWKS encryption |
 
-`service_role` bypasses row level security and may execute the room operations. It has
+`echo_service` is the login the Function uses (`0034`), and the grant-parity suite
+requires its grants to cover `service_role`'s over the public schema rather than
+replace them. `service_role` bypasses row level security and may execute the room operations. It has
 no grant on the auth tables. `echo_auth` may read and write `user`, `session`,
 `account`, `verification`, and `jwks`; it has no grant on the room schema and cannot
 execute a room operation. The owner URL is never set on Vercel.
@@ -198,7 +200,7 @@ vercel env add CRON_SECRET production
 
 | Variable | Value |
 |---|---|
-| `DATABASE_URL` | The pooled `service_role` connection string |
+| `DATABASE_URL` | The pooled `echo_service` connection string (the runtime role since the 2026-10-25 rotation, not `service_role`) |
 | `AUTH_DATABASE_URL` | The direct `echo_auth` connection string |
 | `BETTER_AUTH_SECRET` | A random secret of at least 32 characters |
 | `BETTER_AUTH_URL` | `https://echo-karaoke-mocha.vercel.app` |
@@ -313,7 +315,7 @@ repository secrets:
 gh variable set NEON_PROJECT_ID --body "plain-queen-50704361"
 gh secret set NEON_API_KEY --body "<neon api key>"
 gh secret set NEON_DATABASE_URL --body "<owner direct url>"
-gh secret set NEON_SERVICE_DATABASE_URL --body "<service_role direct url>"
+gh secret set NEON_SERVICE_DATABASE_URL --body "<runtime role direct url: the same login as production DATABASE_URL>"
 gh secret set NEON_AUTH_DATABASE_URL --body "<echo_auth direct url>"
 gh secret set BETTER_AUTH_SECRET --body "<ci-only secret>"
 ```
@@ -325,11 +327,18 @@ key.
 The jobs:
 
 1. `verify` runs typecheck, the unit suite, the build, and `npm audit`.
-2. `database` creates a Neon branch through the API, applies the migration chain,
-   runs the pgTAP assertions, and deletes the branch even on failure.
-3. `integration` creates a second branch, applies the chain, deletes the inherited
+2. `ui` runs the mocked-API Playwright flows on Chromium; it needs no database and no
+   YouTube key, and it is the only browser coverage CI ever executes.
+3. `database` creates a Neon branch through the API, applies the migration chain,
+   requires the runtime role to exist so grant parity cannot pass vacuously
+   (`scripts/require-runtime-role.mjs`), runs the pgTAP assertions, and deletes the
+   branch even on failure.
+4. `integration` creates a second branch, applies the chain, deletes the inherited
    `public.jwks` rows so Better Auth generates keys for this run's secret, runs the
    operation suite, and deletes the branch.
+
+The last three each declare `needs: verify`, so a typecheck, unit, build, or audit
+failure stops the whole pipeline before a branch is created.
 
 Branches copy the parent's data. The CI secret can differ from production because the
 integration job removes the inherited encrypted keys first. Branch names include the
@@ -855,6 +864,23 @@ shows a spinner (the others disable); the waiting screen has no offline signal a
 the browser's back button; and the door list fetches `online`/`joinedAt` without rendering them, so a
 host cannot yet tell who is still watching from who walked away.
 
+## The door is removed (migration 0045, 2026-11-07)
+
+Moderated entry was retired, not defaulted off. Scanning a code lands a guest in the room: there is
+no waiting state, no approval switch, no "At the door" list, and no `approve-member` /
+`reject-member` / `set-approval` operation. `members.status`, `rooms.require_approval`,
+`private.room_door` and `private.require_guest_any` are gone; `join_room`, both reads and the guest
+check were redefined without them. Anyone pending when the migration ran keeps their row and pass
+and is simply a member. The separate **Close the door to new guests** lock (`admissions_locked`)
+survives; it refuses strangers outright rather than queuing them.
+
+**Deploy order is now safe in either direction.** `0045` keeps the nine-argument `create_room` as a
+delegate that ignores the approval flag, the same device `0040` used for its four-argument
+`vote_toggle`. The shipped server can keep calling it while the migration applies, and the new
+server calls the eight-argument form. A later migration retires the delegate once no deployed build
+references it. `supabase/tests/direct_entry_test.sql` replaces the moderated-entry suites and pins
+the removal from both sides: a join lands live immediately, and the door objects no longer exist.
+
 ## What protects the API from a browser console (2026-10-26)
 
 DevTools holds the page's own session, so "only the UI calls the API" was never a control. The
@@ -1021,6 +1047,11 @@ database. That is the evidence that a database built from zero reaches productio
 `0039` and `0040`. Re-run on a
 disposable branch before the next ship — this line is the only one that proves a fresh database
 reaches what production has.
+**Source-reconciled 2026-11-06 at `66d0e8c`:** 24 test files and 440 assertion calls — 217 `is`,
+85 `throws_ok`, 46 `lives_ok`, 38 `function_privs_are`, 34 `ok`, 14 `table_privs_are`, 3
+`isnt`, 2 `has_table`, 1 `has_column` — which is the `440` that `README.md` quotes. The
+runner does not confirm the total: 23 of the 24 suites call `no_plan()` and only
+`role_grant_parity_test.sql` plans, so `pg_prove` never compares a count against one.
 - [x] `npm run test:integration` passes on the same branch, as `echo_service`. **Locally it needs
   `NEON_API_KEY` + `NEON_PROJECT_ID`** so `scripts/neon-branch.mjs` can create a disposable branch;
   neither is on this machine (2026-10-27), so the suite is CI-only here. A local Docker Postgres cannot

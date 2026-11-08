@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'vitest';
+import { resolveBaseUrl } from '../../server/auth/origins';
 
 function part(value: unknown): string {
   return Buffer.from(JSON.stringify(value)).toString('base64url');
@@ -11,9 +12,16 @@ describe('JWKS forced refresh', () => {
       sourceCalls += 1;
       return { keys: [] };
     };
+    const deployment = resolveBaseUrl();
     const token = [
       part({ alg: 'EdDSA', kid: 'not-a-key' }),
-      part({ sub: 'person', isAnonymous: true, exp: Math.floor(Date.now() / 1000) + 600 }),
+      part({
+        sub: 'person',
+        isAnonymous: true,
+        iss: deployment,
+        aud: deployment,
+        exp: Math.floor(Date.now() / 1000) + 600,
+      }),
       'signature',
     ].join('.');
 

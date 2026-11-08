@@ -43,4 +43,15 @@ describe('auth origins', () => {
       'https://echo-preview.vercel.app',
     ]);
   });
+
+  it('canonicalizes configured origins and refuses wildcard entries', () => {
+    const env = {
+      ALLOWED_ORIGINS: 'echo.example/join, https://echo.example/, *, https://*.evil.example',
+    };
+
+    expect(resolveTrustedOrigins(env)).toEqual([
+      'http://127.0.0.1:3000',
+      'https://echo.example',
+    ]);
+  });
 });

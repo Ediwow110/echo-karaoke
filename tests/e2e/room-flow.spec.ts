@@ -1,17 +1,21 @@
 import { expect, test, type Browser, type Page } from '@playwright/test';
+import { resolveE2EBaseURL } from '../../scripts/e2e-target.mjs';
 
-// These tests drive the real SPA and the same-origin Vercel Function.
-// Start: npx vercel dev, then set E2E_BASE_URL only for a different origin.
-
-const BASE = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3000';
+// These tests drive the real SPA and the same-origin Vercel Function. Set
+// E2E_BASE_URL to a branch-backed deployment: `vercel dev` with its default
+// environment writes these rooms into production Neon.
+const BASE = resolveE2EBaseURL();
 
 async function createRoom(page: Page, roomName = 'After Hours', hostName = 'Alex'): Promise<{ code: string; joinUrl: string }> {
   await page.goto(BASE + '/');
+  await page.getByText('Room details').click();
   await page.getByLabel('Room name').fill(roomName);
   await page.getByLabel('Your name').fill(hostName);
-  await page.getByRole('button', { name: 'Create room' }).click();
-  await page.waitForURL(/\/host$/, { timeout: 20000 });
-  await expect(page.getByRole('heading', { level: 1, name: roomName })).toBeVisible();
+  await page.getByRole('button', { name: 'Launch TV' }).click();
+  await page.waitForURL(/\/host\/party$/, { timeout: 20000 });
+  // The stage has no room-name heading: its only h1 names the playing song. The
+  // header is where the room identifies itself.
+  await expect(page.locator('header')).toContainText(roomName + ' · TV stage', { timeout: 20000 });
 
   const qr = page.locator('img[data-join-url]').first();
   await expect(qr).toHaveAttribute('data-join-url', /\/join\/[0-9A-Z]{16}$/, { timeout: 20000 });
@@ -128,7 +132,7 @@ test('a host reopening the invite returns to the host screen', async ({ page }) 
   await page.waitForURL(/\/host$/, { timeout: 20000 });
   await expect(page.getByRole('heading', { level: 1, name: 'Host Guard' })).toBeVisible();
   await expect(page.getByText('Hosted by Host Mia')).toBeVisible();
-  await expect(page.getByRole('banner').getByRole('link', { name: 'Room settings' })).toBeVisible();
+  await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Room settings' })).toBeVisible();
 });
 
 test('a guest adds a song and the host sees it in the queue', async ({ page, browser }) => {
