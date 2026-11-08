@@ -20,7 +20,7 @@
   "dependencies": {
     "@neondatabase/serverless": "^1.2.0",
     "@phosphor-icons/react": "^2.1.10",
-    "better-auth": "^1.7.12",
+    "better-auth": "^1.7.18",
     "jsqr": "^1.4.0",
     "pg": "^8.23.1",
     "qrcode": "^1.5.4",
