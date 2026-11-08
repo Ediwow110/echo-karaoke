@@ -201,9 +201,9 @@ test('a host who ends the room is told that it ended', async ({ page }) => {
   const scenario: Scenario = {};
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openScreen(page, '/room/' + ROOM + '/host/settings');
+  await openScreen(page, '/room/' + ROOM + '/host/party');
 
-  await page.getByRole('button', { name: /leave & end room/i }).click();
+  await page.getByRole('button', { name: 'End room', exact: true }).click();
   await page.getByRole('dialog').getByRole('button', { name: /^end the room$/i }).click();
 
   await expect(page).toHaveURL((url) => url.pathname === '/');
@@ -259,8 +259,8 @@ test('an open guest tab learns the room ended without reloading', async ({ page,
   await openScreen(page, '/room/' + ROOM);
   await expect(page.getByRole('heading', { name: 'The room queue.' })).toBeVisible();
 
-  await openScreen(host, '/room/' + ROOM + '/host/settings');
-  await host.getByRole('button', { name: /leave & end room/i }).click();
+  await openScreen(host, '/room/' + ROOM + '/host/party');
+  await host.getByRole('button', { name: 'End room', exact: true }).click();
   await host.getByRole('dialog').getByRole('button', { name: /^end the room$/i }).click();
 
   await expect(page.getByRole('heading', { name: 'This room has ended.' })).toBeVisible({ timeout: 15_000 });
@@ -297,9 +297,9 @@ test('a guest can second a song and the row remembers it', async ({ page }) => {
   expect(vote).toEqual({ voted: false, count: 2 });
 });
 
-// The invite chip reads "N in" beside the QR. Every screen but one counted
-// guests; Room settings counted the whole roster, so it claimed one more person
-// in the room than the party screen next to it at the same instant.
+// The invite chip reads "N in" beside the QR. It lives on the stage now, so the
+// only screens that can show it are the TV stage and the party layout, and both
+// must count guests rather than the whole roster.
 test('the invite chip says the same head-count on every host screen', async ({ page }) => {
   const scenario: Scenario = {};
   await mock(page, scenario, 'host');
@@ -307,7 +307,6 @@ test('the invite chip says the same head-count on every host screen', async ({ p
 
   for (const path of [
     '/room/' + ROOM + '/host',
-    '/room/' + ROOM + '/host/settings',
     '/room/' + ROOM + '/host/queue',
     '/room/' + ROOM + '/host/party',
   ]) {
@@ -319,7 +318,7 @@ test('the invite chip says the same head-count on every host screen', async ({ p
     expect(chips.every((chip) => chip.toLowerCase() === '1 in'), path + ' chips: ' + JSON.stringify(chips)).toBe(true);
   }
   // The claim is only worth anything if at least one screen renders it.
-  await openScreen(page, '/room/' + ROOM + '/host/settings');
+  await openScreen(page, '/room/' + ROOM + '/host/party');
   await expect(page.getByText('1 in').first()).toBeVisible();
 });
 

@@ -1,25 +1,19 @@
 import { useState } from 'react';
-import { useNavigate } from 'react-router-dom';
 import { CrownIcon } from '@phosphor-icons/react/dist/csr/Crown';
-import { DoorOpenIcon } from '@phosphor-icons/react/dist/csr/DoorOpen';
 import { LockKeyIcon } from '@phosphor-icons/react/dist/csr/LockKey';
-import { ShieldCheckIcon } from '@phosphor-icons/react/dist/csr/ShieldCheck';
-import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
 import { UsersThreeIcon } from '@phosphor-icons/react/dist/csr/UsersThree';
 import { XIcon } from '@phosphor-icons/react/dist/csr/X';
 import { useHostRoom } from './useHostRoom';
 import { useRoomApi } from './RoomApiProvider';
-import InviteCard from '../features/rooms/InviteCard';
 import { setAdmissions } from '../features/rooms/roomApi';
-import { onlineGuestCount, presenceSummary } from '../lib/format';
-import { Avatar, Button, Chip, ConfirmDialog, Toggle } from '../ui';
+import { presenceSummary } from '../lib/format';
+import { Avatar, Chip, ConfirmDialog, Toggle } from '../ui';
 
 export default function HostSettingsPage() {
   const {
     roomId,
     roomName,
     hostName,
-    code,
     joinUrl,
     roster,
     room,
@@ -28,15 +22,11 @@ export default function HostSettingsPage() {
     refresh,
     runHost,
     transferRoom,
-    endRoom,
     removeMember,
   } = useHostRoom();
   const api = useRoomApi();
-  const navigate = useNavigate();
   const [pending, setPending] = useState<'playback' | 'door' | null>(null);
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [confirmEnd, setConfirmEnd] = useState(false);
-  const [ending, setEnding] = useState(false);
   const [confirmTransfer, setConfirmTransfer] = useState<{ memberId: string; displayName: string } | null>(null);
   const [transferring, setTransferring] = useState(false);
   const offline = connection === 'offline';
@@ -90,16 +80,6 @@ export default function HostSettingsPage() {
       );
     } finally {
       setPending(null);
-    }
-  }
-
-  async function finishRoom(): Promise<void> {
-    setEnding(true);
-    try {
-      await endRoom();
-    } finally {
-      setEnding(false);
-      setConfirmEnd(false);
     }
   }
 
@@ -232,50 +212,9 @@ export default function HostSettingsPage() {
             </p>
           </section>
 
-          <section className="rounded-panel border border-line bg-surface p-5 sm:p-6" aria-labelledby="end-title">
-            <div className="flex flex-wrap items-start justify-between gap-4">
-              <div className="max-w-[38ch]">
-                <div className="flex items-center gap-2">
-                  <ShieldCheckIcon size={18} className="text-signal" aria-hidden="true" />
-                  <h3 id="end-title" className="font-display text-[1.3rem] font-bold tracking-[-0.02em] text-ink">Done for the night?</h3>
-                </div>
-                <p className="mt-2 text-[0.75rem] leading-[1.65] text-ink-2">
-                  Ending the room stops playback and closes the queue for every remote. Leaving this screen keeps the room open.
-                </p>
-              </div>
-              <div className="flex flex-wrap gap-2">
-                <Button
-                  variant="secondary"
-                  size="md"
-                  icon={<SignOutIcon size={15} />}
-                  onClick={() => navigate('/')}
-                >
-                  Leave screen
-                </Button>
-                <Button
-                  variant="danger"
-                  size="md"
-                  icon={<DoorOpenIcon size={15} />}
-                  onClick={() => setConfirmEnd(true)}
-                  disabled={offline}
-                >
-                  Leave & end room
-                </Button>
-              </div>
-            </div>
-          </section>
         </div>
 
         <aside className="flex min-w-0 flex-col gap-4">
-          <InviteCard
-            roomName={roomName}
-            code={code}
-            hostName={hostName}
-            joinUrl={joinUrl}
-            guests={onlineGuestCount(roster)}
-            shareReady={connection === 'live'}
-            variant="compact"
-          />
           <section className="rounded-panel border border-line bg-surface p-5">
             <p className="eyebrow text-ink-2">Room access</p>
             <dl className="mt-3 flex flex-col gap-3 text-[0.75rem]">
@@ -309,16 +248,6 @@ export default function HostSettingsPage() {
         busy={transferring}
         onConfirm={() => { void finishTransfer(); }}
         onCancel={() => setConfirmTransfer(null)}
-      />
-      <ConfirmDialog
-        open={confirmEnd}
-        title="End the room?"
-        description="Playback stops, the queue closes, and every remote loses access. This cannot be undone."
-        confirmLabel="End the room"
-        cancelLabel="Keep it open"
-        busy={ending}
-        onConfirm={() => { void finishRoom(); }}
-        onCancel={() => setConfirmEnd(false)}
       />
       <p className="sr-only" aria-live="polite">Room ID {roomId}</p>
     </div>

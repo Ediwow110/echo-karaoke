@@ -252,7 +252,9 @@ describe('host room workspace', () => {
     // label. Matching the concept rather than the old wording is the point: the
     // control came back once already behind a renamed label.
     expect(screen.queryByRole('switch', { name: /guests can add/i })).toBeNull();
-    expect(screen.getByRole('button', { name: /leave & end room/i })).toBeInTheDocument();
+    // Ending the room lives on the stage now; settings keeps only decisions.
+    expect(screen.queryByRole('button', { name: /leave & end room|leave screen/i })).toBeNull();
+    expect(screen.queryByRole('region', { name: 'Invite your people' })).toBeNull();
   });
 
   it('closes the door to new guests from settings', async () => {
@@ -324,18 +326,6 @@ describe('host room workspace', () => {
     expect(screen.getByText('After Hours · TV stage')).toBeInTheDocument();
   });
 
-  it('can end the room after confirmation', async () => {
-    const { api, calls } = makeApi();
-    renderHost(api, '/room/' + roomId + '/host/settings');
-
-    fireEvent.click(await screen.findByRole('button', { name: /leave & end room/i }));
-    expect(await screen.findByRole('dialog')).toBeInTheDocument();
-    fireEvent.click(screen.getByRole('button', { name: /^end the room$/i }));
-
-    expect(await screen.findByText('Back at the start')).toBeInTheDocument();
-    expect(calls.some((call) => call.name === 'host-command' && (call.body as { action?: string }).action === 'end')).toBe(true);
-  });
-
   it('forgets the ended room so it is never offered back', async () => {
     // The home screen offers "Back to the room" for a room this browser hosts.
     // An ended room must never be that offer, and the last-room pointer must
@@ -350,9 +340,9 @@ describe('host room workspace', () => {
       role: 'host',
     });
     const { api } = makeApi();
-    renderHost(api, '/room/' + roomId + '/host/settings');
+    renderHost(api, '/room/' + roomId + '/host/party');
 
-    fireEvent.click(await screen.findByRole('button', { name: /leave & end room/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^end room$/i }));
     fireEvent.click(screen.getByRole('button', { name: /^end the room$/i }));
 
     expect(await screen.findByText('Back at the start')).toBeInTheDocument();
@@ -414,9 +404,9 @@ describe('host room workspace', () => {
     // pause afterwards, and the ended room refused it: a 409 in the console every
     // time a host left their own finished room.
     const { api, calls } = makeApi();
-    renderHost(api, '/room/' + roomId + '/host/settings');
+    renderHost(api, '/room/' + roomId + '/host/party');
 
-    fireEvent.click(await screen.findByRole('button', { name: /leave & end room/i }));
+    fireEvent.click(await screen.findByRole('button', { name: /^end room$/i }));
     fireEvent.click(screen.getByRole('button', { name: /^end the room$/i }));
     expect(await screen.findByText('Back at the start')).toBeInTheDocument();
     await new Promise((resolve) => { window.setTimeout(resolve, 20); });
@@ -1114,41 +1104,4 @@ describe('host room workspace', () => {
     await waitFor(() => expect(reports).toHaveLength(1));
   });
 
-  it('takes the settings invite card offline when the connection drops', async () => {
-    vi.useFakeTimers();
-    let failReads = false;
-    const api: EdgeApi = {
-      invoke: (async (name: string) => {
-        if (name === 'host-room-read') {
-          if (failReads) throw new Error('The room service could not be reached');
-          return liveRoom;
-        }
-        if (name === 'guest-room-read' || name === 'touch-member') {
-          return liveRoom;
-        }
-        if (name === 'youtube-popular') {
-          return { available: false, results: [], message: 'not configured' };
-        }
-        return { ok: true };
-      }) as unknown as EdgeApi['invoke'],
-    };
-
-    renderHost(api, '/room/' + roomId + '/host/settings');
-    for (let step = 0; step < 5; step += 1) {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(0);
-      });
-    }
-    expect(screen.getByRole('button', { name: /copy join link/i })).toBeInTheDocument();
-
-    failReads = true;
-    for (let step = 0; step < 12; step += 1) {
-      await act(async () => {
-        await vi.advanceTimersByTimeAsync(1000);
-      });
-    }
-
-    expect(screen.queryByRole('button', { name: /copy join link/i })).toBeNull();
-    expect(screen.getByText(/cannot verify this room while the connection is offline/i)).toBeInTheDocument();
-  });
 });
