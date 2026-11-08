@@ -385,7 +385,9 @@ describe('host room workspace', () => {
     const { api, calls } = makeApi();
     renderHost(api);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+    // The redirect into party plus the first room read can exceed the default
+    // one-second find timeout on a loaded CI worker.
+    expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' }, { timeout: 4000 })).toBeInTheDocument();
     window.dispatchEvent(new Event('pagehide'));
 
     await waitFor(() => {
@@ -423,7 +425,7 @@ describe('host room workspace', () => {
     const { api, calls } = makeApi();
     renderHost(api);
 
-    expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' })).toBeInTheDocument();
+    expect(await screen.findByRole('heading', { level: 1, name: 'After Hours' }, { timeout: 4000 })).toBeInTheDocument();
     clearRoomTokens(roomId);
     saveGuestToken(roomId, 'fresh-guest-pass');
     window.dispatchEvent(new Event('pagehide'));
@@ -640,12 +642,19 @@ describe('host room workspace', () => {
   it('does not tell the room about a seek the player could not make', async () => {
     // A player that never handed over its controls reads 0 and drops the seek,
     // so reporting one moves every phone to a place the video never reached.
-    expect(await reportsFromSeek(-1, 0, 0)).toEqual([]);
+    const reports = await reportsFromSeek(-1, 0, 0);
+    // Give a wrongly scheduled report time to surface before calling the list empty.
+    await new Promise((resolve) => { window.setTimeout(resolve, 20); });
+    expect(reports).toEqual([]);
   });
 
   it('still tells the room where a real seek landed', async () => {
     const reports = await reportsFromSeek(1, 100, 222);
-    expect(reports.some((report) => report.positionSeconds === 90)).toBe(true);
+    // The report travels through the async command helper; on a loaded worker
+    // the tick that pushes it can land after the click returns.
+    await waitFor(() => {
+      expect(reports.some((report) => report.positionSeconds === 90)).toBe(true);
+    });
   });
 
   it('does not claim autoplay is on while the room is paused', async () => {
