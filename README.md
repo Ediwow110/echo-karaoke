@@ -59,7 +59,7 @@ YouTube search and chart require a data API key. Without it the app explains tha
 Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed. Successful lookups are capped by a per-room and a larger deployment daily budget; failed lookups refund those success budgets but count against separate non-refundable attempt budgets, so a loop of dead links cannot use the add button as an outbound amplifier. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0047 before deploying this tree; queue and search now call
+migrations 0025 through 0048 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
 karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
 calls `playback_next_if_current`, and the songbook catalog tables and its retention
