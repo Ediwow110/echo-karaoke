@@ -83,10 +83,20 @@ describe('Vercel deployment configuration', () => {
     expect(csp).toMatch(/frame-src[^;]*https:\/\/vercel\.live/);
   });
 
+  it('confines style elements while allowing the style attributes React emits', () => {
+    const csp = header('Content-Security-Policy');
+    expect(csp).toContain("style-src-elem 'self'");
+    // The app sets style attributes at seventeen call sites, so the attribute
+    // channel has to stay open; the element channel is what inline-injection needs.
+    expect(csp).toMatch(/style-src[^;]*'unsafe-inline'/);
+  });
+
   it('sets baseline security headers and asset caching', () => {
     expect(header('X-Content-Type-Options')).toBe('nosniff');
     expect(header('Referrer-Policy')).toBe('strict-origin-when-cross-origin');
     expect(header('X-Frame-Options')).toBe('DENY');
+    expect(header('Cross-Origin-Opener-Policy')).toBe('same-origin');
+    expect(header('Cross-Origin-Resource-Policy')).toBe('same-origin');
     expect(header('Permissions-Policy')).toContain('camera=(self)');
     expect(header('Strict-Transport-Security')).toContain('max-age=');
     const assets = config.headers?.find((entry) => entry.source === '/assets/(.*)')?.headers ?? [];

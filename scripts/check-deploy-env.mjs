@@ -1,7 +1,14 @@
 #!/usr/bin/env node
 import { pathToFileURL } from 'node:url';
 
-const CONNECTION_STRING = /^postgres(ql)?:\/\//i;
+const DATABASE_URL = /^postgres(ql)?:\/\//i;
+
+// The public-environment scan cannot assume a leaked value starts with the
+// scheme or names Postgres. A MongoDB or Redis URL is the same leak, and a
+// pasted note or a URL carrying user:pass is how a credential usually arrives.
+const DATASTORE_SCHEME = /(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|rediss|amqp|amqps|mssql|sqlserver):\/\//i;
+const URL_WITH_CREDENTIALS = /[a-z][a-z0-9+.-]*:\/\/[^/\s@]*:[^/\s@]+@/i;
+const PRIVATE_KEY = /-----BEGIN [A-Z0-9 ]*PRIVATE KEY-----/;
 
 function normalizedHost(hostname) {
   // Neon serves the same branch through <endpoint> and <endpoint>-pooler.
@@ -32,7 +39,10 @@ function checkPublicEnvironment(env, errors) {
     if (!key.startsWith('VITE_')) {
       continue;
     }
-    if (CONNECTION_STRING.test(String(raw ?? '').trim())) {
+    const value = String(raw ?? '').trim();
+    if (DATASTORE_SCHEME.test(value)
+      || URL_WITH_CREDENTIALS.test(value)
+      || PRIVATE_KEY.test(value)) {
       errors.push(key + ' must never reach the browser bundle.');
     }
   }
@@ -55,7 +65,7 @@ function checkBackend(env, errors) {
     : ['DATABASE_URL', 'AUTH_DATABASE_URL'];
   for (const name of required) {
     const value = String(env[name] ?? '').trim();
-    if (!CONNECTION_STRING.test(value)) {
+    if (!DATABASE_URL.test(value)) {
       errors.push(name + ' must be a PostgreSQL connection string'
         + (isPreview ? ' in Preview.' : '.'));
     }
@@ -75,7 +85,7 @@ function checkBackend(env, errors) {
     ];
     for (const [name, description] of productionEndpoints) {
       const value = String(env[name] ?? '').trim();
-      if (!CONNECTION_STRING.test(value)) {
+      if (!DATABASE_URL.test(value)) {
         errors.push(name + ' must name the ' + description + ' in Preview.');
         continue;
       }

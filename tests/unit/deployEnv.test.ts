@@ -84,6 +84,49 @@ describe('deployment environment guard', () => {
     expect(errors).toContain('VITE_NEON_DATABASE_URL must never reach the browser bundle.');
   });
 
+  it('refuses a datastore connection string for any scheme in the client environment', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VITE_MONGO_URL: 'mongodb+srv://user:pass@cluster.example/db',
+      VITE_REDIS_URL: 'redis://cache.example:6379',
+    });
+    expect(errors).toContain('VITE_MONGO_URL must never reach the browser bundle.');
+    expect(errors).toContain('VITE_REDIS_URL must never reach the browser bundle.');
+  });
+
+  it('refuses a connection string embedded inside a longer public value', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VITE_LOCAL_NOTE: 'local stack uses postgresql://service@127.0.0.1/app',
+    });
+    expect(errors).toContain('VITE_LOCAL_NOTE must never reach the browser bundle.');
+  });
+
+  it('refuses a credential-bearing URL under a public prefix', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VITE_WEBHOOK_URL: 'https://service:s3cret@hooks.example/path',
+    });
+    expect(errors).toContain('VITE_WEBHOOK_URL must never reach the browser bundle.');
+  });
+
+  it('refuses a private key under a public prefix', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VITE_SIGNING_KEY: '-----BEGIN PRIVATE KEY-----\nMIIEexample',
+    });
+    expect(errors).toContain('VITE_SIGNING_KEY must never reach the browser bundle.');
+  });
+
+  it('accepts public configuration that contains no credentials', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      VITE_API_BASE_URL: '/api',
+      VITE_ANALYTICS_ENDPOINT: 'https://stats.example/collect',
+      VITE_APP_NAME: 'kara-echo',
+    })).toEqual([]);
+  });
+
   it('accepts a relative API base path', () => {
     expect(checkDeployEnv({
       ...valid,

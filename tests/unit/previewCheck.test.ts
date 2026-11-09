@@ -17,6 +17,7 @@ const DEFAULT_CSP = [
   "form-action 'self'",
   "script-src 'self' https://www.youtube.com https://s.ytimg.com",
   "style-src 'self' 'unsafe-inline'",
+  "style-src-elem 'self'",
   "img-src 'self' data: blob: https://i.ytimg.com",
   "font-src 'self'",
   "connect-src 'self' https://www.youtube.com",
@@ -29,6 +30,8 @@ const HOME_HEADERS = {
   'x-content-type-options': 'nosniff',
   'referrer-policy': 'strict-origin-when-cross-origin',
   'x-frame-options': 'DENY',
+  'cross-origin-opener-policy': 'same-origin',
+  'cross-origin-resource-policy': 'same-origin',
   'permissions-policy': 'camera=(self), microphone=(), geolocation=()',
   'strict-transport-security': 'max-age=63072000; includeSubDomains',
 };
@@ -95,6 +98,33 @@ describe('preview verification', () => {
     const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
 
     expect(result.errors).toContain('Missing x-frame-options header.');
+  });
+
+  it('reports a deployment without the cross-origin isolation headers', async () => {
+    const routes = goodRoutes();
+    delete routes['https://app.example/'].headers['cross-origin-opener-policy'];
+    delete routes['https://app.example/'].headers['cross-origin-resource-policy'];
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain('Missing cross-origin-opener-policy header.');
+    expect(result.errors).toContain('Missing cross-origin-resource-policy header.');
+  });
+
+  it('reports a style policy that still allows inline style elements', async () => {
+    const csp = DEFAULT_CSP.replace("; style-src-elem 'self'", '');
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(goodRoutes(csp)) });
+
+    expect(result.errors).toContain("The CSP is missing style-src-elem 'self'.");
+  });
+
+  it('reports a non-Postgres datastore URL in the main asset', async () => {
+    const routes = goodRoutes();
+    routes[ASSET].body = 'const url = "redis://cache.example:6379";';
+
+    const result = await checkPreview('https://app.example', { fetchImpl: fakeFetch(routes) });
+
+    expect(result.errors).toContain('A database connection string is present in the served main asset.');
   });
 
   it('reports a CSP that drops a required directive', async () => {
