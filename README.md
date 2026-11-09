@@ -94,18 +94,18 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 618 unit and component tests (jsdom)
+    npm test                 # 622 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch
     npm run test:e2e:ui      # 64 CI-safe Playwright UI flows with a mocked API
-    npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL, plus E2E_BRANCH_TARGET_CONFIRMED=1 for a local port
+    npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL (HTTPS for remote), plus E2E_BRANCH_TARGET_CONFIRMED=1 for a loopback-resolving target
 
-`vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, and it refuses the deployed production origin even when one names it. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment. A loopback target additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in `http://127.0.0.1:3000` says whether that port is backed by a branch or by production — and the default it replaced was production.
+`vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, resolves the host before launching, refuses all known production aliases and `BETTER_AUTH_URL`, and requires HTTPS for remote targets. Any address that resolves to loopback — including `nip.io`, IPv6-mapped aliases, and trailing-dot names — additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in a hostname says whether that port is backed by a branch or by production. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
 
 The integration suite needs `DATABASE_URL`, `AUTH_DATABASE_URL`, and `BETTER_AUTH_SECRET`, and starts its own HTTP server around the function handler. It skips itself when those variables are absent; when all three are present it refuses to start unless `INTEGRATION_TARGET_CONFIRMED=1` states that they point at a disposable branch. The database suite needs Docker because the Supabase CLI runs `pg_prove` in a container.
 
-The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app, so `E2E_BASE_URL` is mandatory and checked by `scripts/e2e-target.mjs` before anything launches. One E2E test decodes the rendered QR through the local Vite dev resolver.
+The UI suite needs no database or YouTube key. The real E2E suite creates rooms against the running app, so `E2E_BASE_URL` is mandatory and resolved and checked by `scripts/e2e-target.mjs` before anything launches. One E2E test decodes the rendered QR through the local Vite dev resolver.
 
 ## Security notes
 
