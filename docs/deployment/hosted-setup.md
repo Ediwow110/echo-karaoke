@@ -215,6 +215,8 @@ vercel env add CRON_SECRET production
 | `CRON_SECRET` | A random secret of at least 32 characters. Vercel Cron sends it as `Authorization: Bearer …` to `/api/cron/catalog-retention`; required in Production, and `npm run verify:deploy` fails without it |
 | `PREVIEW_DATABASE_URL` | Preview-only service URL pointing at a disposable Neon branch |
 | `PREVIEW_AUTH_DATABASE_URL` | Preview-only auth URL pointing at the same branch |
+| `PRODUCTION_DATABASE_ENDPOINT` | Preview-only, credential-free host/path of the production service database; `verify:deploy` rejects a preview that points at it |
+| `PRODUCTION_AUTH_DATABASE_ENDPOINT` | Preview-only, credential-free host/path of the production auth database; same guard |
 
 `ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. It is
 not a CORS allowlist any more: the function is same-origin, so no CORS headers are
@@ -245,7 +247,10 @@ Neon branch or a separate preview database, protect the deployment, and keep the
 auth secret compatible with the inherited branch. A different preview secret requires
 deleting the inherited `public.jwks` rows first. The function selects
 `PREVIEW_DATABASE_URL` and `PREVIEW_AUTH_DATABASE_URL` whenever
-`VERCEL_ENV=preview`; the deploy guard refuses a Preview build without both. Do **not**
+`VERCEL_ENV=preview`; the deploy guard refuses a Preview build without both. It also
+requires the two `PRODUCTION_*_ENDPOINT` pins, which must be credential-free host/path
+references to the production databases; without them a preview pointed at production
+could pass. Do **not**
 set `BETTER_AUTH_URL` for Preview; the current deployment host is derived from
 `VERCEL_URL` and trusted automatically. A Preview without `YOUTUBE_API_KEY` reports
 search as not configured and shows the manual-link fallback.
@@ -253,7 +258,8 @@ search as not configured and shows the manual-link fallback.
 The guard runs before every build. It rejects a missing or short
 `BETTER_AUTH_SECRET`, missing PostgreSQL URLs for both roles, a missing or malformed
 `ALLOWED_ORIGINS`, an out-of-range quota budget, a wildcard origin, an origin with a
-path or trailing slash, and any `VITE_*` PostgreSQL URL.
+path or trailing slash, any `VITE_*` PostgreSQL URL, and in Preview a missing or
+credential-bearing production endpoint pin.
 
 ### Region
 

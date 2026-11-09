@@ -57,14 +57,36 @@ function checkBackend(env, errors) {
         return null;
       }
     };
-    for (const [previewName, productionName] of [
-      ['PREVIEW_DATABASE_URL', 'DATABASE_URL'],
-      ['PREVIEW_AUTH_DATABASE_URL', 'AUTH_DATABASE_URL'],
+    const productionEndpoints = [
+      ['PRODUCTION_DATABASE_ENDPOINT', 'production database endpoint'],
+      ['PRODUCTION_AUTH_DATABASE_ENDPOINT', 'production auth database endpoint'],
+    ];
+    for (const [name, description] of productionEndpoints) {
+      const value = String(env[name] ?? '').trim();
+      if (!CONNECTION_STRING.test(value)) {
+        errors.push(name + ' must name the ' + description + ' in Preview.');
+        continue;
+      }
+      try {
+        const url = new URL(value);
+        if (url.hostname.length === 0) {
+          errors.push(name + ' must name the ' + description + ' in Preview.');
+        }
+        if (url.username.length > 0 || url.password.length > 0) {
+          errors.push(name + ' must not contain credentials.');
+        }
+      } catch {
+        errors.push(name + ' must name the ' + description + ' in Preview.');
+      }
+    }
+    for (const [previewName, endpointName] of [
+      ['PREVIEW_DATABASE_URL', 'PRODUCTION_DATABASE_ENDPOINT'],
+      ['PREVIEW_AUTH_DATABASE_URL', 'PRODUCTION_AUTH_DATABASE_ENDPOINT'],
     ]) {
       const preview = identity(String(env[previewName] ?? '').trim());
-      const production = identity(String(env[productionName] ?? '').trim());
-      if (preview !== null && preview === production) {
-        errors.push(previewName + ' must point at a different database than ' + productionName + '.');
+      const production = identity(String(env[endpointName] ?? '').trim());
+      if (preview !== null && production !== null && preview === production) {
+        errors.push(previewName + ' must point at a different database than ' + endpointName + '.');
       }
     }
   }

@@ -80,7 +80,7 @@ Two abuse controls are optional. The room cap counts the host and guests present
     ROOM_MEMBER_LIMIT=50
     ANON_SIGNIN_LIMIT_PER_HOUR=120
 
-Before shipping, run `npm run verify:deploy`. It refuses a build when the auth secret, the two database URLs, an origin, a quota budget, or the Production `CRON_SECRET` is missing or malformed, or when any `VITE_` variable holds a PostgreSQL connection string. `vercel.json` applies the security headers and the CSP at the Vercel edge, pins the function to `sin1`, sends `/api/*` to the function instead of the app shell, and schedules the catalog retention cron.
+Before shipping, run `npm run verify:deploy`. It refuses a build when the auth secret, the two database URLs, an origin, a quota budget, or the Production `CRON_SECRET` is missing or malformed, or when any `VITE_` variable holds a PostgreSQL connection string. In Preview it also requires credential-free `PRODUCTION_DATABASE_ENDPOINT` and `PRODUCTION_AUTH_DATABASE_ENDPOINT` pins so a preview pointed at production is rejected. `vercel.json` applies the security headers and the CSP at the Vercel edge, pins the function to `sin1`, sends `/api/*` to the function instead of the app shell, and schedules the catalog retention cron.
 
 The hosted setup, step by step, is in `docs/deployment/hosted-setup.md`. It covers the Neon project, the two database credentials, the auth service, the Vercel environment, the CI secrets, and the preview checks.
 
@@ -94,7 +94,7 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 612 unit and component tests (jsdom)
+    npm test                 # 614 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch

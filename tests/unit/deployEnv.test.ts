@@ -93,42 +93,70 @@ describe('deployment environment guard', () => {
     })).toContain('YOUTUBE_DAILY_POPULAR_BUDGET must be an integer between 1 and 100.');
   });
 
-  it('requires separate preview database branches', () => {
+  it('requires separate preview database branches and pinned production endpoints', () => {
     expect(checkDeployEnv({
       ...valid,
       VERCEL_ENV: 'preview',
     })).toEqual(expect.arrayContaining([
       'PREVIEW_DATABASE_URL must be a PostgreSQL connection string in Preview.',
       'PREVIEW_AUTH_DATABASE_URL must be a PostgreSQL connection string in Preview.',
+      'PRODUCTION_DATABASE_ENDPOINT must name the production database endpoint in Preview.',
+      'PRODUCTION_AUTH_DATABASE_ENDPOINT must name the production auth database endpoint in Preview.',
     ]));
     expect(checkDeployEnv({
       ...valid,
       VERCEL_ENV: 'preview',
       PREVIEW_DATABASE_URL: 'postgresql://service@preview/db',
       PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@preview/db',
+      PRODUCTION_DATABASE_ENDPOINT: 'postgresql://example/db',
+      PRODUCTION_AUTH_DATABASE_ENDPOINT: 'postgresql://auth.example/db',
     })).toEqual([]);
   });
 
-  it('rejects Preview URLs that reuse the production database', () => {
+  it('does not let a missing production pin skip the parity check', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+      PREVIEW_DATABASE_URL: 'postgresql://service@preview/db',
+      PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@preview/db',
+    });
+    expect(errors).toContain('PRODUCTION_DATABASE_ENDPOINT must name the production database endpoint in Preview.');
+    expect(errors).toContain('PRODUCTION_AUTH_DATABASE_ENDPOINT must name the production auth database endpoint in Preview.');
+  });
+
+  it('rejects Preview URLs that reuse the pinned production endpoint', () => {
     expect(checkDeployEnv({
       ...valid,
       VERCEL_ENV: 'preview',
       PREVIEW_DATABASE_URL: valid.DATABASE_URL,
       PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@preview/db',
-    })).toContain('PREVIEW_DATABASE_URL must point at a different database than DATABASE_URL.');
+      PRODUCTION_DATABASE_ENDPOINT: 'postgresql://example/db',
+      PRODUCTION_AUTH_DATABASE_ENDPOINT: 'postgresql://auth.example/db',
+    })).toContain('PREVIEW_DATABASE_URL must point at a different database than PRODUCTION_DATABASE_ENDPOINT.');
   });
 
   it('treats a Neon -pooler alias as the same database', () => {
     const errors = checkDeployEnv({
       ...valid,
       VERCEL_ENV: 'preview',
-      DATABASE_URL: 'postgresql://service@ep-cool-name-123.ap-southeast-1.aws.neon.tech/db',
-      AUTH_DATABASE_URL: 'postgresql://auth@ep-cool-auth-123.ap-southeast-1.aws.neon.tech/db',
       PREVIEW_DATABASE_URL: 'postgresql://service@ep-cool-name-123-pooler.ap-southeast-1.aws.neon.tech/db',
       PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@ep-cool-auth-123-pooler.ap-southeast-1.aws.neon.tech/db',
+      PRODUCTION_DATABASE_ENDPOINT: 'postgresql://ep-cool-name-123.ap-southeast-1.aws.neon.tech/db',
+      PRODUCTION_AUTH_DATABASE_ENDPOINT: 'postgresql://ep-cool-auth-123.ap-southeast-1.aws.neon.tech/db',
     });
-    expect(errors).toContain('PREVIEW_DATABASE_URL must point at a different database than DATABASE_URL.');
-    expect(errors).toContain('PREVIEW_AUTH_DATABASE_URL must point at a different database than AUTH_DATABASE_URL.');
+    expect(errors).toContain('PREVIEW_DATABASE_URL must point at a different database than PRODUCTION_DATABASE_ENDPOINT.');
+    expect(errors).toContain('PREVIEW_AUTH_DATABASE_URL must point at a different database than PRODUCTION_AUTH_DATABASE_ENDPOINT.');
+  });
+
+  it('refuses production endpoint pins that contain credentials', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+      PREVIEW_DATABASE_URL: 'postgresql://service@preview/db',
+      PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@preview-auth/db',
+      PRODUCTION_DATABASE_ENDPOINT: 'postgresql://user:pass@example/db',
+      PRODUCTION_AUTH_DATABASE_ENDPOINT: 'postgresql://auth.example/db',
+    })).toContain('PRODUCTION_DATABASE_ENDPOINT must not contain credentials.');
   });
 
   it('does not conflate non-Neon pooler-looking hosts', () => {
@@ -137,6 +165,8 @@ describe('deployment environment guard', () => {
       VERCEL_ENV: 'preview',
       PREVIEW_DATABASE_URL: 'postgresql://service@db-pooler.example/db',
       PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@auth-pooler.example/db',
+      PRODUCTION_DATABASE_ENDPOINT: 'postgresql://example/db',
+      PRODUCTION_AUTH_DATABASE_ENDPOINT: 'postgresql://auth.example/db',
     })).toEqual([]);
   });
 
