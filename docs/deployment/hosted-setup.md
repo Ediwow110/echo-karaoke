@@ -218,8 +218,10 @@ vercel env add CRON_SECRET production
 | `PRODUCTION_DATABASE_ENDPOINT` | Preview-only, credential-free host/path of the production service database; `verify:deploy` rejects a preview that points at it |
 | `PRODUCTION_AUTH_DATABASE_ENDPOINT` | Preview-only, credential-free host/path of the production auth database; same guard |
 
-`ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. It is
-not a CORS allowlist any more: the function is same-origin, so no CORS headers are
+`ALLOWED_ORIGINS` is read by the deploy guard and becomes a trusted auth origin. The
+guard only accepts entries that match `VERCEL_PROJECT_PRODUCTION_URL`, the current
+`VERCEL_URL`, or `BETTER_AUTH_URL`; any other bare origin fails the build. It is not a
+CORS allowlist any more: the function is same-origin, so no CORS headers are
 needed.
 
 The two abuse limits are optional and have those defaults. The room cap counts only
@@ -257,9 +259,10 @@ search as not configured and shows the manual-link fallback.
 
 The guard runs before every build. It rejects a missing or short
 `BETTER_AUTH_SECRET`, missing PostgreSQL URLs for both roles, a missing or malformed
-`ALLOWED_ORIGINS`, an out-of-range quota budget, a wildcard origin, an origin with a
-path or trailing slash, any `VITE_*` PostgreSQL URL, and in Preview a missing or
-credential-bearing production endpoint pin.
+`ALLOWED_ORIGINS`, an origin that is not a pinned deployment origin, an out-of-range
+quota budget, a wildcard origin, an origin with a path or trailing slash, any
+`VITE_*` PostgreSQL URL, and in Preview a missing or credential-bearing production
+endpoint pin.
 
 ### Region
 

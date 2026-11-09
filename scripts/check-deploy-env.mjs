@@ -11,6 +11,18 @@ function normalizedHost(hostname) {
     : hostname;
 }
 
+function originFrom(value) {
+  const raw = String(value ?? '').trim();
+  if (raw.length === 0) {
+    return null;
+  }
+  try {
+    return new URL(/^https?:\/\//i.test(raw) ? raw : 'https://' + raw).origin;
+  } catch {
+    return null;
+  }
+}
+
 /**
  * Vite copies every VITE_ variable into the browser bundle. A database URL in
  * that namespace is a credential leak that no later runtime check can undo.
@@ -173,6 +185,21 @@ export function checkDeployEnv(env = process.env) {
       }
     } catch {
       errors.push('ALLOWED_ORIGINS contains an invalid origin: ' + origin);
+    }
+  }
+
+  const pinnedOrigins = new Set(
+    ['VERCEL_PROJECT_PRODUCTION_URL', 'VERCEL_URL', 'BETTER_AUTH_URL']
+      .map((name) => originFrom(env[name]))
+      .filter((origin) => origin !== null),
+  );
+  if (pinnedOrigins.size === 0) {
+    errors.push('ALLOWED_ORIGINS cannot be checked without VERCEL_PROJECT_PRODUCTION_URL, VERCEL_URL, or BETTER_AUTH_URL.');
+  } else {
+    for (const origin of origins) {
+      if (!pinnedOrigins.has(origin)) {
+        errors.push('ALLOWED_ORIGINS entry is not a pinned deployment origin: ' + origin);
+      }
     }
   }
 

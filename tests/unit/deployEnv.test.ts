@@ -6,6 +6,7 @@ const valid = {
   BETTER_AUTH_SECRET: 'a'.repeat(40),
   DATABASE_URL: 'postgresql://service@example/db',
   AUTH_DATABASE_URL: 'postgresql://auth@example/db',
+  VERCEL_PROJECT_PRODUCTION_URL: 'app.example',
 };
 
 describe('deployment environment guard', () => {
@@ -22,6 +23,49 @@ describe('deployment environment guard', () => {
   });
   it('accepts a list of explicit deployed origins', () => {
     expect(checkDeployEnv(valid)).toEqual([]);
+  });
+
+  it('refuses an ALLOWED_ORIGINS entry that is not a pinned deployment origin', () => {
+    const errors = checkDeployEnv({
+      ...valid,
+      ALLOWED_ORIGINS: 'https://app.example,https://app.example.evil.test',
+    });
+    expect(errors).toContain(
+      'ALLOWED_ORIGINS entry is not a pinned deployment origin: https://app.example.evil.test',
+    );
+  });
+
+  it('allows an explicitly pinned custom auth origin', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      BETTER_AUTH_URL: 'https://karaoke.example',
+      ALLOWED_ORIGINS: 'https://app.example,https://karaoke.example',
+    })).toEqual([]);
+  });
+
+  it('allows the current preview deployment origin', () => {
+    expect(checkDeployEnv({
+      ...valid,
+      VERCEL_ENV: 'preview',
+      VERCEL_URL: 'preview-abc.vercel.app',
+      PREVIEW_DATABASE_URL: 'postgresql://service@preview/db',
+      PREVIEW_AUTH_DATABASE_URL: 'postgresql://auth@preview/db',
+      PRODUCTION_DATABASE_ENDPOINT: 'postgresql://example/db',
+      PRODUCTION_AUTH_DATABASE_ENDPOINT: 'postgresql://auth.example/db',
+      ALLOWED_ORIGINS: 'https://preview-abc.vercel.app,https://app.example',
+    })).toEqual([]);
+  });
+
+  it('refuses to validate ALLOWED_ORIGINS without a pinned deployment origin', () => {
+    const errors = checkDeployEnv({
+      ALLOWED_ORIGINS: 'https://app.example',
+      BETTER_AUTH_SECRET: 'a'.repeat(40),
+      DATABASE_URL: 'postgresql://service@example/db',
+      AUTH_DATABASE_URL: 'postgresql://auth@example/db',
+    });
+    expect(errors).toContain(
+      'ALLOWED_ORIGINS cannot be checked without VERCEL_PROJECT_PRODUCTION_URL, VERCEL_URL, or BETTER_AUTH_URL.',
+    );
   });
 
   it('refuses a database connection string in the client environment', () => {
