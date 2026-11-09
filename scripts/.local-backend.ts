@@ -30,10 +30,13 @@ const server = createServer(async (req, res) => {
     const cookies = result.headers.getSetCookie();
     if (cookies.length > 0) res.setHeader('set-cookie', cookies);
     res.end(Buffer.from(await result.arrayBuffer()));
-  } catch (err: any) {
+  } catch (err) {
+    // The client is loopback, but a stack trace or query fragment still does
+    // not belong in an HTTP response; keep it in this terminal instead.
+    console.error(err);
     res.statusCode = 500;
     res.setHeader('content-type', 'text/plain');
-    res.end(err.message);
+    res.end('Internal Server Error');
   }
 });
 

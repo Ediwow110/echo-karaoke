@@ -54,6 +54,25 @@ select is(
   1,
   'channel filter matches exactly');
 
+-- A search term is data, not a LIKE pattern. Unescaped, '%' matches every row,
+-- 'Hal_' matches 'Halo', and a lone trailing '\' makes LIKE raise.
+select is(
+  (public.karaoke_catalog_page('%', '', 0, 30) -> 'total')::int,
+  0,
+  'a percent sign is matched literally');
+select is(
+  (public.karaoke_catalog_page('Hal_', '', 0, 30) -> 'total')::int,
+  0,
+  'an underscore does not wildcard');
+select is(
+  (public.karaoke_catalog_page('HALO%', '', 0, 30) -> 'total')::int,
+  0,
+  'a trailing wildcard stays literal');
+select is(
+  (public.karaoke_catalog_page(E'\\', '', 0, 30) -> 'total')::int,
+  0,
+  'a backslash is matched literally');
+
 -- limit is clamped: 0 becomes 1, anything above 50 becomes 50.
 select is(
   jsonb_array_length(public.karaoke_catalog_page('', '', 0, 0) -> 'items'),
