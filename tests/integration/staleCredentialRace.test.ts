@@ -42,6 +42,9 @@ type Fixture = {
   hostToken: string;
   targetMemberId: string;
   newGuestToken: string;
+  victimMemberId: string;
+  songId: string;
+  secondSongId: string;
 };
 
 async function createFixture(client: Client): Promise<Fixture> {
@@ -53,6 +56,8 @@ async function createFixture(client: Client): Promise<Fixture> {
   const hostToken = token('h');
   const targetGuestToken = token('t');
   const newGuestToken = token('n');
+  const victimUser = 'stale-victim-' + suffix;
+  const victimGuestToken = token('v');
 
   const created = await client.query(
     'select public.create_room($1, $2, $3, $4, $5) as result',
@@ -65,6 +70,20 @@ async function createFixture(client: Client): Promise<Fixture> {
     [code, targetUser, 'Stale Target', targetGuestToken, 50],
   );
 
+  const victim = await client.query(
+    'select public.join_room($1, $2, $3, $4, $5) as result',
+    [code, victimUser, 'Stale Victim', victimGuestToken, 50],
+  );
+
+  const first = await client.query(
+    'select public.queue_add($1, $2, $3, $4, $5, $6, $7, $8, $9) as result',
+    [roomId, hostUser, hostGuestToken, hostToken, 'M7lc1UVf-VE', 'Stale One', null, null, null],
+  );
+  const second = await client.query(
+    'select public.queue_add($1, $2, $3, $4, $5, $6, $7, $8, $9) as result',
+    [roomId, hostUser, hostGuestToken, hostToken, '9bZkp7q19f0', 'Stale Two', null, null, null],
+  );
+
   return {
     roomId,
     hostUser,
@@ -72,6 +91,9 @@ async function createFixture(client: Client): Promise<Fixture> {
     hostToken,
     targetMemberId: joined.rows[0].result.memberId as string,
     newGuestToken,
+    victimMemberId: victim.rows[0].result.memberId as string,
+    songId: first.rows[0].result.songId as string,
+    secondSongId: second.rows[0].result.songId as string,
   };
 }
 
@@ -139,6 +161,69 @@ describe.skipIf(!runsHere)('post-lock credential revalidation', () => {
         null,
         null,
       ],
+    ));
+  });
+
+  it('rejects host_command end after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.host_command($1, $2, $3, $4) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostToken, 'end'],
+    ));
+  });
+
+  it('rejects host_command clear_queue after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.host_command($1, $2, $3, $4) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostToken, 'clear_queue'],
+    ));
+  });
+
+  it('rejects host_remove_member after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.host_remove_member($1, $2, $3, $4) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostToken, fixture.victimMemberId],
+    ));
+  });
+
+  it('rejects queue_remove after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.queue_remove($1, $2, $3, $4, $5) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostGuestToken, fixture.hostToken, fixture.songId],
+    ));
+  });
+
+  it('rejects queue_reorder after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.queue_reorder($1, $2, $3, $4, $5, $6) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostGuestToken, fixture.hostToken, fixture.songId, 'down'],
+    ));
+  });
+
+  it('rejects playback_report after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.playback_report($1, $2, $3, $4, $5, $6) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostToken, 10, 100, null],
+    ));
+  });
+
+  it('rejects playback_next_if_current after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.playback_next_if_current($1, $2, $3, $4) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostToken, randomUUID()],
+    ));
+  });
+
+  it('rejects vote_toggle after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.vote_toggle($1, $2, $3, $4, $5) as result',
+      [fixture.roomId, fixture.hostUser, fixture.hostGuestToken, fixture.hostToken, fixture.songId],
+    ));
+  });
+
+  it('rejects touch_host after a waiting transfer', async () => {
+    await runAgainstHeldTransfer((client, fixture) => client.query(
+      'select public.touch_host($1, $2) as result',
+      [fixture.roomId, fixture.hostToken],
     ));
   });
 });
