@@ -31,7 +31,7 @@ and deployment contract.
   branch. It skips without `DATABASE_URL`, `AUTH_DATABASE_URL`, and
   `BETTER_AUTH_SECRET`; when all three are present it also requires
   `INTEGRATION_TARGET_CONFIRMED=1` after you verify they point at a disposable branch.
-- `npx supabase test db --db-url "$NEON_DATABASE_URL"`: pgTAP suite.
+- `npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"`: pgTAP suite.
 - `npm run verify:deploy`: the production environment guard used by Vercel.
 - `npm run verify:preview -- <url>`: deployment header, CSP, asset, and API checks.
 

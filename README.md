@@ -68,8 +68,8 @@ function must exist before the sync and the daily cron run. 0042 gives a room a 
 two still ends rooms lazily inside the room read but leaves expired rows uncollected;
 0044 adds the daily sweep that keeps the rate-limit ledger from growing without bound.
 
-    npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
-    npx supabase test db --db-url "$NEON_DATABASE_URL"
+    npx supabase@2.121.0 db push --db-url "$NEON_DATABASE_URL" --yes
+    npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"
 
 `ALLOWED_ORIGINS` is the deployed app origin. It is read by the deploy guard and trusted by Better Auth; the function is same-origin, so it is not a CORS allowlist:
 
@@ -96,7 +96,7 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
     npm test                 # 622 unit and component tests (jsdom)
     npm run build            # typecheck and production build
-    npx supabase test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
+    npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch
     npm run test:e2e:ui      # 64 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL (HTTPS for remote), plus E2E_BRANCH_TARGET_CONFIRMED=1 for a loopback-resolving target

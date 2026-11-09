@@ -82,7 +82,7 @@ The chain runs from `0000_platform_compatibility.sql` through
 another database:
 
 ```bash
-npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
+npx supabase@2.121.0 db push --db-url "$NEON_DATABASE_URL" --yes
 ```
 
 The migrations create `anon`, `authenticated`, `service_role`, and `echo_auth` when a
@@ -92,7 +92,7 @@ files, and grant the authorized operations only to `service_role`.
 Run the database suite against the same URL:
 
 ```bash
-npx supabase test db --db-url "$NEON_DATABASE_URL"
+npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"
 ```
 
 Expected: `Result: PASS`, 8 files and 225 assertions. Docker must be running because
