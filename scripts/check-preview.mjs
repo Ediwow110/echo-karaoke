@@ -2,7 +2,7 @@
 import { pathToFileURL } from 'node:url';
 
 const REQUIRED_CSP_DIRECTIVES = ["default-src 'self'", "frame-ancestors 'none'", "object-src 'none'"];
-const CONNECTION_STRING = /postgres(ql)?:\/\//i;
+const CONNECTION_STRING = /(?:postgres(?:ql)?|mysql|mariadb|mongodb(?:\+srv)?|redis|rediss|amqp|amqps|mssql|sqlserver):\/\//i;
 
 function cspDirectives(value) {
   const directives = new Map();
@@ -88,6 +88,8 @@ export async function checkPreview(input, options = {}) {
     requireHeader(home.headers, 'x-content-type-options', 'nosniff');
     requireHeader(home.headers, 'referrer-policy', 'strict-origin-when-cross-origin');
     requireHeader(home.headers, 'x-frame-options', 'DENY');
+    requireHeader(home.headers, 'cross-origin-opener-policy', 'same-origin');
+    requireHeader(home.headers, 'cross-origin-resource-policy', 'same-origin');
     requireHeader(home.headers, 'permissions-policy', 'camera=(self)');
     if (target.protocol === 'https:') {
       const hsts = requireHeader(home.headers, 'strict-transport-security');
@@ -107,6 +109,9 @@ export async function checkPreview(input, options = {}) {
     }
     if (!hasToken(directives.get('object-src'), "'none'")) {
       errors.push("The CSP is missing object-src 'none'.");
+    }
+    if (!hasToken(directives.get('style-src-elem'), "'self'")) {
+      errors.push("The CSP is missing style-src-elem 'self'.");
     }
     if (!hasToken(directives.get('connect-src'), "'self'")) {
       errors.push("The CSP is missing connect-src 'self'.");
