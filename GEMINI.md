@@ -15,9 +15,9 @@ Production codebase governed by Sauron Universal Agent Harness.
 - Build and typecheck: `npm run build`
 - Unit and component tests: `npm test`
 - Mocked UI flows: `npm run test:e2e:ui`
-- Real host/guest flows: `npm run test:e2e` (needs `vercel dev` or `E2E_BASE_URL`)
+- Real host/guest flows: `npm run test:e2e` (needs `E2E_BASE_URL` pointing at a disposable branch-backed target)
 - Integration: `npm run test:integration` (needs a disposable Neon branch)
-- Database: `npx supabase test db --db-url "$NEON_DATABASE_URL"`
+- Database: `npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"`
 - Single unit test: `npx vitest run tests/unit/<filename>.test.ts`
 
 ## Architectural & Coding Guidelines

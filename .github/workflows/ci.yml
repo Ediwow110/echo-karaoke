@@ -78,10 +78,13 @@ jobs:
           BRANCH_NAME: ci-db-${{ github.run_id }}-${{ github.run_attempt }}
         run: node scripts/neon-branch.mjs create
 
+      # Call the binary setup-cli installed. `npx supabase` ignores it, downloads
+      # the registry's latest (3.1.0), and dies with "No matching Supabase CLI
+      # binary package found for linux-x64" before it reaches the database.
       - name: Apply the migration chain
         env:
           NEON_DATABASE_URL: ${{ steps.branch.outputs.neon_database_url }}
-        run: npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
+        run: supabase db push --db-url "$NEON_DATABASE_URL" --yes
 
       - name: Require the runtime role
         env:
@@ -91,7 +94,7 @@ jobs:
       - name: Run the database suite
         env:
           NEON_DATABASE_URL: ${{ steps.branch.outputs.neon_database_url }}
-        run: npx supabase test db --db-url "$NEON_DATABASE_URL" --yes
+        run: supabase test db --db-url "$NEON_DATABASE_URL" --yes
 
       - name: Delete the Neon branch
         if: always() && steps.branch.outputs.branch_id != ''
@@ -128,10 +131,11 @@ jobs:
           BRANCH_NAME: ci-it-${{ github.run_id }}-${{ github.run_attempt }}
         run: node scripts/neon-branch.mjs create
 
+      # Same reason as the database job: `supabase`, not `npx supabase`.
       - name: Apply the migration chain
         env:
           NEON_DATABASE_URL: ${{ steps.branch.outputs.neon_database_url }}
-        run: npx supabase db push --db-url "$NEON_DATABASE_URL" --yes
+        run: supabase db push --db-url "$NEON_DATABASE_URL" --yes
 
       # The branch inherits the parent's encrypted JWKS rows. Removing them
       # lets Better Auth generate a key pair with this run's secret.
