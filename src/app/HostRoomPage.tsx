@@ -456,6 +456,11 @@ export default function HostRoomPage() {
       onNext={next}
       onReport={onReport}
       onFindAlternative={onFindAlternative}
+      onAutoSkip={(title) => notify(
+        'Skipped ' + title,
+        'The video could not play here, so the room moved on.',
+        'info',
+      )}
     >
       <Outlet context={context} />
       {toastNode}
