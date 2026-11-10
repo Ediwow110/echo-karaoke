@@ -62,22 +62,6 @@ export default function HostPartyPage() {
   const [panelMounted, setPanelMounted] = useState(computer);
   const panelRef = useRef<HTMLDivElement>(null);
   const switchRef = useRef<HTMLButtonElement>(null);
-  const [inviteHidden, setInviteHidden] = useState(false);
-  const inviteTimerRef = useRef<number | null>(null);
-
-  const hideInviteOnMove = useCallback(() => {
-    setInviteHidden(true);
-    if (inviteTimerRef.current !== null) window.clearTimeout(inviteTimerRef.current);
-    inviteTimerRef.current = window.setTimeout(() => {
-      inviteTimerRef.current = null;
-      setInviteHidden(false);
-    }, 2500);
-  }, []);
-
-  useEffect(() => () => {
-    if (inviteTimerRef.current !== null) window.clearTimeout(inviteTimerRef.current);
-  }, []);
-
   useEffect(() => {
     if (computer) {
       setPanelMounted(true);
@@ -233,15 +217,7 @@ export default function HostPartyPage() {
           : { dot: 'bg-line', label: 'Ready' };
 
   const stageInvite = !computer && connection === 'live' && joinUrl.length > 0 ? (
-    <div
-      data-join-overlay
-      aria-hidden={inviteHidden}
-      inert={inviteHidden}
-      className={[
-        'absolute bottom-3 left-3 z-30 transition-opacity duration-300',
-        inviteHidden ? 'pointer-events-none opacity-0' : 'opacity-100',
-      ].join(' ')}
-    >
+    <div data-join-overlay className="absolute bottom-3 left-3 z-30">
       <InviteCard
         roomName={roomName}
         code={code}
@@ -297,7 +273,6 @@ export default function HostPartyPage() {
         className="party-layout min-h-0 w-full flex-1 p-3 lg:p-4"
         data-layout={computer ? 'computer' : 'tv'}
         style={{ '--layout-duration': LAYOUT_TRANSITION_MS + 'ms' } as CSSProperties}
-        onMouseMove={hideInviteOnMove}
       >
         <main className="flex min-h-0 w-full min-w-0 flex-1 flex-col">
           {hasVideo ? (
