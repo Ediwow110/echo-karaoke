@@ -1,6 +1,5 @@
 import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
-import { Link, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom';
-import { SignOutIcon } from '@phosphor-icons/react/dist/csr/SignOut';
+import { Link, Outlet, useNavigate, useParams } from 'react-router-dom';
 import { useRoomData } from '../features/rooms/useRoomData';
 import { useRoomApi } from './RoomApiProvider';
 import {
@@ -12,34 +11,19 @@ import {
 import { removeSong as removeQueueSong, reorderSong as reorderQueueSong, voteSong as castVote, describeVoteError } from '../features/queue/queueApi';
 import { sendPlaybackCommand, reportPlaybackPosition } from '../features/playback/playbackApi';
 import HostPlayer from '../features/playback/HostPlayer';
-import PlayerDock from '../features/playback/PlayerDock';
-import type { SidebarNav } from '../features/rooms/Sidebar';
-import AppShell from '../features/rooms/AppShell';
 import { buildJoinUrl } from '../features/rooms/roomUrl';
 import { loadHostToken } from '../features/rooms/tokenStore';
 import { rememberSession, forgetSession } from '../features/rooms/sessionStore';
-import { rememberPlayed, rememberSongs } from '../features/library/libraryStore';
-import { groupRoomCode, presenceSummary } from '../lib/format';
-import { Button, Chip, IconButton, Logo, Toast, type ToastTone } from '../ui';
+import { Button, Logo, Toast, type ToastTone } from '../ui';
 import type { HostNotify, HostRoomContext } from './useHostRoom';
 
 export type { HostNotify, HostRoomContext } from './useHostRoom';
-
-function navFor(pathname: string): SidebarNav {
-  if (pathname.endsWith('/host/queue')) return 'queue';
-  if (pathname.endsWith('/host/settings')) return 'settings';
-  if (pathname.endsWith('/host/library')) return 'library';
-  if (pathname.endsWith('/host/favorites')) return 'favorites';
-  if (pathname.endsWith('/host/recent')) return 'recent';
-  return 'discover';
-}
 
 export default function HostRoomPage() {
   const params = useParams<{ roomId: string }>();
   const roomId = params.roomId ?? '';
   const api = useRoomApi();
   const navigate = useNavigate();
-  const location = useLocation();
   const { data, error, loading, connection, restoredAt, refresh } = useRoomData(roomId, 'host');
   const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone: ToastTone } | null>(null);
   const playbackBusy = useRef(false);
@@ -48,8 +32,6 @@ export default function HostRoomPage() {
   const autoAdvance = useRef<{ songId: string; promise: Promise<boolean> } | null>(null);
   const lastAutoAdvance = useRef<string | null>(null);
   const reportFailures = useRef(0);
-  const seenSongs = useRef(new Set<string>());
-  const playedSong = useRef<string | null>(null);
   const rememberedRoom = useRef<string | null>(null);
   const exitSentRef = useRef(false);
   const exitTimerRef = useRef<number | null>(null);
@@ -60,7 +42,6 @@ export default function HostRoomPage() {
     [roomId],
   );
   const lastAutoPlayKey = useRef<string | null>(null);
-  const queueInitialized = useRef(false);
 
   // Hosts arrive here from the home page, which may be scrolled; without this
   // the room opens mid-page with its hero banner cut off.
@@ -176,13 +157,6 @@ export default function HostRoomPage() {
       settle();
     }
   }, [api, notify, refresh, roomId]);
-
-  const openPartyView = useCallback((): void => {
-    if (location.pathname.endsWith('/host/stage') || location.pathname.endsWith('/host/party')) {
-      return;
-    }
-    navigate('/room/' + roomId + '/host/party');
-  }, [location.pathname, navigate, roomId]);
 
   const runManualNext = useCallback(async (): Promise<boolean> => {
     if (advanceBusy.current) return false;
@@ -328,7 +302,7 @@ export default function HostRoomPage() {
   }, [api, notify, roomId]);
 
   const onFindAlternative = useCallback((query: string): void => {
-    navigate('/room/' + roomId + '/host?q=' + encodeURIComponent(query));
+    navigate('/room/' + roomId + '/host/party?layout=computer&panel=search&q=' + encodeURIComponent(query));
   }, [navigate, roomId]);
 
   useEffect(() => {
@@ -353,44 +327,6 @@ export default function HostRoomPage() {
   }, [notify, restoredAt]);
 
   useEffect(() => {
-    if (nowPlaying === null) {
-      return;
-    }
-    if (playedSong.current === nowPlaying.songId) {
-      return;
-    }
-    playedSong.current = nowPlaying.songId;
-    rememberPlayed([nowPlaying]);
-  }, [nowPlaying]);
-
-  useEffect(() => {
-    if (!live) {
-      return;
-    }
-    const fresh = queue.filter((song) => !seenSongs.current.has(song.videoId));
-    if (!queueInitialized.current) {
-      // A host opening the room with an existing queue should not be pulled
-      // away from the page they chose; only songs added after this point do.
-      for (const song of fresh) {
-        seenSongs.current.add(song.videoId);
-      }
-      if (fresh.length > 0) {
-        rememberSongs(fresh);
-      }
-      queueInitialized.current = true;
-      return;
-    }
-    if (fresh.length === 0) {
-      return;
-    }
-    for (const song of fresh) {
-      seenSongs.current.add(song.videoId);
-    }
-    rememberSongs(fresh);
-    openPartyView();
-  }, [openPartyView, live, queue]);
-
-  useEffect(() => {
     document.title = roomName.length > 0 ? 'kara-echo · ' + roomName : 'kara-echo | the room sings together';
     return () => {
       document.title = 'kara-echo | the room sings together';
@@ -413,22 +349,13 @@ export default function HostRoomPage() {
     const key = queue[0].songId;
     if (lastAutoPlayKey.current === key) return;
     lastAutoPlayKey.current = key;
-    // A guest's first request should take the host screen straight into party
-    // view; the manual "Take the stage" button is only a fallback.
-    void runPlayback('play').then((started) => {
-      // Party view is where the host watches the video this command starts, so
-      // a refused play must leave them on the page that can retry it.
-      if (started) {
-        openPartyView();
-      }
-    });
-  }, [openPartyView, live, data?.playback, queue, runPlayback]);
+    void runPlayback('play');
+  }, [live, data?.playback, queue, runPlayback]);
 
   if (loading) {
     return (
-      <main className="min-h-dvh bg-graphite px-4 py-7 text-ink lg:grid lg:grid-cols-[232px_minmax(0,1fr)]">
+      <main className="min-h-dvh bg-graphite px-4 py-7 text-ink">
         <span role="status" className="sr-only">Loading host controls…</span>
-        <div className="hidden border-r border-line lg:block" />
         <div className="mx-auto w-full max-w-[1180px]">
           <div className="skeleton h-16 w-full rounded-panel" />
           <div className="skeleton mt-5 h-[28rem] w-full rounded-panel" />
@@ -482,10 +409,6 @@ export default function HostRoomPage() {
     );
   }
 
-  const stageRoute = location.pathname.endsWith('/host/stage');
-  const partyRoute = location.pathname.endsWith('/host/party');
-  const immersive = stageRoute || partyRoute;
-  const activeNav = navFor(location.pathname);
   const context: HostRoomContext = {
     roomId,
     room,
@@ -514,7 +437,7 @@ export default function HostRoomPage() {
   };
 
   const toastNode = toast === null ? null : (
-    <div className={['pointer-events-none fixed inset-x-0 z-[70] flex justify-center px-4', immersive ? 'bottom-6' : 'bottom-[7.5rem] lg:bottom-[6.5rem]'].join(' ')}>
+    <div className="pointer-events-none fixed inset-x-0 bottom-6 z-[70] flex justify-center px-4">
       <Toast
         key={toast.id}
         message={toast.message}
@@ -525,22 +448,6 @@ export default function HostRoomPage() {
     </div>
   );
 
-  if (immersive) {
-    return (
-      <HostPlayer
-        key={roomId}
-        playback={data.playback}
-        nowPlaying={nowPlaying}
-        onNext={next}
-        onReport={onReport}
-        onFindAlternative={onFindAlternative}
-      >
-        <Outlet context={context} />
-        {toastNode}
-      </HostPlayer>
-    );
-  }
-
   return (
     <HostPlayer
       key={roomId}
@@ -550,87 +457,7 @@ export default function HostRoomPage() {
       onReport={onReport}
       onFindAlternative={onFindAlternative}
     >
-      <AppShell
-        activeNav={activeNav}
-        activeRoom={{ roomId, name: roomName, code, hostName }}
-        hostName={hostName}
-        header={(
-          <header className="relative z-30 border-b border-line bg-graphite/95 backdrop-blur">
-            <div className="mx-auto flex max-w-[1240px] flex-wrap items-center justify-between gap-3 px-4 py-3.5 sm:px-6 lg:px-8">
-              <div className="flex min-w-0 items-center gap-3">
-                <Link to="/" className="inline-flex min-h-6 min-w-6 items-center justify-center lg:hidden" aria-label="kara-echo home">
-                  <Logo size="sm" withWordmark={false} />
-                </Link>
-                <div className="min-w-0">
-                  <p className="eyebrow text-gold">YouTube karaoke room</p>
-                  <h1 className="mt-0.5 truncate font-display text-[1.45rem] font-bold leading-[1.15] tracking-[-0.02em] text-ink sm:text-[1.55rem]">
-                    {roomName}
-                  </h1>
-                </div>
-              </div>
-              <div className="flex flex-wrap items-center gap-2">
-                {connection === 'offline' ? (
-                  <Chip tone="gold">Reconnecting</Chip>
-                ) : (
-                  <span className="hidden items-center gap-2 text-[0.6875rem] text-ink-2 sm:flex">
-                    <span aria-hidden="true" className="animate-presence-pulse size-1.5 rounded-full bg-live" />
-                    {groupRoomCode(code)} · {presenceSummary(roster)}
-                  </span>
-                )}
-                <IconButton
-                  icon={<SignOutIcon size={17} weight="regular" />}
-                  label="Back to home"
-                  tone="ghost"
-                  size="sm"
-                  placement="bottom"
-                  onClick={() => navigate('/')}
-                />
-              </div>
-            </div>
-            <nav aria-label="Room sections" className="lg:hidden">
-              <div className="no-scrollbar mx-auto flex max-w-[1240px] gap-1 overflow-x-auto px-4 pb-2 sm:px-6">
-                {[
-                  { label: 'TV stage', href: '/room/' + roomId + '/host/party' },
-                  { label: 'Queue', href: '/room/' + roomId + '/host/queue' },
-                  { label: 'Library', href: '/room/' + roomId + '/host/library' },
-                  { label: 'Favorites', href: '/room/' + roomId + '/host/favorites' },
-                  { label: 'Recent', href: '/room/' + roomId + '/host/recent' },
-                  { label: 'Settings', href: '/room/' + roomId + '/host/settings' },
-                ].map((link) => {
-                  const isActive = location.pathname === link.href;
-                  return (
-                    <Link
-                      key={link.href}
-                      to={link.href}
-                      aria-current={isActive ? 'page' : undefined}
-                      className={[
-                        'flex min-h-11 shrink-0 items-center rounded-media px-3 text-[0.6875rem] font-semibold transition-[background-color,color,transform,scale] duration-150 active:scale-[0.98]',
-                        isActive ? 'bg-surface text-signal' : 'text-ink-2 hover:bg-surface hover:text-ink',
-                      ].join(' ')}
-                    >
-                      {link.label}
-                    </Link>
-                  );
-                })}
-              </div>
-            </nav>
-          </header>
-        )}
-      >
-        <main className="mx-auto w-full max-w-[1240px] px-4 pb-36 pt-6 sm:px-6 lg:px-8 lg:pt-8">
-          <div key={location.pathname} className="page-enter">
-            <Outlet context={context} />
-          </div>
-        </main>
-
-        <PlayerDock
-          roomId={roomId}
-          nowPlaying={nowPlaying}
-          playback={data.playback}
-          onTogglePlay={togglePlay}
-          onNext={next}
-        />
-      </AppShell>
+      <Outlet context={context} />
       {toastNode}
     </HostPlayer>
   );

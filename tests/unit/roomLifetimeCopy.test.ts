@@ -36,7 +36,6 @@ describe('room lifetime copy', () => {
     expect(minutes).toBe(30); // control: the parse found the live cron argument
 
     const phrase = 'nobody has been online for ' + minutes + ' minutes';
-    expect(source('src/app/HostSettingsPage.tsx')).toContain(phrase);
     expect(source('src/features/rooms/InviteCard.tsx')).toContain(phrase);
   });
 });

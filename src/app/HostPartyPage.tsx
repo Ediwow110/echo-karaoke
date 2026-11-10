@@ -1,15 +1,13 @@
 import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
-import { Link, useSearchParams } from 'react-router-dom';
+import { useSearchParams } from 'react-router-dom';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
 import { ArrowsOutIcon } from '@phosphor-icons/react/dist/csr/ArrowsOut';
 import { DoorOpenIcon } from '@phosphor-icons/react/dist/csr/DoorOpen';
-import { HeartIcon } from '@phosphor-icons/react/dist/csr/Heart';
 import { LaptopIcon } from '@phosphor-icons/react/dist/csr/Laptop';
 import { PauseIcon } from '@phosphor-icons/react/dist/csr/Pause';
 import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { SkipForwardIcon } from '@phosphor-icons/react/dist/csr/SkipForward';
-import { SlidersHorizontalIcon } from '@phosphor-icons/react/dist/csr/SlidersHorizontal';
 import { SpeakerHighIcon } from '@phosphor-icons/react/dist/csr/SpeakerHigh';
 import { TelevisionIcon } from '@phosphor-icons/react/dist/csr/Television';
 import { useHostRoom } from './useHostRoom';
@@ -21,7 +19,6 @@ import PopularSongs from '../features/queue/PopularSongs';
 import SongbookList from '../features/catalog/SongbookList';
 import { CATALOG_CHANNEL_LABELS } from '../features/catalog/catalogApi';
 import InviteCard from '../features/rooms/InviteCard';
-import { isFavorite, subscribeLibrary, toggleFavorite } from '../features/library/libraryStore';
 import { formatTime, onlineGuestCount, queueSummary } from '../lib/format';
 import { Button, Chip, ConfirmDialog, Logo, SongArtwork, TransportButton } from '../ui';
 
@@ -54,6 +51,8 @@ export default function HostPartyPage() {
     votingSongId,
     togglePlay,
     next,
+    runHost,
+    notify,
     endRoom,
   } = useHostRoom();
   const api = useRoomApi();
@@ -77,6 +76,7 @@ export default function HostPartyPage() {
     const requested = params.get('panel');
     return requested === 'queue' || requested === 'songbook' ? requested : 'search';
   });
+  const [searchQuery] = useState(() => params.get('q') ?? '');
 
   useEffect(() => {
     if (params.get('panel') === null) return;
@@ -84,11 +84,24 @@ export default function HostPartyPage() {
     // state and the URL should not keep insisting on this one.
     const next = new URLSearchParams(params);
     next.delete('panel');
+    next.delete('q');
     setParams(next, { replace: true });
   }, [params, setParams]);
   const [density, setDensity] = useState<Density>('grid');
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
+  const [confirmClear, setConfirmClear] = useState(false);
+  const [clearing, setClearing] = useState(false);
+
+  async function clearQueue(): Promise<void> {
+    setClearing(true);
+    const accepted = await runHost('clear_queue');
+    setClearing(false);
+    setConfirmClear(false);
+    if (accepted) {
+      notify('The queue is clear.', 'Nothing is waiting and playback has stopped.', 'info');
+    }
+  }
 
   async function finishRoom(): Promise<void> {
     setEnding(true);
@@ -104,14 +117,6 @@ export default function HostPartyPage() {
     window.scrollTo({ top: 0, left: 0, behavior: 'auto' });
   }, []);
   const [busy, setBusy] = useState<'play' | 'next' | null>(null);
-  const videoId = nowPlaying?.videoId ?? null;
-  const [saved, setSaved] = useState(() => nowPlaying !== null && isFavorite(nowPlaying.videoId));
-
-  useEffect(() => {
-    const sync = (): void => setSaved(videoId !== null && isFavorite(videoId));
-    sync();
-    return subscribeLibrary(sync);
-  }, [videoId]);
 
   const attachSlot = useCallback((node: HTMLDivElement | null) => {
     player.registerStageSlot(node);
@@ -190,11 +195,6 @@ export default function HostPartyPage() {
     }
   }
 
-  function favorite(): void {
-    if (nowPlaying === null) return;
-    setSaved(toggleFavorite(nowPlaying));
-  }
-
   const playing = playback?.isPlaying === true;
   const duration = Number.isFinite(player.duration) && player.duration > 0
     ? player.duration
@@ -233,14 +233,6 @@ export default function HostPartyPage() {
             />
             {onlineGuestCount(roster)} in room
           </span>
-          <Link
-            to={'/room/' + roomId + '/host/settings'}
-            aria-label="Room settings"
-            title="Room settings"
-            className="grid size-11 shrink-0 place-items-center rounded-full text-ink-2 transition-colors hover:bg-surface-2 hover:text-ink focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-signal"
-          >
-            <SlidersHorizontalIcon size={17} aria-hidden="true" />
-          </Link>
           <button
             ref={switchRef}
             type="button"
@@ -281,18 +273,6 @@ export default function HostPartyPage() {
                   on a 320px phone and parked the video without a word. */}
               <div className="relative aspect-video min-h-[202px] w-full overflow-hidden rounded-panel border border-white/10 lg:aspect-auto lg:min-h-0 lg:flex-1" data-stage-frame>
                 <div ref={attachSlot} className="absolute inset-0" data-party-slot />
-                <div className="party-invite pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(21rem,88vw)]" data-join-overlay aria-hidden={computer} inert={computer}>
-                  <InviteCard
-                    roomName={roomName}
-                    code={code}
-                    hostName={hostName}
-                    joinUrl={joinUrl}
-                    guests={onlineGuestCount(roster)}
-                    shareReady={connection === 'live'}
-                    variant="party"
-                    className="pointer-events-auto"
-                  />
-                </div>
               </div>
             </>
           ) : (
@@ -324,18 +304,6 @@ export default function HostPartyPage() {
                     </Button>
                   )}
                 </div>
-              </div>
-              <div className="party-invite pointer-events-none absolute bottom-3 left-3 z-30 max-w-[min(21rem,88vw)]" data-join-overlay aria-hidden={computer} inert={computer}>
-                <InviteCard
-                  roomName={roomName}
-                  code={code}
-                  hostName={hostName}
-                  joinUrl={joinUrl}
-                  guests={onlineGuestCount(roster)}
-                  shareReady={connection === 'live'}
-                  variant="party"
-                  className="pointer-events-auto"
-                />
               </div>
             </div>
           )}
@@ -409,17 +377,6 @@ export default function HostPartyPage() {
               </div>
 
               <div className="flex items-center gap-3">
-                <button
-                  type="button"
-                  onClick={favorite}
-                  disabled={nowPlaying === null}
-                  aria-pressed={saved}
-                  aria-label={(saved ? 'Remove ' : 'Save ') + (nowPlaying?.title ?? 'this song') + (saved ? ' from favorites' : ' to favorites')}
-                  className={['inline-flex min-h-11 items-center gap-1.5 px-1 text-[0.6875rem] transition-colors disabled:opacity-40', saved ? 'text-signal' : 'text-ink-2 hover:text-ink'].join(' ')}
-                >
-                  <HeartIcon size={15} weight={saved ? 'fill' : 'regular'} aria-hidden="true" />
-                  {saved ? 'Saved' : 'Save'}
-                </button>
                 <SpeakerHighIcon size={15} className="text-ink-2" aria-hidden="true" />
                 <input
                   type="range"
@@ -462,7 +419,13 @@ export default function HostPartyPage() {
                   )}
                 </div>
                 <div className="flex shrink-0 items-center gap-3 text-[0.625rem] text-ink-2">
-                  <Link to={'/room/' + roomId + '/host/queue'} className="min-h-11 inline-flex items-center hover:text-ink">Up next · {upNext.length}</Link>
+                  <button
+                    type="button"
+                    onClick={() => { setLayout('computer'); setTab('queue'); }}
+                    className="min-h-11 inline-flex items-center hover:text-ink"
+                  >
+                    Up next · {upNext.length}
+                  </button>
                   {nextSong === null ? null : <span className="hidden sm:block">Starts automatically when this video ends</span>}
                 </div>
               </section>
@@ -480,7 +443,6 @@ export default function HostPartyPage() {
                 joinUrl={joinUrl}
                 guests={onlineGuestCount(roster)}
                 shareReady={connection === 'live'}
-                variant="compact"
                 className="shrink-0"
               />
 
@@ -526,6 +488,7 @@ export default function HostPartyPage() {
                       queue={queue}
                       variant="host"
                       layout={density}
+                      initialQuery={searchQuery}
                       onAdded={() => { void refresh(); }}
                       onOpenQueue={() => setTab('queue')}
                       popularSlot={(
@@ -544,14 +507,14 @@ export default function HostPartyPage() {
                   <>
                     <div className="flex items-center justify-between gap-2">
                       <h2 className="font-display text-[1.05rem] font-bold tracking-[-0.02em] text-ink">Room queue</h2>
-                      <div className="flex items-center gap-1">
-                        <Link to={'/room/' + roomId + '/host/settings'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-ink-2 hover:text-ink hover:underline">
-                          Room settings
-                        </Link>
-                        <Link to={'/room/' + roomId + '/host/queue'} className="min-h-9 inline-flex items-center px-1 text-[0.6875rem] font-semibold text-signal hover:underline">
-                          Full queue
-                        </Link>
-                      </div>
+                      <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => setConfirmClear(true)}
+                        disabled={queue.length === 0 || clearing}
+                      >
+                        Clear queue
+                      </Button>
                     </div>
                     <p className="mt-1.5 text-[0.6875rem] leading-[1.55] text-ink-2">
                       Songs play in order, and the next one starts by itself.
@@ -603,6 +566,16 @@ export default function HostPartyPage() {
         busy={ending}
         onConfirm={() => { void finishRoom(); }}
         onCancel={() => setConfirmEnd(false)}
+      />
+      <ConfirmDialog
+        open={confirmClear}
+        title="Clear the queue?"
+        description="Every song is removed, including the one playing, and playback stops. This cannot be undone."
+        confirmLabel="Clear queue"
+        cancelLabel="Keep the queue"
+        busy={clearing}
+        onConfirm={() => { void clearQueue(); }}
+        onCancel={() => setConfirmClear(false)}
       />
     </div>
   );

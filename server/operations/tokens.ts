@@ -3,7 +3,7 @@ import { HttpError } from './errors.js';
 const CROCKFORD = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
 export function generateRoomCode(): string {
-  const bytes = new Uint8Array(16);
+  const bytes = new Uint8Array(6);
   crypto.getRandomValues(bytes);
   let code = '';
   for (const byte of bytes) {

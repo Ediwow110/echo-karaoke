@@ -70,6 +70,20 @@ from (
   ) as created
 ) s;
 
+select is(
+  (select public.create_room(
+    'ABC123', 'six-code-host', 'Six Code Host', repeat('s', 40), repeat('t', 40)
+  ) ->> 'roomCode'),
+  'ABC123',
+  'a six-character room code is accepted');
+
+select throws_ok(
+  $$select public.create_room(
+    'ABC12', 'short-code-host', 'Short Code Host', repeat('s', 40), repeat('t', 40)
+  )$$,
+  '22023', null,
+  'a five-character room code is refused');
+
 -- A join is a membership the moment it lands: no status gate, and the guest
 -- read returns the live room on the very next call.
 create temp table dguest on commit drop as

@@ -220,7 +220,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
     if (joinSubmitting.current) return;
     setError(null);
     if (!isValidRoomCode(joinCode)) {
-      setError('That room code is not sixteen characters.');
+      setError('That room code is not valid.');
       return;
     }
     joinSubmitting.current = true;
@@ -294,12 +294,12 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
                   invalidatePendingJoin();
                   setJoinCode(normalizeRoomCode(event.target.value));
                 }}
-                placeholder="ABCD EFGH JKMN PQRS"
+                placeholder="ABC 123"
                 autoComplete="off"
                 spellCheck={false}
                 maxLength={24}
                 icon={<KeyIcon size={17} weight="duotone" />}
-                error={joinCode.length > 0 && !isValidRoomCode(joinCode) ? 'That code is not sixteen characters.' : null}
+                error={joinCode.length > 0 && !isValidRoomCode(joinCode) ? 'That code is not valid.' : null}
               />
               <Field
                 id="join-name"

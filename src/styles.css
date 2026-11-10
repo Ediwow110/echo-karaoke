@@ -396,17 +396,6 @@
     opacity: 0;
   }
 
-  .party-invite {
-    transition: opacity var(--layout-duration) var(--ease-console),
-      visibility 0s;
-  }
-
-  .party-layout[data-layout='computer'] .party-invite {
-    opacity: 0;
-    visibility: hidden;
-    transition-delay: 0s, var(--layout-duration);
-  }
-
   @media (min-width: 1024px) {
     .party-layout {
       display: grid;
@@ -478,8 +467,7 @@
 @media (prefers-reduced-motion: reduce) {
   .party-layout,
   .party-panel,
-  .party-up-next,
-  .party-invite {
+  .party-up-next {
     transition: none !important;
   }
 

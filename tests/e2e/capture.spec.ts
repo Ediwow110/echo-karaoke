@@ -18,14 +18,9 @@ test('capture screens', async ({ browser }) => {
   await page.waitForTimeout(1600);
   await page.screenshot({ path: 'test-results/screens/tv-stage.png', fullPage: true });
 
-  const hostId = page.url().split('/room/')[1]?.split('/')[0] ?? '';
-  await page.goto(BASE + '/room/' + hostId + '/host/queue');
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
   await page.waitForTimeout(1200);
-  await page.screenshot({ path: 'test-results/screens/host-queue.png', fullPage: true });
-
-  await page.goto(BASE + '/room/' + hostId + '/host/settings');
-  await page.waitForTimeout(1000);
-  await page.screenshot({ path: 'test-results/screens/host-settings.png', fullPage: true });
+  await page.screenshot({ path: 'test-results/screens/host-computer.png', fullPage: true });
 
   const phone = await browser.newPage({ viewport: { width: 390, height: 844 }, isMobile: true });
   const qr = page.locator('img[data-join-url]').first();

@@ -34,7 +34,7 @@ describe('invitation card presence', () => {
       // It must stay decorative, or a screen reader announces a gradient.
       render(variant === undefined
         ? <InviteCard {...props} />
-        : <InviteCard {...props} variant={variant} />);
+        : <InviteCard {...props} />);
       const card = await screen.findByRole('region', { name: 'Invite your people' });
       const smoke = card.querySelector('.stage-smoke');
       expect(smoke).not.toBeNull();
@@ -95,13 +95,4 @@ describe('host QR invitation safety', () => {
     expect(screen.queryByText(/QR code to join/)).not.toBeInTheDocument();
   });
 
-  it.each(['compact', 'party'] as const)(
-    'suppresses the %s room QR while the host is offline',
-    (variant) => {
-      render(<InviteCard {...props} variant={variant} shareReady={false} />);
-      expect(screen.getByRole('status')).toHaveTextContent(/cannot verify this room/i);
-      expect(screen.queryByText(/ABCD EFGH JKMN PQRS/)).not.toBeInTheDocument();
-      expect(screen.queryByRole('button', { name: /copy/i })).not.toBeInTheDocument();
-    },
-  );
 });

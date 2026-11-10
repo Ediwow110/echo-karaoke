@@ -20,7 +20,7 @@ function normalizeRoomCode(value: unknown): string {
     throw new HttpError('VALIDATION_ERROR', 400, 'A room code is required');
   }
   const code = value.toUpperCase().replace(/[^0-9A-Z]/g, '');
-  if (!/^[0-9A-HJKMNP-TV-Z]{16}$/.test(code)) {
+  if (!/^(?:[0-9A-HJKMNP-TV-Z]{6}|[0-9A-HJKMNP-TV-Z]{16})$/.test(code)) {
     throw new HttpError('VALIDATION_ERROR', 400, 'That room code is not valid');
   }
   return code;
