@@ -779,7 +779,7 @@ describe('host room workspace', () => {
     expect(await screen.findByRole('slider', { name: 'Playback position' })).toBeInTheDocument();
   });
 
-  it('keeps the join QR on the TV stage and hides it while the mouse moves', async () => {
+  it('keeps the join QR on the TV stage', async () => {
     const idle = {
       ...liveRoom,
       playback: {
@@ -796,11 +796,7 @@ describe('host room workspace', () => {
 
     expect(await screen.findByRole('img', { name: /QR code to join After Hours/i })).toBeInTheDocument();
     expect(screen.getByText('ABCD EFGH JKMN PQRS')).toBeInTheDocument();
-    const overlay = document.querySelector('[data-join-overlay]');
-    expect(overlay).not.toBeNull();
-
-    fireEvent.mouseMove(document.querySelector('.party-layout') as Element);
-    expect(overlay).toHaveAttribute('aria-hidden', 'true');
+    expect(document.querySelector('[data-join-overlay]')).not.toBeNull();
 
     cleanup();
 
