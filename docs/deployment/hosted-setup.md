@@ -21,6 +21,22 @@ possible.
 - A production deployment whose browser bundle holds no database credential.
 - A CI workflow that runs the database and operation suites on throwaway Neon branches.
 
+## Current UI state (2026-11-10)
+
+The host console shell and its pages were removed with migrations through 0051. Current behavior:
+
+- The stage at `/room/<id>/host/party` is the only host screen. It has TV and computer layouts;
+  every retired host URL (queue, settings, library, favorites, recently sung) redirects to it.
+- The invitation and its QR live in the computer layout's side panel. The TV layout has no invite overlay.
+- Host controls on the stage: play/pause, skip, reorder, remove, clear queue, and end room. The guest
+  pause/resume and door-lock toggles, guest removal, host handover, and the local library, favorites
+  and recently-sung pages no longer exist in the client. Playback is host-only and guests join directly.
+- New rooms receive six-character Crockford codes. Sixteen-character rooms created before this change
+  remain joinable. Migration `0051_short_room_codes.sql` must run before a build that creates
+  six-character codes is deployed.
+- Sections below dated 2026-10-26/27 are historical records. Where they describe Room settings,
+  handover, a sidebar, or the collection pages, that UI has been removed.
+
 ## Architecture
 
 ```
@@ -78,7 +94,7 @@ into a build environment, a chat message, or a command whose output is logged.
 ## Step 1: Apply the database chain
 
 The chain runs from `0000_platform_compatibility.sql` through
-`0021_user_id_text.sql`. On Neon it has already been applied to `main`. To apply it to
+`0051_short_room_codes.sql`. On Neon it has already been applied to `main`. To apply it to
 another database:
 
 ```bash
@@ -95,7 +111,7 @@ Run the database suite against the same URL:
 npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"
 ```
 
-Expected: `Result: PASS`, 8 files and 225 assertions. Docker must be running because
+Expected: `Result: PASS`, 23 files and 421 assertions. Docker must be running because
 the Supabase CLI runs `pg_prove` in a container.
 
 ### Role logins
@@ -532,10 +548,9 @@ grants in 0034 are needed even though nothing calls them yet.
    after 0032, and the deployed front-end never sends the field that triggers it. The path is guarded —
    `HostPlayer.advance()` refuses unless the video it loaded is still the room's current song,
    `playback_next_if_current` re-checks that song under the room lock, the client latches one advance
-   per song id, and a refusal shows as a stalled-advance state instead of silence. But **there is no
-   host setting that turns it off**: `HostSettingsPage` exposes only the guest-control and
-   guest-playback locks. Treat it as a product decision to ship, not a silent side effect — if you
-   want a per-room switch, that is a follow-up, not something to bolt on mid-ship.
+   per song id, and a refusal shows as a stalled-advance state instead of silence. There is no
+   per-room switch: the console shell and its settings page were removed on 2026-11-10, so automatic
+   advance is always on. Treat it as a product decision to ship, not a silent side effect.
    `npx vercel build --prod` run locally on 2026-10-26 completed in 32 s: `verify:deploy` passed once
    a ≥32-character `CRON_SECRET` existed (any value satisfies the length check — the guard does not
    compare it to anything), the Vite bundle built, and `api/router.ts` packaged into
@@ -723,6 +738,9 @@ no longer valid. The refusal is correct; the console noise is the bug, and one g
 
 ## Transfer host (migration 0035, shipped 2026-10-26)
 
+**Retired 2026-11-10.** The console shell, including Room settings, was removed. The database
+operations remain, but no host screen exposes transfer, guest removal, or guest-permission toggles.
+
 A host can hand the room to any guest whose remote is still connected, from **Room settings →
 crown icon**. Control genuinely moves: the outgoing host's pass stops working at that instant and
 they are demoted to a guest with a pass of their own, rather than being dropped out of a room they
@@ -748,6 +766,9 @@ console error, and silencing it means skipping the unmount pause when the tab wa
 than closed.
 
 ## Narrow screens (shipped 2026-10-26)
+
+**Historical (2026-10-26/27).** The console pages and sidebar measured here were removed on
+2026-11-10; the host screen is now the stage and its computer panel.
 
 The owner's screenshot showed `kara-echo` folded across two lines in the stage header at 320px, with
 the back arrow and Party view pushed apart. The wordmark was a fixed `2.05rem` in a flex row, so on a
@@ -787,6 +808,9 @@ slider is deliberately outside that gate -- it is a range input with a different
 here claims it was changed.
 
 ## Landing identity and the roomless nav (shipped 2026-10-26)
+
+**Historical.** The sidebar and collection pages described here were removed on 2026-11-10; the
+landing identity rules still apply.
 
 **No name until one is typed.** `karaoke.profile.name` survived the blank field: the landing
 sidebar, the collection pages, the join form, `Sidebar` itself and `HostRoomPage` all read it, so a
@@ -1071,15 +1095,15 @@ runner does not confirm the total: 23 of the 24 suites call `no_plan()` and only
   contains the old 55420–55429 range, so `supabase start` could no longer bind them. `supabase/config.toml`
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
-- [x] `npm test` reports 561 passing tests on the current tree (measured 2026-10-27 at `6939495`).
+- [x] `npm test` reports 601 passing tests on the current tree (measured 2026-11-10 at `d8ced69`).
 - [x] Every heartbeat is pinned inside the presence window: `tests/unit/presenceWindow.test.ts` parses
   the 30-second window from the newest migration that projects `online`, with a control that the parse
   found it, and requires the visible, hidden and host heartbeats to be shorter. Slowing one past the
   window turns it red.
 - [x] The room-lifetime notes quote the real cleanup window: `tests/unit/roomLifetimeCopy.test.ts`
   parses the 30-minute interval from the newest migration that schedules `cleanup_abandoned_rooms`,
-  with a control that the parse found it, and requires both `HostSettingsPage` and `InviteCard` to
-  state it instead of promising the room outlives every tab. Changing the cron window turns it red.
+  with a control that the parse found it, and requires `InviteCard` to state it instead of
+  promising the room outlives every tab. Changing the cron window turns it red.
 - [x] CI itself is healthy before relying on it: `gh run list` on 2026-10-27 shows the last five runs on
   `master` all concluded `success` (latest `2026-10-26T03:41Z`), so the push runs against a working
   workflow rather than inheriting a broken pipeline.
@@ -1093,7 +1117,7 @@ runner does not confirm the total: 23 of the 24 suites call `no_plan()` and only
   (docs and four unit tests) — no real connection string. Re-run this before any push that touched env
   handling.
 - [x] `npm run build` passes on the current tree.
-- [x] `npm run test:e2e:ui` reports 56 passing tests on the current tree (measured 2026-10-27 at `49cb2d3`; the suite is two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`). **Thirteen of those gates are mutation-proved** (2026-10-27): suppressing `clear_queue`, suppressing the vote call, pointing `buildJoinUrl` at `/j/`, shrinking one link below `min-h-6`, removing the empty-answer guard, closing the handover dialog regardless, navigating on a refused start, restoring the status pill's catch-all, dropping the host-pass retry, reporting the raw player clock while buffering, reporting a seek the player never made, and dropping the songbook's error gate — the last on **both** the host and guest songbook routes — each turned exactly one test red, on its own assertion — including the QR gate, which also navigates to the encoded URL and checks the join form. The suite is load-bearing rather than decorative.
+- [x] `npm run test:e2e:ui` reports 60 passing tests on the current tree (measured 2026-11-10 at `d8ced69`; the suite is two files, `ui-mock.spec.ts` and `ui-mock-moderation.spec.ts`, matched by `ui-mock*.spec.ts`). The 2026-10-27 mutation proofs are historical: the stage-only shell removed the handover and status-pill gates along with their screens. Re-prove a gate before citing it.
 - [ ] `npm run verify:deploy` passes with the production environment. **It cannot pass today.**
   Measured 2026-10-26 with every other production variable loaded and `CRON_SECRET` unset, the
   guard's only complaint was that missing secret — so this line was checked while false, and it is
