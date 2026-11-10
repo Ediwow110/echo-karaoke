@@ -295,7 +295,7 @@ export default function HostPartyPage() {
               <img src="/images/stage-spotlight.jpg" alt="" className="stage-pan absolute inset-0 h-full w-full object-cover opacity-70" loading="lazy" />
               <div className="absolute inset-0 stage-sheen" aria-hidden="true" />
               <div className="stage-smoke absolute inset-0" aria-hidden="true" />
-              <div className="relative grid h-full place-items-center px-6 text-center">
+              <div className="absolute inset-0 grid place-items-center px-6 text-center">
                 <div className="max-w-[34rem]">
                   <p className="eyebrow text-gold">{roomName}</p>
                   <p className="mt-2 font-display text-[clamp(2rem,4.6vw,3.6rem)] font-bold leading-[0.98] tracking-[-0.04em]">
