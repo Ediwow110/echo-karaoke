@@ -779,6 +779,32 @@ describe('host room workspace', () => {
     expect(await screen.findByRole('slider', { name: 'Playback position' })).toBeInTheDocument();
   });
 
+  it('puts the join QR and six-character code on the idle TV stage', async () => {
+    const idle = {
+      ...liveRoom,
+      playback: {
+        ...liveRoom.playback,
+        currentSongId: null,
+        currentVideoId: null,
+        positionSeconds: 0,
+        isPlaying: false,
+      },
+      queue: [],
+    } as unknown as typeof liveRoom;
+    const { api } = makeApi(idle);
+    renderHost(api);
+
+    expect(await screen.findByRole('img', { name: /QR code to join After Hours/i })).toBeInTheDocument();
+    expect(screen.getByText('ABCD EFGH JKMN PQRS')).toBeInTheDocument();
+
+    cleanup();
+
+    const { api: playingApi } = makeApi();
+    renderHost(playingApi);
+    await screen.findByRole('button', { name: /switch to computer/i });
+    expect(screen.queryByRole('img', { name: /QR code to join After Hours/i })).toBeNull();
+  });
+
   it('opens the stage as a TV layout with no operator panel', async () => {
     const { api } = makeApi();
     renderHost(api, '/room/' + roomId + '/host/stage');

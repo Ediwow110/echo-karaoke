@@ -19,8 +19,8 @@ import PopularSongs from '../features/queue/PopularSongs';
 import SongbookList from '../features/catalog/SongbookList';
 import { CATALOG_CHANNEL_LABELS } from '../features/catalog/catalogApi';
 import InviteCard from '../features/rooms/InviteCard';
-import { formatTime, onlineGuestCount, queueSummary } from '../lib/format';
-import { Button, Chip, ConfirmDialog, Logo, SongArtwork, TransportButton } from '../ui';
+import { formatTime, groupRoomCode, onlineGuestCount, queueSummary } from '../lib/format';
+import { Button, Chip, ConfirmDialog, Logo, QrCode, SongArtwork, TransportButton } from '../ui';
 
 type PanelTab = 'search' | 'queue' | 'songbook';
 type Density = 'grid' | 'list';
@@ -276,7 +276,7 @@ export default function HostPartyPage() {
               </div>
             </>
           ) : (
-            <div className="relative min-h-[34vh] flex-1 overflow-hidden rounded-panel border border-white/10" data-stage-frame>
+            <div className="relative min-h-[52vh] flex-1 overflow-hidden rounded-panel border border-white/10" data-stage-frame>
               <h1 className="sr-only">The stage is ready</h1>
               <img src="/images/stage-spotlight.jpg" alt="" className="stage-pan absolute inset-0 h-full w-full object-cover opacity-70" loading="lazy" />
               <div className="absolute inset-0 stage-sheen" aria-hidden="true" />
@@ -287,21 +287,34 @@ export default function HostPartyPage() {
                   <p className="mt-2 font-display text-[clamp(2rem,4.6vw,3.6rem)] font-bold leading-[0.98] tracking-[-0.04em]">
                     Stage is ready.
                   </p>
-                  <p className="mx-auto mt-3 max-w-[40ch] text-[0.8125rem] leading-[1.65] text-ink-2">
-                    {computer
-                      ? 'Search on this panel, or hand the code to anyone with a phone.'
-                      : 'Scan the code to search from a phone and queue songs straight to this screen.'}
-                  </p>
-                  {computer ? null : (
-                    <Button
-                      variant="primary"
-                      size="md"
-                      className="mt-5"
-                      icon={<LaptopIcon size={15} />}
-                      onClick={() => setLayout('computer')}
-                    >
-                      Add from this computer
-                    </Button>
+                  {computer ? (
+                    <p className="mx-auto mt-3 max-w-[40ch] text-[0.8125rem] leading-[1.65] text-ink-2">
+                      Search on this panel, or hand the code to anyone with a phone.
+                    </p>
+                  ) : (
+                    <div className="mt-4 flex flex-col items-center gap-3">
+                      {connection === 'live' && joinUrl.length > 0 ? (
+                        <>
+                          <QrCode value={joinUrl} label={'QR code to join ' + roomName} size={180} />
+                          <p className="font-mono text-[clamp(1.4rem,3vw,2rem)] font-semibold tracking-[0.18em] text-signal">
+                            {groupRoomCode(code)}
+                          </p>
+                          <p className="text-[0.6875rem] text-ink-2">Scan to join from a phone.</p>
+                        </>
+                      ) : (
+                        <p role="status" className="text-[0.75rem] text-ink-2">
+                          The join QR returns when this room reconnects.
+                        </p>
+                      )}
+                      <Button
+                        variant="primary"
+                        size="md"
+                        icon={<LaptopIcon size={15} />}
+                        onClick={() => setLayout('computer')}
+                      >
+                        Add from this computer
+                      </Button>
+                    </div>
                   )}
                 </div>
               </div>

@@ -9,7 +9,7 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
 - Queue songs, reorder and remove as host, and let the next song start automatically.
-- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume and keyboard shortcuts. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Songbook panel beside the video with the invite card. The TV layout carries no search and no invite overlay. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
+- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume and keyboard shortcuts. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Songbook panel beside the video with the invite card. The TV layout carries no search; its idle stage shows the join QR and code, which disappear once a video starts. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
 - The landing and create screens carry no side navigation; the live room stays one click away in the page body.
 - Phone remote with Search and Queue tabs, duration, automatic-advance feedback, and a "you're up next" card.
 - Honest connection states: stale queue while offline, automatic recovery and a restored notice.
@@ -94,7 +94,7 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 601 unit and component tests (jsdom)
+    npm test                 # 602 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch
