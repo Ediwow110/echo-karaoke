@@ -12,6 +12,8 @@ export type ToastProps = {
   tone?: ToastTone;
   onDismiss: () => void;
   durationMs?: number;
+  /** Keep the notice until the host dismisses it or another notice replaces it. */
+  persistent?: boolean;
   className?: string;
 };
 
@@ -34,6 +36,7 @@ export default function Toast({
   tone = 'success',
   onDismiss,
   durationMs = 5000,
+  persistent = false,
   className = '',
 }: ToastProps) {
   // Parent screens re-render on every poll and pass a fresh inline callback.
@@ -59,9 +62,10 @@ export default function Toast({
   }, []);
 
   useEffect(() => {
+    if (persistent) return;
     const timer = window.setTimeout(beginDismiss, durationMs);
     return () => window.clearTimeout(timer);
-  }, [beginDismiss, durationMs, message]);
+  }, [beginDismiss, durationMs, message, persistent]);
 
   useEffect(() => () => {
     if (exitTimerRef.current !== undefined) window.clearTimeout(exitTimerRef.current);

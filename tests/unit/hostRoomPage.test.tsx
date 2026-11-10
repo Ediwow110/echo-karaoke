@@ -597,6 +597,29 @@ describe('host room workspace', () => {
       && (call.body as { action?: string }).action === 'next')).toBe(false);
   });
 
+  it('names the song it auto-skips after a player error', async () => {
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    const playing = { ...liveRoom, playback: { ...liveRoom.playback, isPlaying: true } };
+    const { api, calls } = makeApi(playing);
+    playerClock.state = 1;
+
+    renderHost(api);
+    await waitFor(() => expect(playerClock.loadCalls).toBeGreaterThan(0));
+    await waitFor(() => expect(playerClock.onError).not.toBeNull());
+
+    act(() => { playerClock.onError?.(2); });
+
+    expect(await screen.findByText(/Skipped Afterglow/i, {}, { timeout: 9000 })).toBeInTheDocument();
+    expect(screen.getByText(/so it was skipped/i)).toBeInTheDocument();
+    expect(calls.some((call) => call.name === 'playback-command'
+      && (call.body as { action?: string }).action === 'next')).toBe(true);
+  }, 15000);
+
   it('stays on the stage when starting the queue fails', async () => {
     // Starting the room used to live on the console page. The stage owns that
     // press now, so a refused start has to leave the host where the retry is.

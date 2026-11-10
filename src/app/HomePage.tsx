@@ -88,7 +88,7 @@ function CreateFeedback({ error, uncertain, onAcknowledge }: {
 }
 
 const steps = [
-  { number: '01', title: 'Launch the TV', body: 'One click opens the room on this screen. The QR is already on it.' },
+  { number: '01', title: 'Launch the TV', body: 'One click opens the room on this screen. The join QR lives in the computer panel.' },
   { number: '02', title: 'Scan from a phone', body: 'Guests scan the room QR and immediately get a phone remote.' },
   { number: '03', title: 'Switch to computer to search', body: 'Search, queue and popular songs live in the stage side panel.' },
   { number: '04', title: 'Let the queue take over', body: 'Phones search and add songs. The shared queue advances automatically.' },
@@ -516,8 +516,8 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
             <div className="mt-6 flex items-start gap-2 rounded-media border border-line px-3.5 py-2.5">
               <KeyIcon size={14} className="mt-0.5 shrink-0 text-ink-2" aria-hidden="true" />
               <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
-                Guests can add songs. Skip, remove and reorder stay host-only, and every new guest waits for your approval.
-                Both are in room settings once the room exists.
+                Guests can add songs as soon as they join. Skip, remove and reorder stay host-only;
+                the computer panel carries the invite and the queue.
               </p>
             </div>
 
@@ -534,7 +534,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
               Launch TV
             </Button>
             <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
-              Next: the stage opens with its join QR already on screen. Switch to computer view to search from this keyboard.
+              Next: the stage opens on this screen. Switch to computer for the join QR and search.
             </p>
             <CreateFeedback
               error={error}
@@ -588,7 +588,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
 
         <p className="mt-5 flex flex-wrap items-center gap-2 text-[0.6875rem] text-ink-2">
           <MicrophoneStageIcon size={15} className="text-signal" aria-hidden="true" />
-          More room settings are available after creation. Change guest permissions whenever you need.
+          The stage is the room. Switch to computer for the invite, search and queue.
         </p>
       </main>
     </div>

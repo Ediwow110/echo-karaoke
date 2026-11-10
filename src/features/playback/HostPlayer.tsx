@@ -24,6 +24,7 @@ type Props = {
   onNext: (expectedSongId?: string | null) => Promise<boolean>;
   onReport: (seconds: number, duration: number, songId: string | null) => void;
   onFindAlternative: (query: string) => void;
+  onAutoSkip?: (title: string) => void;
   children: ReactNode;
 };
 
@@ -84,6 +85,7 @@ export default function HostPlayer({
   onNext,
   onReport,
   onFindAlternative,
+  onAutoSkip,
   children,
 }: Props) {
   const hostRef = useRef<HTMLDivElement | null>(null);
@@ -96,6 +98,7 @@ export default function HostPlayer({
   const earlyFinishRef = useRef<string | null>(null);
   const onNextRef = useRef(onNext);
   const onReportRef = useRef(onReport);
+  const onAutoSkipRef = useRef(onAutoSkip);
   const playbackRef = useRef(playback);
   const nowPlayingRef = useRef(nowPlaying);
   const slotCleanupRef = useRef<(() => void) | null>(null);
@@ -123,6 +126,7 @@ export default function HostPlayer({
 
   onNextRef.current = onNext;
   onReportRef.current = onReport;
+  onAutoSkipRef.current = onAutoSkip;
   playbackRef.current = playback;
   nowPlayingRef.current = nowPlaying;
 
@@ -396,7 +400,10 @@ export default function HostPlayer({
     }
     const timer = window.setTimeout(() => {
       autoSkippedRef.current = playerError.videoId;
-      void advance();
+      const title = nowPlayingRef.current?.title ?? 'The song';
+      void advance().then((advanced) => {
+        if (advanced) onAutoSkipRef.current?.(title);
+      });
     }, 6000);
     return () => window.clearTimeout(timer);
   }, [advance, playerError]);

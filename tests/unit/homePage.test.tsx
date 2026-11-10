@@ -447,11 +447,10 @@ describe('create room workspace', () => {
     stubWide(true);
     renderHome();
 
-    // The three permission switches moved into room settings; the create form only
-    // says what the room will do.
+    // The permission switches are gone with the console shell; the create form
+    // only says what the room will do.
     expect(screen.queryByRole('switch')).toBeNull();
-    expect(screen.getByText(/guests can add songs/i)).toBeInTheDocument();
-    expect(screen.getByText(/every new guest waits for your approval/i)).toBeInTheDocument();
+    expect(screen.getByText(/guests can add songs as soon as they join/i)).toBeInTheDocument();
     expect(screen.getByText(/skip, remove and reorder stay host-only/i)).toBeInTheDocument();
   });
 
