@@ -9,7 +9,7 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
 - Queue songs, reorder and remove as host, and let the next song start automatically.
-- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume and keyboard shortcuts. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Songbook panel beside the video with the invite card. The TV layout carries no search; its idle stage shows the join QR and code, which disappear once a video starts. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
+- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume and keyboard shortcuts. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Songbook panel beside the video with the invite card. The TV layout carries no search; the join QR overlays the stage and hides while the mouse moves. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
 - The landing and create screens carry no side navigation; the live room stays one click away in the page body.
 - Phone remote with Search and Queue tabs, duration, automatic-advance feedback, and a "you're up next" card.
 - Honest connection states: stale queue while offline, automatic recovery and a restored notice.

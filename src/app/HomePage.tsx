@@ -88,7 +88,7 @@ function CreateFeedback({ error, uncertain, onAcknowledge }: {
 }
 
 const steps = [
-  { number: '01', title: 'Launch the TV', body: 'One click opens the room on this screen. The join QR lives in the computer panel.' },
+  { number: '01', title: 'Launch the TV', body: 'One click opens the room on this screen, with the join QR on the stage.' },
   { number: '02', title: 'Scan from a phone', body: 'Guests scan the room QR and immediately get a phone remote.' },
   { number: '03', title: 'Switch to computer to search', body: 'Search, queue and popular songs live in the stage side panel.' },
   { number: '04', title: 'Let the queue take over', body: 'Phones search and add songs. The shared queue advances automatically.' },
@@ -534,7 +534,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
               Launch TV
             </Button>
             <p className="mt-3 text-[0.6875rem] leading-[1.6] text-ink-2">
-              Next: the stage opens on this screen. Switch to computer for the join QR and search.
+              Next: the stage opens on this screen with the join QR. Switch to computer to search.
             </p>
             <CreateFeedback
               error={error}

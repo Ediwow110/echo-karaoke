@@ -459,7 +459,7 @@ test('the stage switches between TV and computer on one route', async ({ page })
   await page.setViewportSize({ width: 1440, height: 900 });
   await openScreen(page, '/room/' + ROOM + '/host/party');
 
-  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(0);
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(1);
   await expect(page.getByRole('search')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Switch to computer' }).click();
@@ -758,7 +758,7 @@ test('home uses the shorter edge for the device class', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: /join the room/i })).toBeVisible();
 });
 
-test('one click on the home screen opens the TV stage, with the invite in the computer panel', async ({ page }) => {
+test('one click on the home screen opens the TV stage with its invite', async ({ page }) => {
   await mockApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openScreen(page, '/');
@@ -771,9 +771,9 @@ test('one click on the home screen opens the TV stage, with the invite in the co
 
   await expect(page).toHaveURL(new RegExp('/room/' + ROOM + '/host/party$'));
   await expect(page.locator('header')).toContainText('Mock Night · TV stage');
-  // The video is not covered by the invitation any more; the invite lives in
-  // the computer layout's side panel.
-  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(0);
+  // The invite overlays the stage and hides while the mouse moves; the
+  // computer layout keeps its own copy in the side panel.
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(1);
   await expect(page.getByRole('search')).toHaveCount(0);
   await page.getByRole('button', { name: 'Switch to computer' }).click();
   await expect(page.getByRole('img', { name: /QR code to join Mock Night/i })).toBeVisible();
@@ -1123,7 +1123,7 @@ test('host opens the songbook inside the party panel and queues a song', async (
   expect(adds[0]).toMatchObject({ action: 'add', videoId: 'video000000', roomId: ROOM });
 });
 
-test('the TV stage hides the invite and the computer panel keeps a scrollable vertical list', async ({ page }) => {
+test('the TV stage and the computer panel both keep the invite and a scrollable vertical list', async ({ page }) => {
   const popular = Array.from({ length: 8 }, (_, index) => ({
     videoId: 'karaoke' + String(index).padStart(4, '0'),
     title: 'Karaoke Pick ' + (index + 1),
@@ -1135,8 +1135,8 @@ test('the TV stage hides the invite and the computer panel keeps a scrollable ve
   await page.setViewportSize({ width: 1440, height: 900 });
   await openScreen(page, '/room/' + ROOM + '/host/party');
 
-  // The TV stage is pure video now; the computer layout owns the invitation.
-  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(0);
+  // The TV stage overlays the invite; the computer layout keeps its own copy.
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(1);
   await expect(page.getByText('Sing live from YouTube.')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Switch to computer' }).click();

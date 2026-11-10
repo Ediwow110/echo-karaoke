@@ -27,7 +27,7 @@ The host console shell and its pages were removed with migrations through 0051. 
 
 - The stage at `/room/<id>/host/party` is the only host screen. It has TV and computer layouts;
   every retired host URL (queue, settings, library, favorites, recently sung) redirects to it.
-- The invitation and its QR live in the computer layout's side panel. The TV stage shows the QR and six-character code only while idle; they disappear once a video starts.
+- The invitation and its QR live in the computer layout's side panel. The TV stage overlays the QR and six-character code and hides them while the mouse moves.
 - Host controls on the stage: play/pause, skip, reorder, remove, clear queue, and end room. The guest
   pause/resume and door-lock toggles, guest removal, host handover, and the local library, favorites
   and recently-sung pages no longer exist in the client. Playback is host-only and guests join directly.
