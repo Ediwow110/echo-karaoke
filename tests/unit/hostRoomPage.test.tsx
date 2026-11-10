@@ -615,6 +615,7 @@ describe('host room workspace', () => {
     act(() => { playerClock.onError?.(2); });
 
     expect(await screen.findByText(/Skipped Afterglow/i, {}, { timeout: 9000 })).toBeInTheDocument();
+    expect(screen.getByText(/so it was skipped/i)).toBeInTheDocument();
     expect(calls.some((call) => call.name === 'playback-command'
       && (call.body as { action?: string }).action === 'next')).toBe(true);
   }, 15000);

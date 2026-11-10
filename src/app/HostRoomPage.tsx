@@ -25,7 +25,13 @@ export default function HostRoomPage() {
   const api = useRoomApi();
   const navigate = useNavigate();
   const { data, error, loading, connection, restoredAt, refresh } = useRoomData(roomId, 'host');
-  const [toast, setToast] = useState<{ id: number; message: string; detail?: string; tone: ToastTone } | null>(null);
+  const [toast, setToast] = useState<{
+    id: number;
+    message: string;
+    detail?: string;
+    tone: ToastTone;
+    persistent?: boolean;
+  } | null>(null);
   const playbackBusy = useRef(false);
   const advanceBusy = useRef(false);
   const playbackSettled = useRef<Promise<void> | null>(null);
@@ -443,6 +449,7 @@ export default function HostRoomPage() {
         message={toast.message}
         detail={toast.detail}
         tone={toast.tone}
+        persistent={toast.persistent}
         onDismiss={() => setToast(null)}
       />
     </div>
@@ -456,11 +463,13 @@ export default function HostRoomPage() {
       onNext={next}
       onReport={onReport}
       onFindAlternative={onFindAlternative}
-      onAutoSkip={(title) => notify(
-        'Skipped ' + title,
-        'The video could not play here, so the room moved on.',
-        'info',
-      )}
+      onAutoSkip={(title) => setToast({
+        id: Date.now(),
+        message: 'Skipped ' + title,
+        detail: 'The video could not play here, so it was skipped.',
+        tone: 'info',
+        persistent: true,
+      })}
     >
       <Outlet context={context} />
       {toastNode}
