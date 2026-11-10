@@ -13,6 +13,7 @@ type Props = {
   guests: number;
   /** Whether the host's latest room state is verified, not an offline snapshot. */
   shareReady?: boolean;
+  variant?: 'panel' | 'party';
   className?: string;
 };
 
@@ -23,6 +24,7 @@ export default function InviteCard({
   joinUrl,
   guests,
   shareReady = true,
+  variant = 'panel',
   className = '',
 }: Props) {
   const [copied, setCopied] = useState(false);
@@ -81,6 +83,21 @@ export default function InviteCard({
         <p role="status" className="mt-4 rounded-media border border-line bg-surface-2 px-4 py-4 text-[0.75rem] leading-[1.6] text-ink-2">
           Cannot verify this room while the connection is offline. The invitation and guest count will return after reconnection.
         </p>
+      </section>
+    );
+  }
+
+  if (variant === 'party') {
+    return (
+      <section
+        className={['flex w-[9.5rem] flex-col items-center gap-2 rounded-panel border border-white/15 bg-graphite-deep/70 p-3 backdrop-blur', className].join(' ')}
+        aria-label="Invite your people"
+      >
+        <QrCode value={joinUrl} label={'QR code to join ' + roomName} size={124} />
+        <p className="font-mono text-[0.8125rem] font-semibold tracking-[0.14em] text-signal">
+          {groupRoomCode(code)}
+        </p>
+        <p className="max-w-full truncate text-[0.625rem] text-ink-2">{roomName}</p>
       </section>
     );
   }
