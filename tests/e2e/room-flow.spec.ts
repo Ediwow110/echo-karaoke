@@ -17,8 +17,9 @@ async function createRoom(page: Page, roomName = 'After Hours', hostName = 'Alex
   // header is where the room identifies itself.
   await expect(page.locator('header')).toContainText(roomName + ' · TV stage', { timeout: 20000 });
 
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
   const qr = page.locator('img[data-join-url]').first();
-  await expect(qr).toHaveAttribute('data-join-url', /\/join\/[0-9A-Z]{16}$/, { timeout: 20000 });
+  await expect(qr).toHaveAttribute('data-join-url', /\/join\/[0-9A-Z]{6}$/, { timeout: 20000 });
   const joinUrl = await qr.getAttribute('data-join-url');
   if (joinUrl === null) {
     throw new Error('The room QR did not carry a join URL');
@@ -115,9 +116,7 @@ test('the QR encodes the real join URL and a guest can join from it', async ({ p
   await expect(guest.getByText(/hosted by host ana/i)).toBeVisible();
   await expect(guest.getByRole('link', { name: /queue ·/i })).toBeVisible();
 
-  const hostId = roomIdFromUrl(page.url());
-  await page.goto(BASE + '/room/' + hostId + '/host/settings');
-  await expect(page.getByText('Guest Sam')).toBeVisible({ timeout: 15000 });
+  await expect(page.getByText('1 in room')).toBeVisible({ timeout: 15000 });
 
   await guest.context().close();
 });
@@ -130,9 +129,9 @@ test('a host reopening the invite returns to the host screen', async ({ page }) 
   await page.getByRole('button', { name: 'Join room' }).click();
 
   await page.waitForURL(/\/host$/, { timeout: 20000 });
-  await expect(page.getByRole('heading', { level: 1, name: 'Host Guard' })).toBeVisible();
+  await expect(page.getByText('Host Guard · TV stage')).toBeVisible();
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
   await expect(page.getByText('Hosted by Host Mia')).toBeVisible();
-  await expect(page.getByRole('navigation', { name: 'Primary' }).getByRole('link', { name: 'Room settings' })).toBeVisible();
 });
 
 test('a guest adds a song and the host sees it in the queue', async ({ page, browser }) => {
@@ -150,35 +149,9 @@ test('a guest adds a song and the host sees it in the queue', async ({ page, bro
   await expect(guest.getByRole('list', { name: 'Up next' }).getByText(/never gonna give you up/i)).toBeVisible({ timeout: 15000 });
   expect(guestRoomId.length).toBeGreaterThan(0);
 
-  const hostId = roomIdFromUrl(page.url());
-  await page.goto(BASE + '/room/' + hostId + '/host/queue');
-  await expect(page.locator('#song-queue').getByText(/never gonna give you up/i)).toBeVisible({ timeout: 20000 });
-
-  await guest.context().close();
-});
-
-test('the host admits a guest and keeps playback control', async ({ page, browser }) => {
-  const { code } = await createRoom(page, 'Rules Night', 'Host Cleo');
-  const guest = await joinRoom(browser, code, 'Guest Dee');
-  const hostId = roomIdFromUrl(page.url());
-
-  // Every new room moderates entry now, so the guest waits until the host opens it.
-  await expect(guest.getByText(/needs to let you in/i)).toBeVisible({ timeout: 15000 });
-
-  await page.goto(BASE + '/room/' + hostId + '/host/settings');
-  const approval = page.getByRole('switch', { name: /approve each guest/i });
-  const playback = page.getByRole('switch', { name: /guests can pause or resume/i });
-  await expect(approval).toBeChecked();
-  await expect(playback).not.toBeChecked();
-  // Adding songs is not a permission any more, so there is no switch to find.
-  await expect(page.getByRole('switch', { name: /guests can add songs/i })).toHaveCount(0);
-
-  await page.getByRole('button', { name: /^Let Guest Dee in$/ }).click();
-  await expect(guest.getByText(/shared playlist/i)).toBeVisible({ timeout: 15000 });
-
-  await playback.click();
-  await guest.getByRole('link', { name: /queue ·/i }).click();
-  await expect(guest.getByText(/you can pause and resume/i)).toBeVisible({ timeout: 15000 });
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
+  await page.getByRole('tab', { name: /queue/i }).click();
+  await expect(page.getByRole('region', { name: 'Stage controls' }).getByText(/never gonna give you up/i)).toBeVisible({ timeout: 20000 });
 
   await guest.context().close();
 });

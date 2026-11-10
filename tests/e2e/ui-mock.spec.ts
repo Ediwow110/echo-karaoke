@@ -451,21 +451,6 @@ test('the stage says Ready on an idle room, never Autoplay on', async ({ page })
   await expect(page.getByText('Autoplay on')).toHaveCount(0);
 });
 
-test('the party header opens Room settings on a phone without overflowing', async ({ page }) => {
-  await mockApi(page);
-  await page.setViewportSize({ width: 390, height: 844 });
-  await openScreen(page, '/room/' + ROOM + '/host/party');
-
-  const settings = page.getByRole('link', { name: 'Room settings' });
-  await expect(settings).toBeVisible();
-  expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
-    .toBeLessThanOrEqual(1);
-
-  await settings.click();
-  await expect(page).toHaveURL(/\/host\/settings$/);
-  await expect(page.getByRole('switch', { name: /guests can pause or resume/i })).toBeVisible();
-});
-
 test('the stage switches between TV and computer on one route', async ({ page }) => {
   // The switch is a query param, so the stage screen and its measured slot stay
   // mounted; a navigation would move the video to the floating frame. The URL is
@@ -474,7 +459,7 @@ test('the stage switches between TV and computer on one route', async ({ page })
   await page.setViewportSize({ width: 1440, height: 900 });
   await openScreen(page, '/room/' + ROOM + '/host/party');
 
-  await expect(page.getByRole('region', { name: 'Invite your people' })).toBeVisible();
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(0);
   await expect(page.getByRole('search')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Switch to computer' }).click();
@@ -485,6 +470,17 @@ test('the stage switches between TV and computer on one route', async ({ page })
   await page.getByRole('button', { name: 'Switch to TV' }).click();
   await expect(page.getByRole('search')).toHaveCount(0);
   await expect(page).toHaveURL(/\/host\/party\?layout=tv$/);
+});
+
+test('old host bookmarks land on the stage', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+
+  for (const path of ['queue', 'settings', 'library', 'favorites', 'recent']) {
+    await openScreen(page, '/room/' + ROOM + '/host/' + path);
+    await expect(page).toHaveURL(new RegExp('/room/' + ROOM + '/host/party$'));
+    await expect(page.getByRole('button', { name: 'Switch to computer' })).toBeVisible();
+  }
 });
 
 test('layout switching animates both ways without detaching or misaligning the player', async ({ page }) => {
@@ -561,7 +557,7 @@ test('layout switching settles immediately with reduced motion on desktop and ph
         await new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve())));
         return document.getAnimations().filter((animation) => {
           const target = (animation.effect as KeyframeEffect).target;
-          return target instanceof Element && target.matches('.party-layout, .party-panel, .party-up-next, .party-invite');
+          return target instanceof Element && target.matches('.party-layout, .party-panel, .party-up-next');
         }).filter((animation) => animation.playState === 'running').map((animation) => ({
           target: ((animation.effect as KeyframeEffect).target as Element).className,
           timing: animation.effect?.getTiming(),
@@ -584,14 +580,10 @@ test('the stage fills the viewport in both layouts without covering its own cont
     await openScreen(page, '/room/' + ROOM + '/host/party');
 
     const frame = page.locator('[data-stage-frame]');
-    const invite = page.locator('[data-stage-frame] [data-join-overlay]');
     await expect(frame).toBeVisible();
     const box = await frame.boundingBox();
-    const overlaid = await invite.boundingBox();
-    expect(overlaid, 'the invitation belongs to the video frame').not.toBeNull();
-    expect(overlaid!.x).toBeGreaterThanOrEqual(box!.x - 1);
-    expect(overlaid!.x + overlaid!.width).toBeLessThanOrEqual(box!.x + box!.width + 1);
-    expect(overlaid!.y + overlaid!.height).toBeLessThanOrEqual(box!.y + box!.height + 1);
+    expect(box!.width).toBeGreaterThan(0);
+    expect(box!.height).toBeGreaterThan(0);
 
     const transport = page.getByRole('button', { name: /play|pause/i }).first();
     const transportBox = await transport.boundingBox();
@@ -669,32 +661,6 @@ test('the stage panel keeps its invite card whole on every tab', async ({ page }
   }
 });
 
-test('the join overlay stays above the docked player once a song is loaded', async ({ page }) => {
-  // boundingBox() and toBeVisible() both miss occlusion. The player layer is a
-  // fixed, opaque z-20 sibling, so an overlay without a z-index is painted under
-  // it the moment a video docks -- exactly when a room needs its QR most.
-  await mockApi(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openScreen(page, '/room/' + ROOM + '/host/party');
-  await page.waitForSelector('[data-host-player]', { state: 'visible' });
-
-  const hit = await page.evaluate(() => {
-    const overlay = document.querySelector<HTMLElement>('[data-join-overlay]');
-    const rect = overlay?.getBoundingClientRect();
-    if (overlay === undefined || overlay === null || rect === undefined) return null;
-    const top = document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2);
-    return {
-      onTop: top !== null && (top === overlay || overlay.contains(top)),
-      topTag: top?.tagName ?? 'none',
-      inPlayer: top?.closest('[data-host-player]') !== null && top?.closest('[data-host-player]') !== undefined,
-    };
-  });
-
-  expect(hit, 'the overlay must be measurable').not.toBeNull();
-  expect(hit!.inPlayer, 'the player layer covers the invitation').toBe(false);
-  expect(hit!.onTop, 'a tap at the overlay centre must reach the invitation').toBe(true);
-});
-
 test('the stage slot stays big enough for the player to dock', async ({ page }) => {
   // HostPlayer refuses to drive a video whose slot is under 200x200, so a frame
   // sized only by aspect ratio or by leftover height silently parks the player
@@ -712,27 +678,6 @@ test('the stage slot stays big enough for the player to dock', async ({ page }) 
   }
 });
 
-test('a failed handover keeps the confirmation open', async ({ page }) => {
-  // transferRoom swallows its own error, so the dialog must be closed by the
-  // reported outcome rather than by the await returning. Closing it anyway
-  // leaves the host at a rebuilt list with a fading toast.
-  await mockApi(page);
-  await page.route('**/api/transfer-host', async (route) => {
-    await route.fulfill({
-      status: 500,
-      contentType: 'application/json',
-      body: JSON.stringify({ error: { code: 'INTERNAL_ERROR', message: 'The room could not be transferred' } }),
-    });
-  });
-
-  await openScreen(page, '/room/' + ROOM + '/host/settings');
-  await page.getByLabel('Hand the room to Jamie').click();
-  await page.getByRole('button', { name: 'Hand it over' }).click();
-
-  await expect(page.getByText('The room could not be transferred.')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Hand it over' })).toBeVisible();
-});
-
 test('an empty room answer is reported as a failure, never as the host ending the room', async ({ page }) => {
   // The API client used to hand back a 200 with no body as if it were the room,
   // and "no room state" is the one state this screen renders as the host having
@@ -746,28 +691,6 @@ test('an empty room answer is reported as a failure, never as the host ending th
 
   await expect(page.getByRole('alert')).toContainText('empty answer');
   await expect(page.getByText('This room has ended.')).toHaveCount(0);
-});
-
-test('host player uses a visible minimum-sized desktop frame and parks it on mobile queue', async ({ page }) => {
-  await mockApi(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  await openScreen(page, '/room/' + ROOM + '/host/queue');
-  const player = page.locator('[data-host-player]');
-  await expect(player).toBeVisible();
-  const desktop = await player.boundingBox();
-  expect(desktop).not.toBeNull();
-  expect(desktop!.width).toBeGreaterThanOrEqual(200);
-  expect(desktop!.height).toBeGreaterThanOrEqual(200);
-  const videoArea = await player.locator('[data-youtube-frame]').boundingBox();
-  expect(videoArea).not.toBeNull();
-  expect(videoArea!.width).toBeGreaterThanOrEqual(200);
-  expect(videoArea!.height).toBeGreaterThanOrEqual(200);
-  // The handle must be outside the video, not covering its top edge.
-  expect(videoArea!.y).toBeGreaterThanOrEqual(desktop!.y + 40);
-
-  await page.setViewportSize({ width: 390, height: 844 });
-  await expect(player).toHaveCSS('opacity', '0');
-  await expect(player).toHaveAttribute('aria-hidden', 'true');
 });
 
 test('host can refresh a populated songbook without losing existing songs', async ({ page }) => {
@@ -835,10 +758,7 @@ test('home uses the shorter edge for the device class', async ({ page }) => {
   await expect(page.getByRole('heading', { level: 1, name: /join the room/i })).toBeVisible();
 });
 
-test('one click on the home screen opens the TV stage with its join QR', async ({ page }) => {
-  // The flow used to stop at a name form and then drop the host on the discovery
-  // screen, where there was no QR at all. Now one click creates the room with its
-  // defaults and lands on the stage the room watches, QR already painted.
+test('one click on the home screen opens the TV stage, with the invite in the computer panel', async ({ page }) => {
   await mockApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });
   await openScreen(page, '/');
@@ -851,10 +771,12 @@ test('one click on the home screen opens the TV stage with its join QR', async (
 
   await expect(page).toHaveURL(new RegExp('/room/' + ROOM + '/host/party$'));
   await expect(page.locator('header')).toContainText('Mock Night · TV stage');
-  await expect(page.getByRole('img', { name: /QR code to join Mock Night/i }).first()).toBeVisible();
-  // The stage is a screen, not a console: no search field until the host asks for
-  // the computer layout.
+  // The video is not covered by the invitation any more; the invite lives in
+  // the computer layout's side panel.
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(0);
   await expect(page.getByRole('search')).toHaveCount(0);
+  await page.getByRole('button', { name: 'Switch to computer' }).click();
+  await expect(page.getByRole('img', { name: /QR code to join Mock Night/i })).toBeVisible();
 });
 
 test('host creation warns and blocks automatic retries after an uncertain server response', async ({ page }) => {
@@ -914,11 +836,7 @@ test('the create action opens the create form and keeps the hosted room one clic
   // of the lg breakpoint: with a classic scrollbar WebKit's 1024 is 1009 CSS px,
   // so the sidebar is correctly hidden there and the link is not on screen.
   await page.setViewportSize({ width: 1280, height: 600 });
-  // The console pages carry the sidebar; the stage is immersive and does not.
-  await openScreen(page, '/room/' + ROOM + '/host/queue');
-
-  await page.getByRole('link', { name: 'Create room' }).click();
-  await expect(page).toHaveURL(/\/create$/);
+  await openScreen(page, '/create');
   await expect(page.getByRole('button', { name: 'Launch TV' })).toBeVisible();
   await page.getByText('Room details').click();
   await expect(page.getByLabel('Room name')).toBeVisible();
@@ -943,90 +861,6 @@ test('the create action opens the create form and keeps the hosted room one clic
 // The bug that started this: a control named "Create room" that went
 // somewhere else. Every sidebar label promises a destination, so each one is
 // clicked and its landing checked, with no console error allowed in passing.
-test('every host sidebar destination lands where its label says', async ({ page }) => {
-  const noise: string[] = [];
-  const note = (text: string) => noise.push(text);
-  await mockApi(page);
-  // The YouTube frame reports through this page: its cross-origin postMessage
-  // failures carry this page's location, or none at all. The message text names
-  // the third-party host, which is the only handle on them.
-  const THIRD_PARTY = /fonts\.gstatic\.com|youtube\.com|ytimg\.com|googleads|doubleclick|googlevideo/;
-  page.on('console', (message) => {
-    if (message.type() !== 'error') return;
-    if (THIRD_PARTY.test(message.text())) return;
-    const location = message.location();
-    if (location.url.length === 0) {
-      note('console: ' + message.text().slice(0, 140));
-      return;
-    }
-    // The player is a YouTube frame and answers to YouTube's own policies --
-    // it logs a compute-pressure violation on some Chrome builds. This gate is
-    // about the app's console, so only same-origin messages count.
-    try {
-      if (new URL(location.url).origin === new URL(page.url()).origin) {
-        note('console: ' + message.text().slice(0, 140));
-      }
-    } catch {
-      note('console: ' + message.text().slice(0, 140));
-    }
-  });
-  page.on('pageerror', (error) => {
-    // Two Firefox texts that are transport, not render, failures: a frame script
-    // reaching across the origin boundary (no app code in src/ touches another
-    // frame's objects), and an aborted script/module request. A pageerror carries
-    // no URL, so the message is the only handle. A module abort that outlives the
-    // retry shows up as the "rendered no screen" assertion instead.
-    if (/Permission denied to access property|A network error occurred/.test(error.message)) return;
-    // WebKit refuses a keepalive request that Playwright fulfilled: the page is
-    // already unloading, so the fulfilled response fails an access-control check.
-    // The same request succeeds against a real server (probed without route
-    // interception, no page error), so this is the harness, not the app.
-    if (/\/api\/[a-z-]+ due to access control checks/.test(error.message)) return;
-    note('pageerror: ' + error.message.slice(0, 140));
-  });
-  await page.setViewportSize({ width: 1440, height: 900 });
-
-  const destinations: Array<{ label: string; path: string }> = [
-    { label: 'TV stage', path: '/room/' + ROOM + '/host/party' },
-    { label: 'Song library', path: '/room/' + ROOM + '/host/library' },
-    { label: 'Room queue', path: '/room/' + ROOM + '/host/queue' },
-    { label: 'Favorites', path: '/room/' + ROOM + '/host/favorites' },
-    { label: 'Recently sung', path: '/room/' + ROOM + '/host/recent' },
-    { label: 'Create room', path: '/create' },
-    { label: 'Room settings', path: '/room/' + ROOM + '/host/settings' },
-  ];
-
-  for (const destination of destinations) {
-    // Every destination is reached from a console page: the stage has no sidebar.
-    await openScreen(page, '/room/' + ROOM + '/host/queue');
-    const link = page.getByRole('navigation', { name: 'Primary' })
-      .getByRole('link', { name: destination.label, exact: true });
-    await expect(link, destination.label + ' is missing from the sidebar').toBeVisible();
-    // The loop starts on the queue page, so that one destination is already on
-    // screen; clicking it changes no pathname and RouteFocus does not re-stamp.
-    if (new URL(page.url()).pathname === destination.path) {
-      await expect(page.locator('[data-route-focus]'), destination.label + ' rendered no screen').toBeAttached();
-      await link.click();
-      continue;
-    }
-    // The URL changes before React renders, and the previous screen's heading is
-    // still stamped for a tick, so "a heading exists" can be the old screen. Mark
-    // it, then wait for an unmarked one: that is the destination's own heading.
-    await page.locator('[data-route-focus]').evaluate((heading) => heading.setAttribute('data-previous', 'true'));
-    await link.click();
-    await expect(page, destination.label + ' landed elsewhere')
-      .toHaveURL((url) => url.pathname === destination.path);
-    // A URL match alone can be the error boundary: a lazy chunk that failed keeps
-    // the path and replaces the screen.
-    await expect(page.locator('[data-route-focus]:not([data-previous])'), destination.label + ' rendered no screen')
-      .toBeAttached();
-  }
-  expect(noise).toEqual([]);
-});
-
-// The TV stage is the screen a room actually watches, and RouteFocus only
-// announces a screen that has a heading inside <main>. A playing song used to
-// leave it with none, so the route change announced nothing at all.
 test('the TV stage names the playing song as its heading', async ({ page }) => {
   await mockApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });
@@ -1045,9 +879,8 @@ test('every keyboard tab stop shows where focus landed', async ({ page }) => {
   await page.setViewportSize({ width: 1440, height: 900 });
 
   for (const path of [
-    '/room/' + ROOM + '/host',
-    '/room/' + ROOM + '/host/queue',
-    '/room/' + ROOM + '/host/settings',
+    '/room/' + ROOM + '/host/party',
+    '/room/' + ROOM + '/host/party?layout=computer',
     // The audience screen is where a host actually stands. Both layouts have
     // their own controls, and neither was in this sweep before.
     '/room/' + ROOM + '/host/party',
@@ -1082,33 +915,10 @@ test('every keyboard tab stop shows where focus landed', async ({ page }) => {
 // The store is unit-tested and the nav reaches the page, but nothing proved the
 // heart of it: pressing the heart on a library card actually saves the song,
 // remembers it across a reload, and shows up on the favorites page.
-test('a favorited song survives a reload and reaches the favorites page', async ({ page }) => {
-  await mockApi(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
-
-  // The host screen records the room's songs locally; the library reads them back.
-  await openScreen(page, '/room/' + ROOM + '/host');
-  await openScreen(page, '/room/' + ROOM + '/host/library');
-
-  const save = page.getByRole('button', { name: 'Save Afterglow to favorites' });
-  await expect(save, 'the library never listed a song the room has queued').toBeVisible();
-  await save.click();
-  await expect(page.getByRole('button', { name: 'Remove Afterglow from favorites' })).toBeVisible();
-
-  await reloadScreen(page);
-  await expect(page.getByRole('button', { name: 'Remove Afterglow from favorites' }), 'the favorite did not survive a reload')
-    .toBeVisible();
-
-  await openScreen(page, '/room/' + ROOM + '/host/favorites');
-  await expect(page.getByText('Afterglow').first(), 'the favorites page never showed the saved song').toBeVisible();
-});
-
-// The QR is how a room full of phones gets in, and a decorative one once passed
-// through review unnoticed. Nothing here proved it is an encoded image.
 test('the invite QR is a real encoded image', async ({ page }) => {
   await mockApi(page);
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openScreen(page, '/room/' + ROOM + '/host');
+  await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
 
   const src = await page.getByRole('img', { name: /QR code to join Mock Night/i }).first().getAttribute('src');
   expect(src ?? '', 'the invite card rendered no QR').toMatch(/^data:image\/png;base64,/);
@@ -1159,10 +969,8 @@ test('no host link or button is smaller than the 24px target floor', async ({ pa
   await page.setViewportSize({ width: 390, height: 844 });
 
   for (const path of [
-    '/room/' + ROOM + '/host',
-    '/room/' + ROOM + '/host/queue',
     '/room/' + ROOM + '/host/party',
-    '/room/' + ROOM + '/host/settings',
+    '/room/' + ROOM + '/host/party?layout=computer',
   ]) {
     await openScreen(page, path);
     // A page with no controls at all would satisfy the assertion below without
@@ -1315,7 +1123,7 @@ test('host opens the songbook inside the party panel and queues a song', async (
   expect(adds[0]).toMatchObject({ action: 'add', videoId: 'video000000', roomId: ROOM });
 });
 
-test('the stage shows one invite and the search panel keeps a scrollable vertical list', async ({ page }) => {
+test('the TV stage hides the invite and the computer panel keeps a scrollable vertical list', async ({ page }) => {
   const popular = Array.from({ length: 8 }, (_, index) => ({
     videoId: 'karaoke' + String(index).padStart(4, '0'),
     title: 'Karaoke Pick ' + (index + 1),
@@ -1327,10 +1135,8 @@ test('the stage shows one invite and the search panel keeps a scrollable vertica
   await page.setViewportSize({ width: 1440, height: 900 });
   await openScreen(page, '/room/' + ROOM + '/host/party');
 
-  // One invitation, painted over the video. The computer layout moves the same
-  // card into the panel rather than adding a second copy.
-  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(1);
-  await expect(page.locator('[data-join-overlay] section[aria-label="Invite your people"]')).toBeVisible();
+  // The TV stage is pure video now; the computer layout owns the invitation.
+  await expect(page.getByRole('region', { name: 'Invite your people' })).toHaveCount(0);
   await expect(page.getByText('Sing live from YouTube.')).toHaveCount(0);
 
   await page.getByRole('button', { name: 'Switch to computer' }).click();
@@ -1346,9 +1152,9 @@ test('the stage shows one invite and the search panel keeps a scrollable vertica
 
 test('host QR payload points to the actual guest join route with its live room code', async ({ page }) => {
   await mockApi(page);
-  await openScreen(page, '/room/' + ROOM + '/host/party');
+  await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
   const actualJoinUrl = new URL('/join/ABCDEFGHJKMNPQRS', page.url()).toString();
-  await expect(page.locator('[data-join-overlay] img[data-join-url]'))
+  await expect(page.locator('img[data-join-url]').first())
     .toHaveAttribute('data-join-url', actualJoinUrl);
   await openScreen(page, actualJoinUrl);
   await expect(page.getByRole('heading', { name: 'Join the room.' })).toBeVisible();
@@ -1367,8 +1173,8 @@ test('the stage invite and the search panel fit narrow widths and 200 percent te
   await mockApi(page, true, [], () => false, popular);
   for (const [width, height] of [[390, 844], [768, 1024]] as const) {
     await page.setViewportSize({ width, height });
-    await openScreen(page, '/room/' + ROOM + '/host/party');
-    await expect(page.locator('[data-join-overlay] section[aria-label="Invite your people"]')).toBeVisible();
+    await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
+    await expect(page.getByRole('region', { name: 'Invite your people' })).toBeVisible();
     expect(await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth))
       .toBeLessThanOrEqual(1);
   }
@@ -1408,92 +1214,4 @@ test('host pauses the server when its controls disappear', async ({ page }) => {
   fail = true;
   await page.waitForTimeout(6500);
   expect(commands.some((command) => command.action === 'pause')).toBe(true);
-});
-
-async function tooltipRect(page: Page, label: string) {
-  return page.evaluate((wanted) => {
-    const button = [...document.querySelectorAll('button[aria-label]')]
-      .find((element) => element.getAttribute('aria-label') === wanted);
-    const anchor = button?.closest('.tooltip');
-    if (anchor === null || anchor === undefined) return null;
-    const style = getComputedStyle(anchor, '::after');
-    const box = anchor.getBoundingClientRect();
-    const px = (value: string) => Number.parseFloat(value);
-    const height = px(style.height);
-    const width = px(style.width);
-    const top = style.top === 'auto' ? box.bottom - px(style.bottom) - height : box.top + px(style.top);
-    const left = style.left === 'auto' ? box.right - px(style.right) - width : box.left + px(style.left);
-    return { top, left, bottom: top + height, right: left + width, opacity: Number(style.opacity) };
-  }, label);
-}
-
-test('host header labels its back control inside the viewport', async ({ page }) => {
-  await mockApi(page);
-  for (const viewport of [{ width: 1440, height: 900 }, { width: 390, height: 844 }]) {
-    await page.setViewportSize(viewport);
-    // The shell header (and its back control) belongs to the console pages now.
-    await openScreen(page, '/room/' + ROOM + '/host/queue');
-    const button = page.getByRole('button', { name: 'Back to home' });
-    await expect(button).toBeVisible();
-    await button.hover();
-    await expect.poll(async () => (await tooltipRect(page, 'Back to home'))?.opacity).toBe(1);
-
-    const tip = await tooltipRect(page, 'Back to home');
-    expect(tip).not.toBeNull();
-    expect(tip!.top).toBeGreaterThanOrEqual(0);
-    expect(tip!.left).toBeGreaterThanOrEqual(0);
-    expect(tip!.bottom).toBeLessThanOrEqual(viewport.height);
-    expect(tip!.right).toBeLessThanOrEqual(viewport.width);
-  }
-});
-
-test('host floating video stays clear of header controls', async ({ page }) => {
-  await mockApi(page);
-  await page.setViewportSize({ width: 1440, height: 900 });
-  // The dock and the shell header coexist on the console pages; the stage has no
-  // floating frame to clear.
-  await openScreen(page, '/room/' + ROOM + '/host/queue');
-  await expect(page.getByRole('button', { name: 'Back to home' })).toBeVisible();
-  await page.waitForSelector('[data-host-player]', { state: 'visible' });
-  const geometry = await page.evaluate(() => {
-    const frame = document.querySelector<HTMLElement>('[data-host-player]');
-    const control = [...document.querySelectorAll('button')]
-      .find((button) => button.getAttribute('aria-label') === 'Back to home');
-    const frameRect = frame?.getBoundingClientRect();
-    const controlRect = control?.getBoundingClientRect();
-    if (frameRect === undefined || controlRect === undefined) return null;
-    const top = document.elementFromPoint(controlRect.x + controlRect.width / 2, controlRect.y + controlRect.height / 2);
-    return {
-      overlaps: !(frameRect.right < controlRect.left || frameRect.left > controlRect.right
-        || frameRect.bottom < controlRect.top || frameRect.top > controlRect.bottom),
-      topIsControl: top === control || control?.contains(top) === true,
-    };
-  });
-  expect(geometry).toEqual({ overlaps: false, topIsControl: true });
-});
-
-test('the host console keeps 44 pixel touch targets', async ({ page }) => {
-  await mockApi(page);
-  await page.setViewportSize({ width: 768, height: 900 });
-  await openScreen(page, '/room/' + ROOM + '/host/queue');
-
-  const controls = [
-    page.getByLabel('Back 10 seconds'),
-    page.getByRole('button', { name: /^(Play|Pause)$/ }),
-    page.getByLabel('Skip song'),
-    page.getByRole('link', { name: 'Open TV stage' }),
-    page.getByRole('button', { name: /^Second / }).first(),
-    page.getByRole('button', { name: /^Move .* up$/ }).first(),
-    page.getByRole('button', { name: /^Remove / }).first(),
-  ];
-
-  for (const control of controls) {
-    await expect(control).toBeVisible();
-    const box = await control.boundingBox();
-    expect(box).not.toBeNull();
-    // A control sized to exactly 44 CSS px comes back as 43.99994 from the
-    // device-pixel round trip, so the floor is compared on whole pixels.
-    expect(Math.round(box!.width)).toBeGreaterThanOrEqual(44);
-    expect(Math.round(box!.height)).toBeGreaterThanOrEqual(44);
-  }
 });

@@ -306,9 +306,8 @@ test('the invite chip says the same head-count on every host screen', async ({ p
   await page.setViewportSize({ width: 1440, height: 900 });
 
   for (const path of [
-    '/room/' + ROOM + '/host',
-    '/room/' + ROOM + '/host/queue',
     '/room/' + ROOM + '/host/party',
+    '/room/' + ROOM + '/host/party?layout=computer',
   ]) {
     await openScreen(page, path);
     // The mock roster is one host plus one guest, both heartbeating. Screens
@@ -318,7 +317,7 @@ test('the invite chip says the same head-count on every host screen', async ({ p
     expect(chips.every((chip) => chip.toLowerCase() === '1 in'), path + ' chips: ' + JSON.stringify(chips)).toBe(true);
   }
   // The claim is only worth anything if at least one screen renders it.
-  await openScreen(page, '/room/' + ROOM + '/host/party');
+  await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
   await expect(page.getByText('1 in').first()).toBeVisible();
 });
 
@@ -341,11 +340,12 @@ test('the party strip names the count it actually shows', async ({ page }) => {
 
 // The console redesign spec names this control (Trash, "Clear queue") and the
 // server has answered the action since 0014, but no screen ever sent it.
-test('the host can clear the queue from the queue page', async ({ page }) => {
+test('the host can clear the queue from the stage queue tab', async ({ page }) => {
   const scenario: Scenario = { hostActions: [] };
   await mock(page, scenario, 'host');
   await page.setViewportSize({ width: 1440, height: 900 });
-  await openScreen(page, '/room/' + ROOM + '/host/queue');
+  await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
+  await page.getByRole('tab', { name: /queue/i }).click();
 
   await page.getByRole('button', { name: 'Clear queue' }).click();
   const dialog = page.getByRole('dialog');

@@ -5,18 +5,18 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 ## What it does
 
 - One click on the landing screen creates the room and opens it as the TV stage, where a real, scannable QR and the 80-bit room code are already on screen. The names are optional and live behind a "Room details" disclosure (`Karaoke room` and `Host` if left blank).
-- Guest permissions have one switch: playback is host-only unless the host lets guests pause or resume. Adding and voting are always open to guests, and who gets in is moderated by the door instead.
+- Playback is host-only; guests can always add and vote, and they join directly.
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
 - Queue songs, reorder and remove as host, and let the next song start automatically.
-- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume, favorites and keyboard shortcuts, and the room QR over the video for new singers. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Hits panel beside the video with the invite card above it. The TV layout carries no search. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
+- One full-bleed TV stage with play/pause, 10-second seek, fullscreen, volume and keyboard shortcuts. `Switch to computer` (or `v`) stays on the same route and keeps the same player, and opens a Search / Queue / Songbook panel beside the video with the invite card. The TV layout carries no search and no invite overlay. Both `/host` and the retired `/host/stage` redirect here: the room's home is the stage, not a separate console page.
 - The landing and create screens carry no side navigation; the live room stays one click away in the page body.
 - Phone remote with Search and Queue tabs, duration, automatic-advance feedback, and a "you're up next" card.
 - Honest connection states: stale queue while offline, automatic recovery and a restored notice.
-- Local Song library, Favorites and Recently sung, plus remembered room sessions.
+- Remembered room sessions on the same browser.
 - Ended-room and unavailable-video states that do not leave dead controls.
 
-Host-only controls: skip, remove, reorder, guest removal, closing the door, and clearing the queue. Link rotation and turn rotation are not implemented; the UI does not pretend they exist. Room expiry is: a hard 24-hour ceiling ends a room even if nobody does.
+Host-only controls: skip, remove, reorder, and clearing the queue. Link rotation and turn rotation are not implemented; the UI does not pretend they exist. Room expiry is: a hard 24-hour ceiling ends a room even if nobody does.
 
 ## Architecture
 
@@ -59,7 +59,7 @@ YouTube search and chart require a data API key. Without it the app explains tha
 Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed. Successful lookups are capped by a per-room and a larger deployment daily budget; failed lookups refund those success budgets but count against separate non-refundable attempt budgets, so a loop of dead links cannot use the add button as an outbound amplifier. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0050 before deploying this tree; queue and search now call
+migrations 0025 through 0051 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
 karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
 calls `playback_next_if_current`, and the songbook catalog tables and its retention
@@ -94,11 +94,11 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 635 unit and component tests (jsdom)
+    npm test                 # 601 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch
-    npm run test:e2e:ui      # 64 CI-safe Playwright UI flows with a mocked API
+    npm run test:e2e:ui      # 60 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL (HTTPS for remote), plus E2E_BRANCH_TARGET_CONFIRMED=1 for a loopback-resolving target
 
 `vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, resolves the host before launching, refuses all known production aliases and `BETTER_AUTH_URL`, and requires HTTPS for remote targets. Any address that resolves to loopback — including `nip.io`, IPv6-mapped aliases, and trailing-dot names — additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in a hostname says whether that port is backed by a branch or by production. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
@@ -131,7 +131,7 @@ The UI suite needs no database or YouTube key. The real E2E suite creates rooms 
     src/features/rooms      create, join, passes, roster, sessions, invitations
     src/features/queue      links, search, queue rows, duplicate feedback
     src/features/playback   persistent host player, transport, stage and party docking
-    src/features/library    local library, favorites and recently sung
+
     src/lib                 anonymous auth client and same-origin API transport
     scripts                 deploy guard, preview verifier, CI branch helper
     supabase/migrations     schema and authorized SQL operations

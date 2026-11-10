@@ -40,7 +40,7 @@ export default function JoinRoomPage() {
     if (submitting.current) return;
     setError(null);
     if (!isValidRoomCode(code)) {
-      setError('That room code is not sixteen characters.');
+      setError('That room code is not valid.');
       return;
     }
     submitting.current = true;
@@ -115,13 +115,13 @@ export default function JoinRoomPage() {
                 setCode(normalizeRoomCode(event.target.value));
                 setError(null);
               }}
-              placeholder="ABCD EFGH JKMN PQRS"
+              placeholder="ABC 123"
               autoComplete="off"
               spellCheck={false}
               maxLength={24}
               icon={<KeyIcon size={17} weight="duotone" />}
-              hint={knownCode ? 'The room code from the host screen.' : 'Ask the host for the sixteen character code.'}
-              error={code.length > 0 && !isValidRoomCode(code) ? 'That code is not sixteen characters.' : null}
+              hint={knownCode ? 'The room code from the host screen.' : 'Ask the host for the six character code.'}
+              error={code.length > 0 && !isValidRoomCode(code) ? 'That code is not valid.' : null}
             />
             <Field
               id="name"

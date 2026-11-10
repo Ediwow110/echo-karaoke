@@ -1,6 +1,8 @@
 export const CROCKFORD_ALPHABET = '0123456789ABCDEFGHJKMNPQRSTVWXYZ';
 
-const VALID_CODE = /^[0-9A-HJKMNP-TV-Z]{16}$/;
+// New rooms get six characters. The sixteen-character form stays valid until
+// every room created before the change has expired.
+const VALID_CODE = /^(?:[0-9A-HJKMNP-TV-Z]{6}|[0-9A-HJKMNP-TV-Z]{16})$/;
 // Accepted symbols that Crockford decoding folds onto a canonical symbol.
 const ALIASES: Record<string, string> = {
   I: '1',

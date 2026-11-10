@@ -157,7 +157,7 @@ export default function ScanRoomPage() {
           <div className="mt-7 w-full max-w-[26rem] rounded-panel border border-line bg-graphite/90 p-5 text-left backdrop-blur">
             <p className="font-display text-[1.25rem] font-bold tracking-[-0.02em]">The camera is not available.</p>
             <p className="mt-2 text-[0.8125rem] leading-[1.6] text-ink-2">
-              Allow camera access for this site, or type the sixteen character code the host can read out.
+              Allow camera access for this site, or type the six character code the host can read out.
             </p>
             <Link
               to="/join"

@@ -129,7 +129,7 @@ describe.skipIf(!runsHere)('Vercel operation router', () => {
       role?: string;
     };
     expect(createdBody.roomId).toMatch(/^[0-9a-f-]{36}$/);
-    expect(createdBody.roomCode).toMatch(/^[0-9A-HJKMNP-TV-Z]{16}$/);
+    expect(createdBody.roomCode).toMatch(/^[0-9A-HJKMNP-TV-Z]{6}$/);
     expect(createdBody.hostToken).toHaveLength(43);
     expect(createdBody.role).toBe('host');
     const roomId = createdBody.roomId as string;

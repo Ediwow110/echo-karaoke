@@ -23,7 +23,6 @@ import SongSearchPanel from '../features/queue/SongSearchPanel';
 import PopularSongs from '../features/queue/PopularSongs';
 import { clearGuestToken, loadHostToken } from '../features/rooms/tokenStore';
 import { touchSession } from '../features/rooms/sessionStore';
-import { rememberPlayed, rememberSongs } from '../features/library/libraryStore';
 import { QUEUE_ELEMENT_ID } from '../features/queue/queueAnchor';
 import { formatTime, queueSummary } from '../lib/format';
 import { Avatar, Button, IconButton, Logo, SongArtwork, Toast } from '../ui';
@@ -58,8 +57,6 @@ export default function GuestRoomPage() {
   const [retrying, setRetrying] = useState(false);
   const [tookOver, setTookOver] = useState(false);
   const hostPassClaimed = useRef<string | null>(null);
-  const seenSongs = useRef(new Set<string>());
-  const playedSong = useRef<string | null>(null);
   const touchedRoom = useRef<string | null>(null);
 
   const queue = useMemo(() => {
@@ -155,17 +152,6 @@ export default function GuestRoomPage() {
     setToast({ id: Date.now(), message: 'Connection restored.', detail: 'Same room, same name. No need to rejoin.' });
   }, [restoredAt]);
 
-  useEffect(() => {
-    if (nowPlaying === null) {
-      return;
-    }
-    if (playedSong.current === nowPlaying.songId) {
-      return;
-    }
-    playedSong.current = nowPlaying.songId;
-    rememberPlayed([nowPlaying]);
-  }, [nowPlaying]);
-
   const [votingSongId, setVotingSongId] = useState<string | null>(null);
 
   const secondSong = useCallback(async (songId: string): Promise<void> => {
@@ -180,17 +166,6 @@ export default function GuestRoomPage() {
       setVotingSongId(null);
     }
   }, [api, refresh, roomId, votingSongId]);
-
-  useEffect(() => {
-    const fresh = queue.filter((song) => !seenSongs.current.has(song.videoId));
-    if (fresh.length === 0) {
-      return;
-    }
-    for (const song of fresh) {
-      seenSongs.current.add(song.videoId);
-    }
-    rememberSongs(fresh);
-  }, [queue]);
 
   useEffect(() => {
     document.title = roomName.length > 0 ? 'kara-echo · ' + roomName : 'kara-echo | the room sings together';

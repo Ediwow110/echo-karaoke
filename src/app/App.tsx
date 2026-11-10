@@ -10,18 +10,8 @@ import { lazyRoute } from '../lib/lazyRoute';
 const JoinRoomPage = lazyRoute(() => import('./JoinRoomPage'));
 const GuestRoomPage = lazyRoute(() => import('./GuestRoomPage'));
 const HostRoomPage = lazyRoute(() => import('./HostRoomPage'));
-const HostQueuePage = lazyRoute(() => import('./HostQueuePage'));
-const HostSettingsPage = lazyRoute(() => import('./HostSettingsPage'));
 const HostPartyPage = lazyRoute(() => import('./HostPartyPage'));
 const ScanRoomPage = lazyRoute(() => import('../features/scan/ScanRoomPage'));
-const HostLibraryPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostLibraryPage })));
-const HostFavoritesPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostFavoritesPage })));
-const HostRecentPage = lazyRoute(() => import('./HostCollectionPages').then((module) => ({ default: module.HostRecentPage })));
-const LibraryPage = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.LibraryPage })));
-const FavoritesPage = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.FavoritesPage })));
-const RecentPage = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.RecentPage })));
-const LastRoomQueueRedirect = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.LastRoomQueueRedirect })));
-const LastRoomSettingsRedirect = lazyRoute(() => import('./CollectionPages').then((module) => ({ default: module.LastRoomSettingsRedirect })));
 
 // React Router reuses a route element when only its parameter changes. Keying
 // the room screens by room id resets their state and tears down the old
@@ -50,6 +40,13 @@ export function HostStageRedirect() {
 export function HostSongbookRedirect() {
   const { roomId } = useParams<{ roomId: string }>();
   return <Navigate to={'/room/' + roomId + '/host/party?layout=computer&panel=songbook'} replace />;
+}
+
+// The console shell is gone. Old host bookmarks (queue, settings, library,
+// favorites, recently sung) land on the stage rather than a dead route.
+function HostLegacyRedirect() {
+  const { roomId } = useParams<{ roomId: string }>();
+  return <Navigate to={'/room/' + roomId + '/host/party'} replace />;
 }
 
 // A route change should announce the new screen to keyboard and screen-reader
@@ -129,22 +126,13 @@ export default function App() {
               without mounting the old sidebar for a tick. */}
           <Route path="/room/:roomId/host/songbook" element={<HostSongbookRedirect />} />
           <Route path="/room/:roomId/host" element={<HostRoomRoute />}>
-            {/* The console page is retired: the room opens on the stage, and the
-                computer layout carries search, queue and hits. */}
+            {/* The stage is the only host screen. The computer layout carries
+                search, queue and the songbook inside the same route. */}
             <Route index element={<Navigate to="party" replace />} />
-            <Route path="queue" element={<HostQueuePage />} />
-            <Route path="settings" element={<HostSettingsPage />} />
-            <Route path="library" element={<HostLibraryPage />} />
-            <Route path="favorites" element={<HostFavoritesPage />} />
-            <Route path="recent" element={<HostRecentPage />} />
             <Route path="stage" element={<HostStageRedirect />} />
             <Route path="party" element={<HostPartyPage />} />
+            <Route path="*" element={<HostLegacyRedirect />} />
           </Route>
-          <Route path="/library" element={<LibraryPage />} />
-          <Route path="/favorites" element={<FavoritesPage />} />
-          <Route path="/recent" element={<RecentPage />} />
-          <Route path="/queue" element={<LastRoomQueueRedirect />} />
-          <Route path="/settings" element={<LastRoomSettingsRedirect />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Routes>
       </Suspense>

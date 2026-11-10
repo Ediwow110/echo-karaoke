@@ -41,6 +41,9 @@ export function plural(count: number, one: string, many = one + 's'): string {
 }
 
 export function groupRoomCode(code: string): string {
+  if (code.length === 6) {
+    return code.slice(0, 3) + ' ' + code.slice(3);
+  }
   return code.replace(/(.{4})(?=.)/g, '$1 ');
 }
 
