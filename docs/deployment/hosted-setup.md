@@ -27,7 +27,7 @@ The host console shell and its pages were removed with migrations through 0051. 
 
 - The stage at `/room/<id>/host/party` is the only host screen. It has TV and computer layouts;
   every retired host URL (queue, settings, library, favorites, recently sung) redirects to it.
-- The invitation and its QR live in the computer layout's side panel. The TV layout has no invite overlay.
+- The invitation and its QR live in the computer layout's side panel. The TV stage shows the QR and six-character code only while idle; they disappear once a video starts.
 - Host controls on the stage: play/pause, skip, reorder, remove, clear queue, and end room. The guest
   pause/resume and door-lock toggles, guest removal, host handover, and the local library, favorites
   and recently-sung pages no longer exist in the client. Playback is host-only and guests join directly.
@@ -1095,7 +1095,7 @@ runner does not confirm the total: 23 of the 24 suites call `no_plan()` and only
   contains the old 55420–55429 range, so `supabase start` could no longer bind them. `supabase/config.toml`
   now uses api `55901`, db `55902`, studio `55903`, inbucket `55904`, analytics `55907`, pooler `55909`,
   shadow `55900`. Update any local `.env.local` that points at the old ports.
-- [x] `npm test` reports 601 passing tests on the current tree (measured 2026-11-10 at `d8ced69`).
+- [x] `npm test` reports 602 passing tests on the current tree (measured 2026-11-10).
 - [x] Every heartbeat is pinned inside the presence window: `tests/unit/presenceWindow.test.ts` parses
   the 30-second window from the newest migration that projects `online`, with a control that the parse
   found it, and requires the visible, hidden and host heartbeats to be shorter. Slowing one past the
