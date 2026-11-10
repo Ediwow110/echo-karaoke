@@ -306,17 +306,6 @@ export default function HostPartyPage() {
                       ? 'Search on this panel, or hand the code to anyone with a phone.'
                       : 'Scan the code to search from a phone and queue songs straight to this screen.'}
                   </p>
-                  {computer ? null : (
-                    <Button
-                      variant="primary"
-                      size="md"
-                      className="mt-5"
-                      icon={<LaptopIcon size={15} />}
-                      onClick={() => setLayout('computer')}
-                    >
-                      Add from this computer
-                    </Button>
-                  )}
                 </div>
               </div>
               {stageInvite}
