@@ -517,7 +517,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
               <KeyIcon size={14} className="mt-0.5 shrink-0 text-ink-2" aria-hidden="true" />
               <p className="text-[0.6875rem] leading-[1.6] text-ink-2">
                 Guests can add songs as soon as they join. Skip, remove and reorder stay host-only;
-                the computer panel carries the invite and the queue.
+                the stage carries the invite, and the computer panel adds search and the queue.
               </p>
             </div>
 
@@ -588,7 +588,7 @@ export default function HomePage({ intent = 'landing' }: HomePageProps) {
 
         <p className="mt-5 flex flex-wrap items-center gap-2 text-[0.6875rem] text-ink-2">
           <MicrophoneStageIcon size={15} className="text-signal" aria-hidden="true" />
-          The stage is the room. Switch to computer for the invite, search and queue.
+          The stage is the room. Switch to computer for search and queue.
         </p>
       </main>
     </div>
