@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { act, cleanup, render, screen } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen } from '@testing-library/react';
 import ConfirmDialog from '../../src/ui/ConfirmDialog';
 import '@testing-library/jest-dom/vitest';
 
@@ -48,5 +48,34 @@ describe('confirm dialog focus', () => {
     });
 
     expect(document.activeElement).toBe(cancel);
+  });
+
+  it('owns Escape while it is open, so the page does not also act on it', () => {
+    const onCancel = vi.fn();
+    const onPageKey = vi.fn();
+    const pageListener = (event: KeyboardEvent): void => {
+      if (event.key === 'Escape') onPageKey();
+    };
+    window.addEventListener('keydown', pageListener);
+
+    try {
+      render(
+        <ConfirmDialog
+          open
+          title="End the room?"
+          description="This cannot be undone."
+          confirmLabel="End the room"
+          onConfirm={() => undefined}
+          onCancel={onCancel}
+        />,
+      );
+
+      fireEvent.keyDown(document.body, { key: 'Escape' });
+
+      expect(onCancel).toHaveBeenCalledTimes(1);
+      expect(onPageKey, 'Escape reached the page behind the dialog').not.toHaveBeenCalled();
+    } finally {
+      window.removeEventListener('keydown', pageListener);
+    }
   });
 });
