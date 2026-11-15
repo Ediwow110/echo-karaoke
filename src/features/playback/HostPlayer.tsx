@@ -788,7 +788,7 @@ export default function HostPlayer({
               </div>
             ) : null}
 
-            {needsTap ? (
+            {needsTap && playerError === null ? (
               <div className="pointer-events-auto absolute inset-0 grid place-items-center bg-graphite-deep/72 px-6 text-center">
                 <div className="max-w-[24rem]">
                   <p className="eyebrow text-gold">Browser autoplay restriction</p>

@@ -932,7 +932,9 @@ describe('host room workspace', () => {
       playback: { ...liveRoom.playback, isPlaying: true, positionSeconds: 100 },
     };
     const { api, calls } = makeApi(playingRoom);
-    playerClock.state = 1;
+    // The iframe API never loaded, so the player reports its unstarted state
+    // even though the room believes it is playing.
+    playerClock.state = -1;
     playerClock.currentTime = 100;
     playerClock.duration = 222;
 
@@ -948,6 +950,7 @@ describe('host room workspace', () => {
     await new Promise((resolve) => { window.setTimeout(resolve, 6300); });
     expect(calls.some((call) => call.name === 'playback-command'
       && (call.body as { action?: string }).action === 'next')).toBe(false);
+    expect(screen.queryByRole('heading', { name: /playback needs a host click/i })).toBeNull();
 
     fireEvent.click(screen.getByRole('button', { name: /retry player/i }));
     expect(playerClock.loadCalls, 'retry did not ask the factory to load again').toBeGreaterThan(loadsBefore);
