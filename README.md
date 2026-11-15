@@ -4,7 +4,7 @@ A login-free YouTube karaoke room. A host creates a named room, guests scan a re
 
 ## What it does
 
-- One click on the landing screen creates the room and opens it as the TV stage, where a real, scannable QR and the 80-bit room code are already on screen. The names are optional and live behind a "Room details" disclosure (`Karaoke room` and `Host` if left blank).
+- One click on the landing screen creates the room and opens it as the TV stage, where a real, scannable QR and the room code are already on screen. The names are optional and live behind a "Room details" disclosure (`Karaoke room` and `Host` if left blank).
 - Playback is host-only; guests can always add and vote, and they join directly.
 - Search YouTube by song or artist and add songs directly from the results.
 - Prevent duplicate active songs, including concurrent adds.
@@ -36,7 +36,7 @@ not configured or resting. It is not a general replacement for search.
 - Realtime is not used for room data. Screens poll the token-checked read function and use visibility-aware polling.
 - The host screen owns one persistent YouTube player. It stays mounted while the host moves between the Queue, Settings, Library, Favorites and Songbook pages reachable from the stage panel; the stage docks that same player into a measured slot, and switching between its TV and computer layouts never unmounts it.
 
-Room codes use 16 Crockford Base32 characters (80 bits). Rooms live until the host ends them or 24 hours pass, whichever comes first, and abandoned rooms are swept when the next room is created.
+New room codes use 6 Crockford Base32 characters (30 bits); rooms created before that change keep their 16-character codes until they expire. Rooms live until the host ends them or 24 hours pass, whichever comes first, and abandoned rooms are swept when the next room is created.
 
 ## Local setup
 
@@ -94,7 +94,7 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 602 unit and component tests (jsdom)
+    npm test                 # 605 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch

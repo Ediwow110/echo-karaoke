@@ -16,6 +16,7 @@ const playerClock = vi.hoisted(() => ({
   duration: 0,
   state: -1,
   loadCalls: 0,
+  loadedVideoIds: [] as string[],
   playCalls: 0,
   pauseCalls: 0,
   onEnded: null as (() => void) | null,
@@ -24,6 +25,7 @@ const playerClock = vi.hoisted(() => ({
 }));
 
 vi.mock('../../src/features/playback/youtubeIframe', () => ({
+  YOUTUBE_LOAD_ERROR: -1,
   youtubePlayerFactory: (
     _element: unknown,
     callbacks: {
@@ -36,7 +38,10 @@ vi.mock('../../src/features/playback/youtubeIframe', () => ({
     playerClock.onError = callbacks.onError ?? null;
     playerClock.onStateChange = callbacks.onStateChange ?? null;
     return ({
-    load: () => { playerClock.loadCalls += 1; },
+    load: (videoId: string) => {
+      playerClock.loadCalls += 1;
+      playerClock.loadedVideoIds.push(videoId);
+    },
     play: () => { playerClock.playCalls += 1; },
     pause: () => { playerClock.pauseCalls += 1; },
     seekTo: () => undefined,
@@ -57,6 +62,7 @@ beforeEach(() => {
   playerClock.duration = 0;
   playerClock.state = -1;
   playerClock.loadCalls = 0;
+  playerClock.loadedVideoIds.length = 0;
   playerClock.playCalls = 0;
   playerClock.pauseCalls = 0;
   playerClock.onEnded = null;
@@ -79,6 +85,7 @@ beforeEach(() => {
 afterEach(() => {
   cleanup();
   localStorage.clear();
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
   vi.useRealTimers();
 });
@@ -916,5 +923,117 @@ describe('host room workspace', () => {
     });
     await waitFor(() => expect(reports).toHaveLength(1));
   });
+
+  it('does not skip the song when the player script itself fails to load', async () => {
+    // A blocked or timed-out iframe API is an infrastructure failure, not a bad
+    // video. Treating it as a playback error burned one playable queue entry.
+    const playingRoom = {
+      ...liveRoom,
+      playback: { ...liveRoom.playback, isPlaying: true, positionSeconds: 100 },
+    };
+    const { api, calls } = makeApi(playingRoom);
+    playerClock.state = 1;
+    playerClock.currentTime = 100;
+    playerClock.duration = 222;
+
+    renderHost(api);
+    await screen.findByRole('button', { name: /switch to computer/i });
+    await waitFor(() => expect(playerClock.onError).not.toBeNull());
+    const loadsBefore = playerClock.loadCalls;
+
+    act(() => { playerClock.onError?.(-1); });
+
+    expect(await screen.findByRole('heading', { name: /player failed to load/i })).toBeInTheDocument();
+    // Past the old six-second auto-skip window.
+    await new Promise((resolve) => { window.setTimeout(resolve, 6300); });
+    expect(calls.some((call) => call.name === 'playback-command'
+      && (call.body as { action?: string }).action === 'next')).toBe(false);
+
+    fireEvent.click(screen.getByRole('button', { name: /retry player/i }));
+    expect(playerClock.loadCalls, 'retry did not ask the factory to load again').toBeGreaterThan(loadsBefore);
+  }, 15000);
+
+  it('re-arms early finish for the next song after an early finish', async () => {
+    // The last-five-seconds check runs in the same commit as the next video's
+    // load, while the clock state still belongs to the finished song. It must
+    // not spend the next song's one early-finish attempt.
+    const songA = liveRoom.queue[0];
+    const songB = liveRoom.queue[1];
+    const firstRoom = {
+      ...liveRoom,
+      queue: [{ ...songA, status: 'playing' }, songB],
+      playback: {
+        ...liveRoom.playback,
+        currentSongId: songA.songId,
+        currentVideoId: songA.videoId,
+        positionSeconds: 217,
+        isPlaying: true,
+      },
+    };
+    const afterFirstNext = {
+      ...liveRoom,
+      queue: [{ ...songB, status: 'playing' }],
+      playback: {
+        ...liveRoom.playback,
+        currentSongId: songB.songId,
+        currentVideoId: songB.videoId,
+        positionSeconds: 0,
+        isPlaying: true,
+      },
+    };
+    let room = firstRoom;
+    const nextActions: Array<{ action?: string; expectedSongId?: string }> = [];
+    const api: EdgeApi = {
+      invoke: (async (name: string, body: unknown) => {
+        if (name === 'host-room-read' || name === 'guest-room-read' || name === 'touch-member') {
+          return room;
+        }
+        if (name === 'playback-command') {
+          const payload = body as { action?: string; expectedSongId?: string };
+          if (payload.action === 'next') {
+            nextActions.push(payload);
+            room = afterFirstNext;
+            playerClock.currentTime = 0;
+            playerClock.duration = 243;
+          }
+          return { roomId, status: 'live', playback: room.playback };
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    playerClock.state = 1;
+    playerClock.currentTime = 217;
+    playerClock.duration = 222;
+    // A visible stage slot is what tells HostPlayer to drive the video; jsdom
+    // reports a zero-size box unless the test supplies one.
+    vi.stubGlobal('matchMedia', vi.fn((query: string) => ({
+      matches: query.includes('min-width: 1024px'),
+      media: query,
+      addEventListener: () => undefined,
+      removeEventListener: () => undefined,
+    })));
+    vi.spyOn(Element.prototype, 'getBoundingClientRect').mockReturnValue({
+      width: 400, height: 300, top: 0, left: 0, right: 400, bottom: 300,
+      x: 0, y: 0, toJSON: () => ({}),
+    } as DOMRect);
+
+    renderHost(api);
+
+    await waitFor(() => expect(nextActions).toHaveLength(1), { timeout: 5000 });
+    expect(nextActions[0].expectedSongId).toBe(songA.songId);
+    await waitFor(() => expect(playerClock.loadedVideoIds).toContain(songB.videoId), { timeout: 5000 });
+
+    // Let the 1.5-second advance guard from A's finish expire; real songs take
+    // minutes to reach B's end, so this only compresses the test's timeline.
+    await new Promise((resolve) => { window.setTimeout(resolve, 1700); });
+
+    // B now reaches its own last five seconds. Its early finish must still be
+    // armed after the load that followed A's early finish.
+    playerClock.currentTime = 238;
+    playerClock.duration = 243;
+    await waitFor(() => {
+      expect(nextActions.some((action) => action.expectedSongId === songB.songId)).toBe(true);
+    }, { timeout: 4000 });
+  }, 20000);
 
 });

@@ -29,6 +29,7 @@ export type HostPlayerValue = {
   setVolume: (volume: number) => void;
   toggleFullscreen: () => void;
   skipFailed: () => void;
+  retryPlayer: () => void;
   retryAdvance: () => void;
   findAlternative: () => void;
 };

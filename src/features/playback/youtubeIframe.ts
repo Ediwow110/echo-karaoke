@@ -18,6 +18,9 @@ type YouTubeApi = {
   PlayerState: { ENDED: number; PLAYING: number; PAUSED: number; BUFFERING: number; CUED: number };};
 
 const API_TIMEOUT_MS = 8000;
+// The player handle uses video error codes; -1 means the iframe API itself
+// never loaded, which is an infrastructure failure rather than a bad video.
+export const YOUTUBE_LOAD_ERROR = -1;
 let apiPromise: Promise<YouTubeApi> | null = null;
 
 function finitePosition(value: number): number {
@@ -159,7 +162,7 @@ export const youtubePlayerFactory: PlayerFactory = (element, callbacks) => {
       .catch(() => {
         if (destroyed) return;
         player = null;
-        callbacks.onError?.(-1);
+        callbacks.onError?.(YOUTUBE_LOAD_ERROR);
       })
       .finally(() => {
         starting = false;

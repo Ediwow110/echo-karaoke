@@ -39,8 +39,13 @@ export default function ConfirmDialog({
       panelRef.current?.querySelector<HTMLButtonElement>('[data-confirm]')?.focus();
     }, 20);
     const onKey = (event: KeyboardEvent): void => {
-      if (event.key === 'Escape' && !busyRef.current) {
-        cancelRef.current();
+      if (event.key === 'Escape') {
+        // A modal owns Escape. Without this the page's global shortcut also ran
+        // and switched layouts behind the dialog that was being dismissed.
+        event.stopPropagation();
+        if (!busyRef.current) {
+          cancelRef.current();
+        }
         return;
       }
       if (event.key !== 'Tab') {

@@ -4,7 +4,7 @@ import { PlayIcon } from '@phosphor-icons/react/dist/csr/Play';
 import { SpinnerGapIcon } from '@phosphor-icons/react/dist/csr/SpinnerGap';
 import { WarningCircleIcon } from '@phosphor-icons/react/dist/csr/WarningCircle';
 import type { PlaybackState } from './playbackApi';
-import { youtubePlayerFactory } from './youtubeIframe';
+import { youtubePlayerFactory, YOUTUBE_LOAD_ERROR } from './youtubeIframe';
 import { HostPlayerContext, type HostPlayerValue } from './useHostPlayer';
 import type { PlayerHandle } from './playerTypes';
 import type { QueueEntry } from '../rooms/useRoomData';
@@ -111,6 +111,7 @@ export default function HostPlayer({
   const [playerState, setPlayerState] = useState<number>(PLAYER_STATE.unstarted);
   const [needsTap, setNeedsTap] = useState(false);
   const [playerError, setPlayerError] = useState<PlayerError | null>(null);
+  const [clockVideoId, setClockVideoId] = useState<string | null>(null);
   const [advanceStalled, setAdvanceStalled] = useState(false);
   const [currentTime, setCurrentTime] = useState(0);
   const [duration, setDuration] = useState(0);
@@ -234,6 +235,7 @@ export default function HostPlayer({
       setAdvanceStalled(false);
       setCurrentTime(0);
       setDuration(0);
+      setClockVideoId(null);
       try {
         player.pause();
       } catch {
@@ -248,11 +250,13 @@ export default function HostPlayer({
     if (loadedVideoRef.current !== videoId) {
       loadedVideoRef.current = videoId;
       autoSkippedRef.current = null;
+      earlyFinishRef.current = null;
       setPlayerError(null);
       setNeedsTap(false);
       setAdvanceStalled(false);
       setCurrentTime(playback?.positionSeconds ?? 0);
       setDuration(nowPlaying?.durationSeconds ?? 0);
+      setClockVideoId(videoId);
       player.load(videoId, Math.max(0, playback?.positionSeconds ?? 0));
     }
   }, [factoryReady, nowPlaying?.durationSeconds, playback?.positionSeconds, playerVisible, videoId]);
@@ -369,7 +373,11 @@ export default function HostPlayer({
   }, []);
 
   useEffect(() => {
-    if (!isPlaying || videoId === null || loadedVideoRef.current !== videoId) {
+    // The clock state can still belong to the previous video in the commit
+    // that loads a new one. Waiting for clockVideoId keeps those stale final
+    // seconds from spending the new song's early-finish attempt.
+    if (!isPlaying || videoId === null || loadedVideoRef.current !== videoId
+      || clockVideoId !== videoId) {
       return;
     }
     const total = duration > 0 ? duration : nowPlaying?.durationSeconds ?? 0;
@@ -382,7 +390,7 @@ export default function HostPlayer({
     }
     earlyFinishRef.current = videoId;
     finishSong();
-  }, [currentTime, duration, finishSong, isPlaying, nowPlaying?.durationSeconds, videoId]);
+  }, [clockVideoId, currentTime, duration, finishSong, isPlaying, nowPlaying?.durationSeconds, videoId]);
 
   useEffect(() => {
     if (duration > 0 || nowPlaying?.durationSeconds == null) {
@@ -392,7 +400,9 @@ export default function HostPlayer({
   }, [duration, nowPlaying?.durationSeconds]);
 
   useEffect(() => {
-    if (playerError === null) {
+    // A failed iframe API load is an infrastructure failure. Skipping the song
+    // would lose a playable queue entry; the overlay offers a retry instead.
+    if (playerError === null || playerError.code === YOUTUBE_LOAD_ERROR) {
       return;
     }
     if (autoSkippedRef.current === playerError.videoId) {
@@ -565,6 +575,18 @@ export default function HostPlayer({
     void advance();
   }, [advance, playerError?.videoId]);
 
+  const retryPlayer = useCallback(() => {
+    const current = playbackRef.current;
+    const player = playerRef.current;
+    const id = current?.currentVideoId ?? null;
+    setPlayerError(null);
+    setNeedsTap(false);
+    if (player !== null && id !== null) {
+      // The factory retries the iframe script on the next load request.
+      player.load(id, Math.max(0, current?.positionSeconds ?? 0));
+    }
+  }, []);
+
   const retryAdvance = useCallback(() => {
     setAdvanceStalled(false);
     void advance();
@@ -579,6 +601,7 @@ export default function HostPlayer({
   }, [onFindAlternative, playerError]);
 
   const effectiveDuration = duration > 0 ? duration : nowPlaying?.durationSeconds ?? 0;
+  const loadFailed = playerError?.code === YOUTUBE_LOAD_ERROR;
   const loading = videoId !== null
     && needsTap === false
     && playerState !== PLAYER_STATE.playing
@@ -608,6 +631,7 @@ export default function HostPlayer({
     setVolume: changeVolume,
     toggleFullscreen,
     skipFailed,
+    retryPlayer,
     retryAdvance,
     findAlternative,
   }), [
@@ -626,6 +650,7 @@ export default function HostPlayer({
     registerStageSlot,
     requestPlay,
     retryAdvance,
+    retryPlayer,
     seekBy,
     seekTo,
     skipFailed,
@@ -688,9 +713,18 @@ export default function HostPlayer({
         <div className="pointer-events-none fixed inset-x-0 bottom-[7.25rem] z-40 flex justify-center px-4">
           <div className="pointer-events-auto flex w-full max-w-[32rem] items-center gap-2 rounded-panel border border-danger/30 bg-danger-soft/95 px-3.5 py-2.5 text-[0.75rem] text-danger shadow-[0_12px_36px_rgba(0,0,0,0.4)] backdrop-blur">
             <WarningCircleIcon size={16} className="shrink-0" aria-hidden="true" />
-            <p className="min-w-0 flex-1 leading-[1.5]">This video can't play here. Skipping to the next song.</p>
+            <p className="min-w-0 flex-1 leading-[1.5]">
+              {loadFailed
+                ? 'The player failed to load. Retry, or skip this song.'
+                : "This video can't play here. Skipping to the next song."}
+            </p>
+            {loadFailed ? (
+              <button type="button" onClick={retryPlayer} className="shrink-0 font-semibold underline underline-offset-2">Retry</button>
+            ) : null}
             <button type="button" onClick={skipFailed} className="shrink-0 font-semibold underline underline-offset-2">Skip now</button>
-            <button type="button" onClick={findAlternative} className="hidden shrink-0 text-ink-2 underline underline-offset-2 hover:text-ink sm:block">Alternative</button>
+            {loadFailed ? null : (
+              <button type="button" onClick={findAlternative} className="hidden shrink-0 text-ink-2 underline underline-offset-2 hover:text-ink sm:block">Alternative</button>
+            )}
           </div>
         </div>
       ) : null}
@@ -773,15 +807,26 @@ export default function HostPlayer({
               <div className="pointer-events-auto absolute inset-0 grid place-items-center bg-graphite-deep/82 px-6 text-center">
                 <div className="max-w-[26rem]">
                   <WarningCircleIcon size={26} className="mx-auto text-gold" aria-hidden="true" />
-                  <h3 className="mt-3 font-display text-[1.65rem] font-bold tracking-[-0.02em]">This video can't play here.</h3>
+                  <h3 className="mt-3 font-display text-[1.65rem] font-bold tracking-[-0.02em]">
+                    {loadFailed ? 'The player failed to load.' : "This video can't play here."}
+                  </h3>
                   <p className="mt-2 text-[0.8125rem] leading-[1.6] text-ink-2">
-                    The uploader restricted embedding, or the video is no longer available. The room moves on to the next available song.
+                    {loadFailed
+                      ? 'YouTube’s player script was blocked or timed out. Retry the player, or skip this song.'
+                      : 'The uploader restricted embedding, or the video is no longer available. The room moves on to the next available song.'}
                   </p>
                   <div className="mt-4 flex flex-wrap justify-center gap-2">
-                    <Button variant="primary" size="md" onClick={skipFailed}>Skip this video</Button>
-                    <Button variant="secondary" size="md" onClick={findAlternative}>Find another version</Button>
+                    {loadFailed ? (
+                      <Button variant="primary" size="md" onClick={retryPlayer}>Retry player</Button>
+                    ) : null}
+                    <Button variant={loadFailed ? 'secondary' : 'primary'} size="md" onClick={skipFailed}>Skip this video</Button>
+                    {loadFailed ? null : (
+                      <Button variant="secondary" size="md" onClick={findAlternative}>Find another version</Button>
+                    )}
                   </div>
-                  <p className="mt-3 text-[0.6875rem] text-ink-3">Automatically advancing in a few seconds.</p>
+                  {loadFailed ? null : (
+                    <p className="mt-3 text-[0.6875rem] text-ink-3">Automatically advancing in a few seconds.</p>
+                  )}
                 </div>
               </div>
             ) : null}
