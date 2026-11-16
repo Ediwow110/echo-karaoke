@@ -75,12 +75,23 @@ export default function HostPartyPage() {
     const requested = params.get('panel');
     return requested === 'queue' || requested === 'songbook' ? requested : 'search';
   });
-  const [searchQuery] = useState(() => params.get('q') ?? '');
+  const [searchQuery, setSearchQuery] = useState(() => params.get('q') ?? '');
 
   useEffect(() => {
-    if (params.get('panel') === null) return;
-    // A deep link names the panel it wants; after it opens, the tab is local
-    // state and the URL should not keep insisting on this one.
+    // A deep link names the panel and query it wants. The alternative button
+    // navigates inside this same mounted route, so initializers alone would
+    // discard its parameters.
+    const requestedPanel = params.get('panel');
+    const requestedQuery = params.get('q');
+    if (requestedPanel === 'search' || requestedPanel === 'queue' || requestedPanel === 'songbook') {
+      setTab(requestedPanel);
+    }
+    if (requestedQuery !== null) {
+      setSearchQuery(requestedQuery);
+    }
+    if (requestedPanel === null && requestedQuery === null) {
+      return;
+    }
     const next = new URLSearchParams(params);
     next.delete('panel');
     next.delete('q');
@@ -490,6 +501,7 @@ export default function HostPartyPage() {
                       </div>
                     </div>
                     <SongSearchPanel
+                      key={'search-panel-' + searchQuery}
                       roomId={roomId}
                       queue={queue}
                       variant="host"

@@ -1039,4 +1039,22 @@ describe('host room workspace', () => {
     }, { timeout: 4000 });
   }, 20000);
 
+  it('opens Search with the alternative query from the queue panel', async () => {
+    const playing = { ...liveRoom, playback: { ...liveRoom.playback, isPlaying: true } };
+    const { api } = makeApi(playing);
+    playerClock.state = 1;
+
+    renderHost(api, '/room/' + roomId + '/host/party?layout=computer');
+    fireEvent.click(await screen.findByRole('tab', { name: /queue/i }));
+    await waitFor(() => expect(playerClock.onError).not.toBeNull());
+
+    act(() => { playerClock.onError?.(2); });
+    fireEvent.click(await screen.findByRole('button', { name: /find another version/i }));
+
+    const search = await screen.findByRole('search');
+    expect(within(search).getByRole('textbox', { name: /find a song on youtube/i }))
+      .toHaveValue('Afterglow karaoke');
+    expect(screen.getByRole('tab', { name: /^search$/i })).toHaveAttribute('aria-selected', 'true');
+  });
+
 });

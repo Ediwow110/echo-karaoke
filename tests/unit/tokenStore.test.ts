@@ -64,4 +64,27 @@ describe('room token storage', () => {
 
     setItem.mockRestore();
   });
+
+  it('re-reads a pass another tab rotated in storage', () => {
+    saveGuestToken('room-cross', 'first');
+    expect(loadGuestToken('room-cross')).toBe('first');
+
+    localStorage.setItem('karaoke.guest.room-cross', 'second');
+
+    expect(loadGuestToken('room-cross')).toBe('second');
+  });
+
+  it('drops an in-memory copy when another tab removes the pass', () => {
+    saveHostToken('room-cross', 'host');
+    expect(loadHostToken('room-cross')).toBe('host');
+
+    localStorage.removeItem('karaoke.host.room-cross');
+    window.dispatchEvent(new StorageEvent('storage', {
+      key: 'karaoke.host.room-cross',
+      newValue: null,
+      storageArea: localStorage,
+    }));
+
+    expect(loadHostToken('room-cross')).toBeNull();
+  });
 });

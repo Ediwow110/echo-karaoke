@@ -6,20 +6,34 @@ const HOST_PREFIX = 'karaoke.host.';
 const memory = new Map<string, string>();
 
 function read(key: string): string | null {
-  const cached = memory.get(key);
-  if (cached !== undefined) {
-    return cached;
-  }
   try {
+    // Storage is the cross-tab source of truth. The memory copy is only a
+    // fallback for a browser that rejected the write; preferring it forever
+    // strands this tab when another tab rotates the pass.
     const value = localStorage.getItem(key);
-    if (value === null || value.length === 0) {
-      return null;
+    if (value !== null && value.length > 0) {
+      memory.set(key, value);
+      return value;
     }
-    memory.set(key, value);
-    return value;
   } catch {
-    return null;
+    // Fall through to the in-memory pass.
   }
+  return memory.get(key) ?? null;
+}
+
+function syncFromStorage(event: StorageEvent): void {
+  if (event.storageArea !== localStorage || event.key === null) {
+    return;
+  }
+  if (event.newValue === null || event.newValue.length === 0) {
+    memory.delete(event.key);
+    return;
+  }
+  memory.set(event.key, event.newValue);
+}
+
+if (typeof window !== 'undefined' && typeof localStorage !== 'undefined') {
+  window.addEventListener('storage', syncFromStorage);
 }
 
 function write(key: string, token: string): void {

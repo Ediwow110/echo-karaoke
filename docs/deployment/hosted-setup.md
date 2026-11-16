@@ -262,7 +262,10 @@ expects more than 120 new guests in an hour.
 YouTube's current quota model is split. `search.list` has its own bucket of 100 calls
 per day at one unit per call. Both user searches and the karaoke strip use it: the
 defaults are 90 user searches plus 6 strip refreshes, and the deploy guard rejects a
-pair that exceeds 100. User searches are cached for ten minutes; the strip asks for
+pair that exceeds 100. Search and strip calls also share a non-refundable
+provider-attempt budget (96/day by default, `YOUTUBE_DAILY_API_ATTEMPT_BUDGET`);
+failed and empty upstream responses refund personal success allowances but still
+spend one attempt. User searches are cached for ten minutes; the strip asks for
 embeddable karaoke videos with lyrics, drops medleys and compilations, caches a pool
 of up to twenty for twelve hours, and serves up to twenty cards from that pool. Per-user, per-room, and global limits sit in front of
 the upstream call. oEmbed metadata is quota-free, but the add path still has a
