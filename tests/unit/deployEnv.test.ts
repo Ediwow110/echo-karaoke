@@ -161,6 +161,16 @@ describe('deployment environment guard', () => {
     })).toContain('YOUTUBE_DAILY_SEARCH_BUDGET must be an integer between 1 and 100.');
   });
 
+  it.each(['1', '96', '100'])('accepts provider-attempt budget %s', (value) => {
+    expect(checkDeployEnv({ ...valid, YOUTUBE_DAILY_API_ATTEMPT_BUDGET: value })).toEqual([]);
+  });
+
+  it.each(['0', '-1', '1.5', '101', '1000', 'not-a-number'])('rejects unsafe provider-attempt budget %s', (value) => {
+    expect(checkDeployEnv({ ...valid, YOUTUBE_DAILY_API_ATTEMPT_BUDGET: value })).toContain(
+      'YOUTUBE_DAILY_API_ATTEMPT_BUDGET must be an integer between 1 and 100.',
+    );
+  });
+
   it('keeps user searches and karaoke picks inside the 100-call bucket', () => {
     expect(checkDeployEnv({
       ...valid,

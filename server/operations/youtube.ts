@@ -21,6 +21,7 @@ const SEARCH_WINDOW_SECONDS = 60;
 const CACHE_TTL_SECONDS = 600;
 const DEFAULT_DAILY_SEARCH_BUDGET = 90;
 const DEFAULT_DAILY_POPULAR_BUDGET = 6;
+const DEFAULT_DAILY_ATTEMPT_BUDGET = DEFAULT_DAILY_SEARCH_BUDGET + DEFAULT_DAILY_POPULAR_BUDGET;
 const POPULAR_QUERY = 'popular karaoke songs';
 const POPULAR_FETCH_LIMIT = 20;
 const POPULAR_RESULT_LIMIT = 20;
@@ -158,6 +159,30 @@ async function enforceLimit(name: string, params: unknown[], message: string): P
   }
 }
 
+// YouTube charges the provider bucket for a request even when the body is
+// unusable, so an authorized attempt is never refunded. The per-user, per-room
+// and success budgets remain refundable; this is the actual outbound ceiling.
+async function consumeProviderAttempt(request: Request): Promise<boolean> {
+  const configured = Number(process.env.YOUTUBE_DAILY_API_ATTEMPT_BUDGET);
+  const limit = Number.isInteger(configured) && configured >= 1 && configured <= 100
+    ? configured : DEFAULT_DAILY_ATTEMPT_BUDGET;
+  const result = await queryAllowNull('consume_daily_rate_limit', [
+    'global',
+    'youtube-api-attempt-day',
+    limit,
+  ]) as { allowed?: boolean } | null;
+  if (result?.allowed === true) {
+    return true;
+  }
+  // The SQL limiter increments on refusal too; discard that denied debit.
+  try {
+    await queryAllowNull('refund_daily_rate_limit', ['global', 'youtube-api-attempt-day']);
+  } catch (error) {
+    logFailure('youtube-provider-attempt/refund', error, 500, request);
+  }
+  return false;
+}
+
 async function readSearchCache(key: string): Promise<SearchResult[] | null> {
   return (await queryAllowNull('youtube_search_cache_get', [key])) as SearchResult[] | null;
 }
@@ -286,6 +311,9 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     throw new HttpError('RATE_LIMITED', 429, "You have reached today's search limit. Try again tomorrow.");
   }
 
+  const target = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&maxResults=10&key=' +
+    encodeURIComponent(apiKey) + '&q=' + encodeURIComponent(query);
+
   const charged: string[] = [];
   const refundCharged = async (): Promise<void> => {
     if (charged.length === 0) return;
@@ -340,8 +368,19 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     });
   }
 
-  const target = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&maxResults=10&key=' +
-    encodeURIComponent(apiKey) + '&q=' + encodeURIComponent(query);
+  // Only an eligible outbound request spends a provider attempt. A refusal or
+  // failure here gives back the success allowances reserved above.
+  let attemptAllowed: boolean;
+  try {
+    attemptAllowed = await consumeProviderAttempt(request);
+  } catch (error) {
+    await refundCharged();
+    throw error;
+  }
+  if (!attemptAllowed) {
+    await refundCharged();
+    return localSearchOrUnavailable(query, 'Search is resting for today. Try again tomorrow.');
+  }
 
   let upstream: Response;
   try {
@@ -364,12 +403,14 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
   }
 
   const results = mapSearchResponse(payload);
-  // An unrecognized 200 maps to an empty list; caching that would show "no
-  // matches" to every room for the next ten minutes. The popular path already
-  // refuses to cache an empty pool.
-  if (results.length > 0) {
-    await writeSearchCache(cacheKey, results);
+  if (results.length === 0) {
+    // The provider charged the non-refundable attempt budget, but there is no
+    // useful result to charge the caller's success allowances for. Never cache
+    // an empty list: it would show "no matches" to every room for ten minutes.
+    await refundCharged();
+    return jsonResponse({ available: true, results: [] });
   }
+  await writeSearchCache(cacheKey, results);
   return jsonResponse({ available: true, results });
 }
 
@@ -404,15 +445,6 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     return jsonResponse({ available: true, results: pickPopularCards(persisted) });
   }
 
-  const daily = await queryAllowNull('consume_daily_rate_limit', [
-    'global',
-    'youtube-popular-day',
-    dailyBudget('YOUTUBE_DAILY_POPULAR_BUDGET', DEFAULT_DAILY_POPULAR_BUDGET),
-  ]) as { allowed?: boolean } | null;
-  if (daily?.allowed !== true) {
-    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
-  }
-
   const refund = async (): Promise<void> => {
     try {
       await queryAllowNull('refund_daily_rate_limit', ['global', 'youtube-popular-day']);
@@ -422,6 +454,29 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
   };
 
   const target = buildPopularSearchUrl(apiKey);
+
+  const daily = await queryAllowNull('consume_daily_rate_limit', [
+    'global',
+    'youtube-popular-day',
+    dailyBudget('YOUTUBE_DAILY_POPULAR_BUDGET', DEFAULT_DAILY_POPULAR_BUDGET),
+  ]) as { allowed?: boolean } | null;
+  if (daily?.allowed !== true) {
+    // The SQL limiter increments on refusal too; discard that denied debit.
+    await refund();
+    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
+  }
+
+  let attemptAllowed: boolean;
+  try {
+    attemptAllowed = await consumeProviderAttempt(request);
+  } catch (error) {
+    await refund();
+    throw error;
+  }
+  if (!attemptAllowed) {
+    await refund();
+    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
+  }
 
   let response: Response;
   try {
@@ -447,6 +502,9 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
   if (pool.length > 0) {
     await writeSearchCache(POPULAR_CACHE_KEY, pool, POPULAR_CACHE_TTL_SECONDS);
     popularCached = { at: Date.now(), results: pool };
+  } else {
+    // The provider attempt stays charged; the app's success allowance does not.
+    await refund();
   }
   return jsonResponse({ available: true, results: pickPopularCards(pool) });
 }

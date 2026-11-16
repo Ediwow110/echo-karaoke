@@ -45,6 +45,25 @@ describe('JWKS cache', () => {
     expect(reads).toBe(2);
   });
 
+  it('shares one cold load across concurrent callers', async () => {
+    let reads = 0;
+    let release!: () => void;
+    const gate = new Promise<void>((resolve) => { release = resolve; });
+    const source = async () => {
+      reads += 1;
+      await gate;
+      return { keys: [{ kid: 'cold' }] };
+    };
+
+    const pending = Array.from({ length: 20 }, () => fetchJwks(source));
+    await Promise.resolve();
+    release();
+    const results = await Promise.all(pending);
+
+    expect(reads).toBe(1);
+    expect(results.every((keys) => keys[0]?.kid === 'cold')).toBe(true);
+  });
+
   it('does not reuse keys from a different in-process source', async () => {
     const first = async () => ({ keys: [{ kid: 'first' }] });
     const second = async () => ({ keys: [{ kid: 'second' }] });

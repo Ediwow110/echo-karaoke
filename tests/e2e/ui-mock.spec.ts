@@ -168,6 +168,20 @@ async function openGuestSearch(page: Page): Promise<void> {
   await page.waitForSelector('ul[aria-label="Songs"] li');
 }
 
+test('the landing page loads when local storage access is blocked', async ({ page }) => {
+  await page.setViewportSize({ width: 390, height: 844 });
+  await page.addInitScript(() => {
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      get() { throw new DOMException('Storage access is blocked', 'SecurityError'); },
+    });
+  });
+
+  await openScreen(page, '/');
+
+  await expect(page.getByRole('heading', { name: 'Join the room.', exact: true })).toBeVisible();
+});
+
 test('a refused start leaves the host on the stage that can retry it', async ({ page }) => {
   // Both the auto-play effect and the Play button used to navigate as soon as the
   // command was sent, so a refused play put the host in front of a silent room
@@ -213,7 +227,15 @@ async function stubYouTube(page: Page, state: number, currentTime: number): Prom
   await page.addInitScript(([playerState, clock]) => {
     (window as unknown as { YT: unknown }).YT = {
       PlayerState: { ENDED: 0, PLAYING: 1, PAUSED: 2, BUFFERING: 3, CUED: 5 },
-      Player: function StubPlayer(_mount: HTMLElement, options: { events?: { onReady?: () => void } }) {
+      Player: function StubPlayer(_mount: HTMLElement, options: {
+        events?: { onReady?: () => void; onError?: (event: { data: number }) => void };
+      }) {
+        const diagnostics = window as unknown as {
+          __youtubeError?: (event: { data: number }) => void;
+          __youtubeMounts?: number;
+        };
+        diagnostics.__youtubeError = options.events?.onError;
+        diagnostics.__youtubeMounts = (diagnostics.__youtubeMounts ?? 0) + 1;
         const stub = {
           cueVideoById: () => undefined,
           loadVideoById: () => undefined,
@@ -233,6 +255,29 @@ async function stubYouTube(page: Page, state: number, currentTime: number): Prom
     };
   }, [state, currentTime]);
 }
+
+test('repeated alternative search restores its query and preserves the player', async ({ page }) => {
+  await mockApi(page, false);
+  await stubYouTube(page, 2, 0);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
+  await page.getByRole('tab', { name: 'Queue', exact: true }).click();
+  await page.waitForFunction(() => typeof (window as unknown as { __youtubeError?: unknown }).__youtubeError === 'function');
+  await page.evaluate(() => {
+    (window as unknown as { __youtubeError: (event: { data: number }) => void }).__youtubeError({ data: 101 });
+  });
+  await page.getByRole('button', { name: 'Find another version', exact: true }).click();
+  const input = page.getByRole('textbox', { name: 'Find a song on YouTube' });
+  await expect(input).toHaveValue('Afterglow karaoke');
+
+  await input.fill('Manually edited query');
+  await page.getByRole('button', { name: 'Find another version', exact: true }).click();
+
+  await expect(input).toHaveValue('Afterglow karaoke');
+  await expect(page.getByRole('tab', { name: 'Search', exact: true })).toHaveAttribute('aria-selected', 'true');
+  await expect.poll(() => new URL(page.url()).search).toBe('?layout=computer');
+  expect(await page.evaluate(() => (window as unknown as { __youtubeMounts: number }).__youtubeMounts)).toBe(1);
+});
 
 async function collectReports(page: Page): Promise<Array<{ positionSeconds?: number }>> {
   const reports: Array<{ positionSeconds?: number }> = [];

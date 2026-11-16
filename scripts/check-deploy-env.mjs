@@ -125,6 +125,7 @@ function checkBackend(env, errors) {
   // and the karaoke strip.
   budget('YOUTUBE_DAILY_SEARCH_BUDGET', 1, 100);
   budget('YOUTUBE_DAILY_POPULAR_BUDGET', 1, 100);
+  budget('YOUTUBE_DAILY_API_ATTEMPT_BUDGET', 1, 100);
   budget('YOUTUBE_DAILY_METADATA_BUDGET', 1, 100000);
   budget('YOUTUBE_ROOM_METADATA_BUDGET', 1, 100000);
   budget('YOUTUBE_DAILY_METADATA_ATTEMPT_BUDGET', 1, 100000);
