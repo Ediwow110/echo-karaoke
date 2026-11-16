@@ -160,16 +160,27 @@ async function enforceLimit(name: string, params: unknown[], message: string): P
 }
 
 // YouTube charges the provider bucket for a request even when the body is
-// unusable, so this budget is never refunded. The per-user, per-room and
-// success budgets remain refundable; this is the actual outbound ceiling.
-async function consumeProviderAttempt(): Promise<boolean> {
-  const limit = dailyBudget('YOUTUBE_DAILY_API_ATTEMPT_BUDGET', DEFAULT_DAILY_ATTEMPT_BUDGET);
+// unusable, so an authorized attempt is never refunded. The per-user, per-room
+// and success budgets remain refundable; this is the actual outbound ceiling.
+async function consumeProviderAttempt(request: Request): Promise<boolean> {
+  const configured = Number(process.env.YOUTUBE_DAILY_API_ATTEMPT_BUDGET);
+  const limit = Number.isInteger(configured) && configured >= 1 && configured <= 100
+    ? configured : DEFAULT_DAILY_ATTEMPT_BUDGET;
   const result = await queryAllowNull('consume_daily_rate_limit', [
     'global',
     'youtube-api-attempt-day',
     limit,
   ]) as { allowed?: boolean } | null;
-  return result?.allowed === true;
+  if (result?.allowed === true) {
+    return true;
+  }
+  // The SQL limiter increments on refusal too; discard that denied debit.
+  try {
+    await queryAllowNull('refund_daily_rate_limit', ['global', 'youtube-api-attempt-day']);
+  } catch (error) {
+    logFailure('youtube-provider-attempt/refund', error, 500, request);
+  }
+  return false;
 }
 
 async function readSearchCache(key: string): Promise<SearchResult[] | null> {
@@ -300,9 +311,8 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     throw new HttpError('RATE_LIMITED', 429, "You have reached today's search limit. Try again tomorrow.");
   }
 
-  if (!(await consumeProviderAttempt())) {
-    return localSearchOrUnavailable(query, 'Search is resting for today. Try again tomorrow.');
-  }
+  const target = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&maxResults=10&key=' +
+    encodeURIComponent(apiKey) + '&q=' + encodeURIComponent(query);
 
   const charged: string[] = [];
   const refundCharged = async (): Promise<void> => {
@@ -358,8 +368,19 @@ export async function youtubeSearch(request: Request, caller: Caller): Promise<R
     });
   }
 
-  const target = 'https://www.googleapis.com/youtube/v3/search?part=snippet&type=video&videoEmbeddable=true&videoSyndicated=true&maxResults=10&key=' +
-    encodeURIComponent(apiKey) + '&q=' + encodeURIComponent(query);
+  // Only an eligible outbound request spends a provider attempt. A refusal or
+  // failure here gives back the success allowances reserved above.
+  let attemptAllowed: boolean;
+  try {
+    attemptAllowed = await consumeProviderAttempt(request);
+  } catch (error) {
+    await refundCharged();
+    throw error;
+  }
+  if (!attemptAllowed) {
+    await refundCharged();
+    return localSearchOrUnavailable(query, 'Search is resting for today. Try again tomorrow.');
+  }
 
   let upstream: Response;
   try {
@@ -424,19 +445,6 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     return jsonResponse({ available: true, results: pickPopularCards(persisted) });
   }
 
-  if (!(await consumeProviderAttempt())) {
-    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
-  }
-
-  const daily = await queryAllowNull('consume_daily_rate_limit', [
-    'global',
-    'youtube-popular-day',
-    dailyBudget('YOUTUBE_DAILY_POPULAR_BUDGET', DEFAULT_DAILY_POPULAR_BUDGET),
-  ]) as { allowed?: boolean } | null;
-  if (daily?.allowed !== true) {
-    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
-  }
-
   const refund = async (): Promise<void> => {
     try {
       await queryAllowNull('refund_daily_rate_limit', ['global', 'youtube-popular-day']);
@@ -446,6 +454,29 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
   };
 
   const target = buildPopularSearchUrl(apiKey);
+
+  const daily = await queryAllowNull('consume_daily_rate_limit', [
+    'global',
+    'youtube-popular-day',
+    dailyBudget('YOUTUBE_DAILY_POPULAR_BUDGET', DEFAULT_DAILY_POPULAR_BUDGET),
+  ]) as { allowed?: boolean } | null;
+  if (daily?.allowed !== true) {
+    // The SQL limiter increments on refusal too; discard that denied debit.
+    await refund();
+    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
+  }
+
+  let attemptAllowed: boolean;
+  try {
+    attemptAllowed = await consumeProviderAttempt(request);
+  } catch (error) {
+    await refund();
+    throw error;
+  }
+  if (!attemptAllowed) {
+    await refund();
+    throw new HttpError('RATE_LIMITED', 429, 'Karaoke picks are resting right now');
+  }
 
   let response: Response;
   try {

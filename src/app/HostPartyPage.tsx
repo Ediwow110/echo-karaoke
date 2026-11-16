@@ -76,6 +76,7 @@ export default function HostPartyPage() {
     return requested === 'queue' || requested === 'songbook' ? requested : 'search';
   });
   const [searchQuery, setSearchQuery] = useState(() => params.get('q') ?? '');
+  const [searchRevision, setSearchRevision] = useState(0);
 
   useEffect(() => {
     // A deep link names the panel and query it wants. The alternative button
@@ -88,6 +89,8 @@ export default function HostPartyPage() {
     }
     if (requestedQuery !== null) {
       setSearchQuery(requestedQuery);
+      // The same alternative can be requested after the textbox was edited.
+      setSearchRevision((revision) => revision + 1);
     }
     if (requestedPanel === null && requestedQuery === null) {
       return;
@@ -501,7 +504,7 @@ export default function HostPartyPage() {
                       </div>
                     </div>
                     <SongSearchPanel
-                      key={'search-panel-' + searchQuery}
+                      key={'search-panel-' + searchRevision}
                       roomId={roomId}
                       queue={queue}
                       variant="host"

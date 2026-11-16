@@ -15,6 +15,7 @@ const playerClock = vi.hoisted(() => ({
   currentTime: 0,
   duration: 0,
   state: -1,
+  createCalls: 0,
   loadCalls: 0,
   loadedVideoIds: [] as string[],
   playCalls: 0,
@@ -34,6 +35,7 @@ vi.mock('../../src/features/playback/youtubeIframe', () => ({
       onStateChange?: (state: number) => void;
     },
   ) => {
+    playerClock.createCalls += 1;
     playerClock.onEnded = callbacks.onEnded;
     playerClock.onError = callbacks.onError ?? null;
     playerClock.onStateChange = callbacks.onStateChange ?? null;
@@ -61,6 +63,7 @@ beforeEach(() => {
   playerClock.currentTime = 0;
   playerClock.duration = 0;
   playerClock.state = -1;
+  playerClock.createCalls = 0;
   playerClock.loadCalls = 0;
   playerClock.loadedVideoIds.length = 0;
   playerClock.playCalls = 0;
@@ -1055,6 +1058,30 @@ describe('host room workspace', () => {
     expect(within(search).getByRole('textbox', { name: /find a song on youtube/i }))
       .toHaveValue('Afterglow karaoke');
     expect(screen.getByRole('tab', { name: /^search$/i })).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('restores a repeated alternative query without recreating the player', async () => {
+    const playing = { ...liveRoom, playback: { ...liveRoom.playback, isPlaying: true } };
+    const { api } = makeApi(playing);
+    playerClock.state = 1;
+    renderHost(api, '/room/' + roomId + '/host/party?layout=computer');
+    fireEvent.click(await screen.findByRole('tab', { name: /queue/i }));
+    await waitFor(() => expect(playerClock.onError).not.toBeNull());
+    act(() => { playerClock.onError?.(2); });
+    fireEvent.click(await screen.findByRole('button', { name: /find another version/i }));
+    const input = await screen.findByRole('textbox', { name: /find a song on youtube/i });
+    expect(input).toHaveValue('Afterglow karaoke');
+    const created = playerClock.createCalls;
+    const loaded = playerClock.loadCalls;
+
+    fireEvent.change(input, { target: { value: 'Manually edited query' } });
+    fireEvent.click(screen.getByRole('button', { name: /find another version/i }));
+
+    await waitFor(() => expect(screen.getByRole('textbox', {
+      name: /find a song on youtube/i,
+    })).toHaveValue('Afterglow karaoke'));
+    expect(playerClock.createCalls).toBe(created);
+    expect(playerClock.loadCalls).toBe(loaded);
   });
 
 });
