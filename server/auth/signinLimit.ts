@@ -34,8 +34,12 @@ export function clientIp(request: Request): string {
   return 'unknown';
 }
 
+export function networkSubject(prefix: string, ip: string, secret: string): string {
+  return prefix + ':' + createHmac('sha256', secret).update(ip).digest('hex');
+}
+
 export function signInSubject(ip: string, secret: string): string {
-  return 'signin:' + createHmac('sha256', secret).update(ip).digest('hex');
+  return networkSubject('signin', ip, secret);
 }
 
 export function isTrustedSignInOrigin(

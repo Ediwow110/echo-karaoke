@@ -41,7 +41,7 @@ export function normalizeRoomName(value: unknown): string {
   if (typeof value !== 'string') {
     throw new HttpError('VALIDATION_ERROR', 400, 'A room name is required');
   }
-  const trimmed = value.trim().replace(/\s+/g, ' ');
+  const trimmed = value.replace(CONTROL_AND_BIDI, '').trim().replace(/\s+/g, ' ');
   if (trimmed.length === 0) {
     return 'Karaoke room';
   }

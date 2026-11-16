@@ -23,7 +23,7 @@ possible.
 
 ## Current UI state (2026-11-10)
 
-The host console shell and its pages were removed with migrations through 0051. Current behavior:
+The host console shell and its pages were removed with migrations through 0052. Current behavior:
 
 - The stage at `/room/<id>/host/party` is the only host screen. It has TV and computer layouts;
   every retired host URL (queue, settings, library, favorites, recently sung) redirects to it.
@@ -88,13 +88,24 @@ no grant on the auth tables. `echo_auth` may read and write `user`, `session`,
 `account`, `verification`, and `jwks`; it has no grant on the room schema and cannot
 execute a room operation. The owner URL is never set on Vercel.
 
+`echo_service` and `echo_auth` are deployment logins, not schema objects. Both must
+exist before the chain, and `echo_service` must also be `LOGIN` + `BYPASSRLS`: the
+integration sweep test backdates rows through the app connection. The migrations skip
+their grants when the role is absent, and `scripts/require-runtime-role.mjs` checks
+presence only, so a fresh plain Postgres or self-hosted Neon project must shape the
+roles before migrating or testing. Neon branches inherit the project roles, which is
+why a branch created from `main` is already shaped. Do not create or alter these roles
+from a branch-scoped migration: Neon roles are project-wide, so a branch run would
+change production too.
+
 `server/.env.neon` holds the four local values and is ignored by git. Never copy it
 into a build environment, a chat message, or a command whose output is logged.
 
 ## Step 1: Apply the database chain
 
 The chain runs from `0000_platform_compatibility.sql` through
-`0051_short_room_codes.sql`. On Neon it has already been applied to `main`. To apply it to
+`0052_room_name_sanitizer.sql`. 0052 mirrors the server's bidi/control strip for
+direct `create_room` callers. On Neon it has already been applied to `main`. To apply it to
 another database:
 
 ```bash

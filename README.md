@@ -59,14 +59,15 @@ YouTube search and chart require a data API key. Without it the app explains tha
 Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves each screen a random eight-song selection from that pool. Song metadata uses quota-free oEmbed. Successful lookups are capped by a per-room and a larger deployment daily budget; failed lookups refund those success budgets but count against separate non-refundable attempt budgets, so a loop of dead links cannot use the add button as an outbound amplifier. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0051 before deploying this tree; queue and search now call
+migrations 0025 through 0052 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
 karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
 calls `playback_next_if_current`, and the songbook catalog tables and its retention
 function must exist before the sync and the daily cron run. 0042 gives a room a hard
 24-hour ceiling and 0043 grants the sweep that enforces it, so a tree older than those
 two still ends rooms lazily inside the room read but leaves expired rows uncollected;
-0044 adds the daily sweep that keeps the rate-limit ledger from growing without bound.
+0044 adds the daily sweep that keeps the rate-limit ledger from growing without bound;
+0052 mirrors the server's room-name sanitizer for direct RPC callers.
 
     npx supabase@2.121.0 db push --db-url "$NEON_DATABASE_URL" --yes
     npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"
@@ -75,10 +76,11 @@ two still ends rooms lazily inside the room read but leaves expired rows uncolle
 
     ALLOWED_ORIGINS=https://your-app.example
 
-Two abuse controls are optional. The room cap counts the host and guests present in the last 30 seconds; an inactive guest frees a slot and the host can remove a guest. The sign-in cap counts anonymous sign-ins per hashed network address per hour:
+Three abuse controls are optional. The room cap counts the host and guests present in the last 30 seconds; an inactive guest frees a slot and the host can remove a guest. The sign-in cap counts anonymous sign-ins per hashed network address per hour. The join cap counts failed room-code guesses per hashed network address per Pacific day; a successful join does not spend it:
 
     ROOM_MEMBER_LIMIT=50
     ANON_SIGNIN_LIMIT_PER_HOUR=120
+    JOIN_FAIL_LIMIT_PER_DAY=60
 
 Before shipping, run `npm run verify:deploy`. It refuses a build when the auth secret, the two database URLs, an origin, a quota budget, or the Production `CRON_SECRET` is missing or malformed, or when any `VITE_` variable holds a PostgreSQL connection string. It also rejects an `ALLOWED_ORIGINS` entry that is not the production origin, the current deployment, or `BETTER_AUTH_URL`. In Preview it also requires credential-free `PRODUCTION_DATABASE_ENDPOINT` and `PRODUCTION_AUTH_DATABASE_ENDPOINT` pins so a preview pointed at production is rejected. `vercel.json` applies the security headers and the CSP at the Vercel edge, pins the function to `sin1`, sends `/api/*` to the function instead of the app shell, and schedules the catalog retention cron.
 
@@ -94,7 +96,7 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 605 unit and component tests (jsdom)
+    npm test                 # 612 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch
@@ -119,7 +121,7 @@ The UI suite needs no database or YouTube key. The real E2E suite creates rooms 
 - Room codes gate joining only. Do not treat a room as secret.
 - Guest adds and votes share one SQL lock (`require_guest_controls`, consulted by `queue_add`, `queue_add_preflight` and `vote_toggle`), and playback has its own. The adds lock is not exposed: nothing sends `lock` or `unlock` and no server path sets the column, so it stays false and the door is what moderates a room. Skip, remove and reorder are always host-only.
 - A partial unique index prevents two active copies of the same video in one room. Played songs may return.
-- A song cap of five per minute per member is enforced. Room creation is capped at 10 rooms per session per hour, and a room is capped at 50 present members including the host (`ROOM_MEMBER_LIMIT`, 2–500). Inactive guest rows stop counting after 30 seconds; the host can remove a guest, which also removes that guest's queue and votes. Anonymous sign-in is capped at 120 per hour per network address (`ANON_SIGNIN_LIMIT_PER_HOUR`, 1–1000), stored as an HMAC, not a raw IP. These are speed bumps; a large venue should set the sign-in cap for its expected crowd.
+- A song cap of five per minute per member is enforced. Room creation is capped at 10 rooms per session per hour, and a room is capped at 50 present members including the host (`ROOM_MEMBER_LIMIT`, 2–500). Inactive guest rows stop counting after 30 seconds; the host can remove a guest, which also removes that guest's queue and votes. Anonymous sign-in is capped at 120 per hour per network address (`ANON_SIGNIN_LIMIT_PER_HOUR`, 1–1000), stored as an HMAC, not a raw IP. Failed room-code guesses are capped at 60 per Pacific day per hashed network address (`JOIN_FAIL_LIMIT_PER_DAY`, 1–1000); successful joins do not spend that budget. These are speed bumps; a large venue should set the sign-in cap for its expected crowd.
 
 ## Layout
 

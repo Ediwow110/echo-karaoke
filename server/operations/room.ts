@@ -1,7 +1,8 @@
 import { operationCall, serviceDatabase } from '../db/client.js';
-import { HttpError, jsonResponse, mapDatabaseError, UNAUTHORIZED_MESSAGE } from './errors.js';
-import { resolveRoomMemberLimit } from './limits.js';
+import { HttpError, jsonResponse, logFailure, mapDatabaseError, UNAUTHORIZED_MESSAGE } from './errors.js';
+import { resolveJoinFailureLimit, resolveRoomMemberLimit } from './limits.js';
 import { generateToken, normalizeDisplayName, readJsonObject } from './tokens.js';
+import { clientIp, networkSubject } from '../auth/signinLimit.js';
 
 export type Caller = { userId: string; accessToken: string };
 
@@ -82,14 +83,55 @@ export async function joinRoom(request: Request, caller: Caller): Promise<Respon
   const code = normalizeRoomCode(body.code);
   const displayName = normalizeDisplayName(body.displayName);
   const guestToken = generateToken();
-  const result = await callOperation('join_room', [
-    code,
-    caller.userId,
-    displayName,
-    guestToken,
-    resolveRoomMemberLimit(),
-  ]);
-  return jsonResponse(result);
+  const failLimit = resolveJoinFailureLimit();
+  const failBucket = 'join-fail-day';
+  // The guess surface is per network, not per anonymous session: a client can
+  // mint a new session every fifteen minutes without changing its address.
+  const failSubject = networkSubject(
+    'join-fail',
+    clientIp(request),
+    process.env.BETTER_AUTH_SECRET ?? '',
+  );
+  const peek = await callOperation('peek_daily_rate_limit', [
+    failSubject,
+    failBucket,
+    failLimit,
+  ]) as { allowed?: unknown; retryAfterSeconds?: unknown };
+  if (peek.allowed !== true) {
+    const response = jsonResponse({
+      error: {
+        code: 'RATE_LIMITED',
+        message: 'Too many invalid room codes. Try again later.',
+      },
+    }, 429);
+    const retryAfter = Number(peek.retryAfterSeconds);
+    if (Number.isFinite(retryAfter) && retryAfter > 0) {
+      response.headers.set('retry-after', String(Math.ceil(retryAfter)));
+    }
+    return response;
+  }
+
+  try {
+    const result = await callOperation('join_room', [
+      code,
+      caller.userId,
+      displayName,
+      guestToken,
+      resolveRoomMemberLimit(),
+    ]);
+    return jsonResponse(result);
+  } catch (error) {
+    // Only a miss spends the guess budget. A valid room that is full, closed
+    // or already hosted is not evidence of guessing and must stay joinable.
+    if (error instanceof HttpError && error.code === 'ROOM_NOT_FOUND') {
+      try {
+        await callOperation('consume_daily_rate_limit', [failSubject, failBucket, failLimit]);
+      } catch (limitError) {
+        logFailure('join-room/failure-limit', limitError, 500, request);
+      }
+    }
+    throw error;
+  }
 }
 
 export async function readRoomGuest(request: Request, caller: Caller): Promise<Response> {
