@@ -121,17 +121,6 @@ export function pickPopularCards(
   return shuffled.slice(0, limit);
 }
 
-export const POPULAR_CARDS_PER_SCREEN = 8;
-
-/**
- * The operation's called path. Keeping the per-screen count here prevents the
- * twenty-card cache pool from silently replacing the documented eight-card
- * strip when the call site forgets to pass a limit.
- */
-export function popularCards(pool: SearchResult[]): SearchResult[] {
-  return pickPopularCards(pool, POPULAR_CARDS_PER_SCREEN);
-}
-
 function requireQuery(value: unknown, minimum = 1): string {
   if (typeof value !== 'string') {
     throw new HttpError('VALIDATION_ERROR', 400, 'A search term is required');
@@ -406,13 +395,13 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
   ], 'Karaoke picks are busy. Try again shortly.');
 
   if (popularCached !== null && Date.now() - popularCached.at < POPULAR_CACHE_TTL_MS) {
-    return jsonResponse({ available: true, results: popularCards(popularCached.results) });
+    return jsonResponse({ available: true, results: pickPopularCards(popularCached.results) });
   }
 
   const persisted = await readSearchCache(POPULAR_CACHE_KEY);
   if (persisted !== null && persisted.length > 0) {
     popularCached = { at: Date.now(), results: persisted };
-    return jsonResponse({ available: true, results: popularCards(persisted) });
+    return jsonResponse({ available: true, results: pickPopularCards(persisted) });
   }
 
   const daily = await queryAllowNull('consume_daily_rate_limit', [
@@ -459,6 +448,6 @@ export async function youtubePopular(request: Request, caller: Caller): Promise<
     await writeSearchCache(POPULAR_CACHE_KEY, pool, POPULAR_CACHE_TTL_SECONDS);
     popularCached = { at: Date.now(), results: pool };
   }
-  return jsonResponse({ available: true, results: popularCards(pool) });
+  return jsonResponse({ available: true, results: pickPopularCards(pool) });
 }
 

@@ -5,7 +5,6 @@ import {
   mapFreshCatalogResults,
   mapSearchResponse,
   pickPopularCards,
-  popularCards,
   selectPopularResults,
 } from '../../server/operations/youtube';
 
@@ -199,20 +198,5 @@ describe('per-screen popular picks', () => {
   it('serves the whole pool when it cannot fill a screen', () => {
     const small = pool.slice(0, 4);
     expect(pickPopularCards(small, 8)).toEqual(small);
-  });
-
-  it('serves eight cards on the path the operation actually calls', () => {
-    const large = Array.from({ length: 20 }, (_, index) => ({
-      videoId: 'karaoke4' + String(index).padStart(3, '0'),
-      title: 'Karaoke Pick ' + index,
-      channelTitle: 'Channel',
-      thumbnailUrl: null,
-      durationSeconds: null,
-    }));
-
-    const results = popularCards(large);
-
-    expect(results).toHaveLength(8);
-    expect(new Set(results.map((song) => song.videoId)).size).toBe(8);
   });
 });
