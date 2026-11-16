@@ -66,4 +66,12 @@ describe('console design system', () => {
     expect(css).toContain('.page-enter');
     expect(css).toContain('.stagger-in');
   });
+
+  it('gives range sliders a visible thumb and a larger hit area', () => {
+    expect(css).toMatch(/\.range-signal\s*\{[^}]*height:\s*28px/s);
+    expect(css).toContain('.range-signal::-webkit-slider-thumb');
+    expect(css).toContain('.range-signal::-moz-range-thumb');
+    expect(css).toMatch(/\.range-signal::-webkit-slider-thumb\s*\{[^}]*width:\s*16px/s);
+    expect(css).toContain('--range-progress');
+  });
 });

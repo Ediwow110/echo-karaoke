@@ -201,6 +201,7 @@ export default function HostPartyPage() {
   const rawCurrent = Number.isFinite(player.currentTime) ? Math.max(0, player.currentTime) : 0;
   const current = duration > 0 ? Math.min(rawCurrent, duration) : rawCurrent;
   const progress = duration > 0 ? Math.min(100, (current / duration) * 100) : 0;
+  const volume = Number.isFinite(player.volume) ? player.volume : 100;
   const nextSong = upNext[0] ?? null;
   const hasVideo = nowPlaying !== null && playback?.currentVideoId != null;
   // One computation feeds both the dot and its words. They used to be two
@@ -325,8 +326,8 @@ export default function HostPartyPage() {
                 onKeyUp={player.commitSeek}
                 aria-label="Playback position"
                 disabled={!hasVideo || duration <= 0}
-                className="h-1 w-full cursor-pointer appearance-none rounded-full bg-line accent-signal disabled:cursor-default"
-                style={{ background: 'linear-gradient(to right, var(--color-signal) ' + progress + '%, rgba(255,255,255,0.14) ' + progress + '%)' }}
+                className="range-signal w-full"
+                style={{ '--range-progress': progress + '%' } as CSSProperties}
               />
               <span className="w-10 shrink-0 text-right text-[0.625rem] tabular text-ink-2">{duration > 0 ? formatTime(duration) : '—:—'}</span>
             </div>
@@ -386,10 +387,11 @@ export default function HostPartyPage() {
                   type="range"
                   min={0}
                   max={100}
-                  value={Number.isFinite(player.volume) ? player.volume : 100}
+                  value={volume}
                   onChange={(event) => player.setVolume(Number(event.target.value))}
                   aria-label="Volume"
-                  className="h-1 w-20 cursor-pointer appearance-none rounded-full bg-line accent-signal"
+                  className="range-signal w-20"
+                  style={{ '--range-progress': volume + '%' } as CSSProperties}
                 />
                 <button
                   type="button"

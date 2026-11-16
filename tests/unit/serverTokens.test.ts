@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { normalizeDisplayName, readJsonObject } from '../../server/operations/tokens';
+import { normalizeDisplayName, normalizeRoomName, readJsonObject } from '../../server/operations/tokens';
 
 function post(body: string, headers: Record<string, string> = {}): Request {
   return new Request('http://localhost/api/test', { method: 'POST', headers, body });
@@ -22,6 +22,21 @@ describe('server display name normalization', () => {
   it('still collapses whitespace and caps at 32 characters', () => {
     expect(normalizeDisplayName('  Ana   Maria  ')).toBe('Ana Maria');
     expect(normalizeDisplayName('a'.repeat(40))).toHaveLength(32);
+  });
+});
+
+describe('server room name normalization', () => {
+  it('strips bidi overrides, zero-width marks and control characters', () => {
+    expect(normalizeRoomName('Party \u202Eevil\u202C\u200B\u0007')).toBe('Party evil');
+  });
+
+  it('falls back to the default when only formatting remains', () => {
+    expect(normalizeRoomName('\u202E\u200B\u0000')).toBe('Karaoke room');
+  });
+
+  it('still collapses whitespace and caps at 48 characters', () => {
+    expect(normalizeRoomName('  Friday   night  ')).toBe('Friday night');
+    expect(normalizeRoomName('a'.repeat(60))).toHaveLength(48);
   });
 });
 

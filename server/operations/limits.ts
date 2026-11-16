@@ -21,6 +21,16 @@ export function resolveSignInLimit(
 }
 
 /**
+ * Failed room-code guesses one network may spend per Pacific day. Successful
+ * joins do not charge this bucket; only a ROOM_NOT_FOUND answer does.
+ */
+export function resolveJoinFailureLimit(
+  env: Record<string, string | undefined> = process.env,
+): number {
+  return readInt(env.JOIN_FAIL_LIMIT_PER_DAY, 60, 1, 1000);
+}
+
+/**
  * Requests per minute for one session, across every operation. The ceiling sits
  * just above the product's own worst case rather than at a comfortable average:
  * the songbook filters on a 200ms debounce, so sustained fast typing can reach
