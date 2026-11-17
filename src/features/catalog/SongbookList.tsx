@@ -31,6 +31,7 @@ export type SongbookListProps = {
   canSync?: boolean;
   // The party panel is narrow; one column keeps each row readable inside it.
   columns?: 1 | 2;
+  queuedVideoIds?: string[];
   onAdded?: () => void;
 };
 
@@ -49,7 +50,7 @@ function syncOutcome(result: CatalogSyncResult): string | null {
   return 'The channels have nothing new yet. Try again in a few hours.';
 }
 
-export default function SongbookList({ api, roomId, channels, disabled = false, canSync = false, columns = 2, onAdded }: SongbookListProps) {
+export default function SongbookList({ api, roomId, channels, disabled = false, canSync = false, columns = 2, queuedVideoIds = [], onAdded }: SongbookListProps) {
   const [query, setQuery] = useState('');
   const [channel, setChannel] = useState('');
   const [items, setItems] = useState<CatalogSong[]>([]);
@@ -67,6 +68,16 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
   // Search responses can arrive out of order. Every read owns a sequence number
   // and may only write (and clear `busy`) while it is still the newest one.
   const seq = useRef(0);
+  const previousQueued = useRef(new Set(queuedVideoIds));
+
+  useEffect(() => {
+    const next = new Set(queuedVideoIds);
+    setAdded((current) => {
+      const kept = current.filter((videoId) => next.has(videoId) || !previousQueued.current.has(videoId));
+      return kept.length === current.length ? current : kept;
+    });
+    previousQueued.current = next;
+  }, [queuedVideoIds]);
 
   const load = useCallback(async (nextOffset: number, reset: boolean): Promise<void> => {
     const id = ++seq.current;
@@ -219,7 +230,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
         // of flashing an empty list.
         <ul className={['grid grid-cols-1 gap-2', columns === 2 ? 'sm:grid-cols-2' : ''].join(' ')} aria-label="Songbook songs" aria-busy={busy}>
           {items.map((song) => {
-            const isAdded = added.includes(song.videoId);
+            const isAdded = queuedVideoIds.includes(song.videoId) || added.includes(song.videoId);
             return (
               <li key={song.videoId}>
                 <div className="flex flex-wrap items-center gap-3 gap-y-2 rounded-panel border border-line bg-surface p-2">

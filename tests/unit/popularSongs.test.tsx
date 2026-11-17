@@ -149,6 +149,66 @@ describe('popular songs', () => {
     });
   });
 
+  it('re-enables a suggestion after it leaves the queue', async () => {
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    const api = fakeApi(true);
+    const view = render(
+      createElement(RoomApiProvider, {
+        api,
+        children: createElement(MemoryRouter, null,
+          createElement(PopularSongs, { roomId, queuedVideoIds: [] })),
+      }),
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: /queue dancing queen/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /dancing queen is already queued/i })).toBeDisabled();
+    });
+
+    view.rerender(
+      createElement(RoomApiProvider, {
+        api,
+        children: createElement(MemoryRouter, null,
+          createElement(PopularSongs, { roomId, queuedVideoIds: [song.videoId] })),
+      }),
+    );
+    view.rerender(
+      createElement(RoomApiProvider, {
+        api,
+        children: createElement(MemoryRouter, null,
+          createElement(PopularSongs, { roomId, queuedVideoIds: [] })),
+      }),
+    );
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /queue dancing queen/i })).toBeEnabled();
+    });
+  });
+
+  it('uses the host pass for the host popular strip when both passes exist', async () => {
+    const invocations: Array<{ name: string; tokens?: unknown }> = [];
+    const api = {
+      invoke: (async (name: string, _body: unknown, tokens?: unknown) => {
+        invocations.push({ name, tokens });
+        return name === 'youtube-popular' ? { available: true, results: [song] } : {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    localStorage.setItem('karaoke.host.' + roomId, 'host-pass');
+    render(
+      createElement(RoomApiProvider, {
+        api,
+        children: createElement(MemoryRouter, null,
+          createElement(PopularSongs, { roomId, role: 'host' })),
+      }),
+    );
+
+    await screen.findByRole('button', { name: /queue dancing queen/i });
+
+    expect(invocations.find((call) => call.name === 'youtube-popular')?.tokens)
+      .toEqual({ hostToken: 'host-pass' });
+  });
+
   it('explains a song that could not be queued', async () => {
     const api: EdgeApi = {
       invoke: (async (name: string) => {

@@ -57,6 +57,54 @@ select throws_ok(
   '22023', 'ROOM_FULL',
   'a stale guest cannot re-enter a full room');
 
+select throws_ok(
+  format('select public.touch_member(%L::uuid, %L, %L, %L)', (select room_id from cap), 'cap-guest-2', repeat('b', 40), 3),
+  '22023', 'ROOM_FULL',
+  'a stale guest heartbeat cannot revive past the cap');
+
+-- Free one slot, then the same stale guest must revive: the cap blocks a
+-- crowded revive, not every heartbeat from a member that went quiet.
+update public.members
+set last_seen_at = now() - interval '2 minutes'
+where room_id = (select room_id from cap)
+  and user_id = 'cap-guest-3';
+
+select is(
+  public.touch_member((select room_id from cap), 'cap-guest-2', repeat('b', 40), 3) ->> 'memberId',
+  (select id::text from public.members
+    where room_id = (select room_id from cap) and user_id = 'cap-guest-2'),
+  'a stale guest revives when a slot is free');
+
+select throws_ok(
+  format('select public.touch_member(%L::uuid, %L, %L, 1)', (select room_id from cap), 'cap-guest-2', repeat('b', 40)),
+  '22023', 'VALIDATION_ERROR',
+  'the heartbeat cap below two is rejected');
+select throws_ok(
+  format('select public.touch_member(%L::uuid, %L, %L, 501)', (select room_id from cap), 'cap-guest-2', repeat('b', 40)),
+  '22023', 'VALIDATION_ERROR',
+  'the heartbeat cap above five hundred is rejected');
+
+select is(
+  (select count(*) from pg_proc
+    where proname = 'touch_member'
+      and pronamespace = 'public'::regnamespace
+      and proargtypes::text = 'uuid text text'),
+  0::bigint,
+  'the uncapped three-argument heartbeat overload is gone');
+select function_privs_are(
+  'public', 'touch_member',
+  array['uuid', 'text', 'text', 'integer'],
+  'anon', array[]::text[],
+  'anon cannot execute the capped heartbeat');
+select is(
+  has_function_privilege('service_role', 'public.touch_member(uuid, text, text, integer)', 'execute'),
+  true,
+  'service_role can execute the capped heartbeat');
+select is(
+  has_function_privilege('echo_service', 'public.touch_member(uuid, text, text, integer)', 'execute'),
+  true,
+  'the runtime role can execute the capped heartbeat');
+
 create temp table cap2 on commit drop as
 select (created ->> 'roomId')::uuid as room_id
 from (

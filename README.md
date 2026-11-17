@@ -60,7 +60,7 @@ YouTube search and chart require a data API key. Without it the app explains tha
 Searches are cached for ten minutes, limited to 20/min and 30/day per member and 60/day per room, and capped by the global daily budget. YouTube resets its quota at midnight Pacific. `search.list` has its own bucket of 100 calls/day at one unit per call; the default 90 user searches plus 6 karaoke-strip refreshes stay within it. Search and strip calls also share a non-refundable provider-attempt budget (`YOUTUBE_DAILY_API_ATTEMPT_BUDGET`, 96/day by default), so a failed or empty upstream response still counts against YouTube's ceiling even when the caller's success allowance is refunded. The setting accepts integers from 1 to 100; the deployment guard rejects invalid values and runtime falls back to 96 if a malformed value bypasses that guard. A request refused by an application allowance spends no provider attempt. The strip asks for embeddable karaoke videos with lyrics, caches a pool of up to twenty for twelve hours, hides medleys and compilations, and serves up to twenty cards from that pool. Song metadata uses quota-free oEmbed. Successful lookups are capped by a per-room and a larger deployment daily budget; failed lookups refund those success budgets but count against separate non-refundable attempt budgets, so a loop of dead links cannot use the add button as an outbound amplifier. If search is resting or the key is absent, the panel offers a manual YouTube-link fallback.
 
 Apply the schema and run the database suite against the Neon owner URL. Apply
-migrations 0025 through 0052 before deploying this tree; queue and search now call
+migrations 0025 through 0053 before deploying this tree; queue and search now call
 `queue_add_preflight`, `peek_daily_rate_limit`, the search refund, and the longer
 karaoke-strip cache TTL, host removal now repairs playback state, an automatic advance
 calls `playback_next_if_current`, and the songbook catalog tables and its retention
@@ -68,7 +68,7 @@ function must exist before the sync and the daily cron run. 0042 gives a room a 
 24-hour ceiling and 0043 grants the sweep that enforces it, so a tree older than those
 two still ends rooms lazily inside the room read but leaves expired rows uncollected;
 0044 adds the daily sweep that keeps the rate-limit ledger from growing without bound;
-0052 mirrors the server's room-name sanitizer for direct RPC callers.
+0052 mirrors the server's room-name sanitizer for direct RPC callers. 0053 re-applies the room cap when a stale guest heartbeat revives a member.
 
     npx supabase@2.121.0 db push --db-url "$NEON_DATABASE_URL" --yes
     npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"

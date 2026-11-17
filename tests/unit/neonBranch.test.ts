@@ -51,6 +51,22 @@ describe('Neon CI branch', () => {
     expect(calls).toHaveLength(4);
   });
 
+  it('reports the branch id before a later connection-URI failure', async () => {
+    const fetchImpl = vi.fn(async (input: string | URL | Request) => {
+      const url = String(input);
+      if (url.endsWith('/projects/project-1/branches')) {
+        return jsonResponse(201, { branch: { id: 'br-ci' } });
+      }
+      throw new Error('connection URI failed');
+    }) as unknown as typeof fetch;
+    const onBranchCreated = vi.fn();
+
+    await expect(createBranch({ ...base, fetchImpl, onBranchCreated }))
+      .rejects.toThrow('connection URI failed');
+
+    expect(onBranchCreated).toHaveBeenCalledWith('br-ci');
+  });
+
   it('rejects a non-Postgres connection string without calling Neon', async () => {
     const fetchImpl = vi.fn() as unknown as typeof fetch;
     await expect(createBranch({ ...base, ownerUrl: 'https://main.example', fetchImpl }))

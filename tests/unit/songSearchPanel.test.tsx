@@ -245,6 +245,38 @@ describe('song search panel', () => {
     expect(calls).not.toContain('queue-command');
   });
 
+  it('uses the host pass for the host search when both passes exist', async () => {
+    const invocations: Array<{ name: string; tokens?: unknown }> = [];
+    const api = {
+      invoke: (async (name: string, _body: unknown, tokens?: unknown) => {
+        invocations.push({ name, tokens });
+        if (name === 'youtube-search') return { available: true, results: [result] };
+        if (name === 'catalog-page') return { total: 0, items: [] };
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    localStorage.setItem('karaoke.host.' + roomId, 'host-pass');
+    render(
+      createElement(RoomApiProvider, {
+        api,
+        children: createElement(SongSearchPanel, {
+          roomId,
+          queue: [],
+          variant: 'host',
+          onAdded: () => undefined,
+        }),
+      }),
+    );
+
+    await search();
+
+    await waitFor(() => {
+      expect(invocations.find((call) => call.name === 'youtube-search')?.tokens)
+        .toEqual({ hostToken: 'host-pass' });
+    });
+  });
+
   it('shows the manual fallback when YouTube search is not configured', async () => {
     const { api, calls } = makeApi(false);
     renderPanel(api);
