@@ -172,6 +172,7 @@ export async function touchMember(request: Request, caller: Caller): Promise<Res
     roomId,
     caller.userId,
     guestToken,
+    resolveRoomMemberLimit(),
   ]));
 }
 

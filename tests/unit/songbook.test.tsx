@@ -105,6 +105,25 @@ describe('songbook list', () => {
     });
   });
 
+  it('re-enables a songbook row after it leaves the queue', async () => {
+    const { api } = makeApi();
+    localStorage.setItem('karaoke.host.' + roomId, 'host-pass-value');
+    const view = render(<SongbookList api={api} roomId={roomId} queuedVideoIds={[]} />);
+
+    await screen.findByText('Halo - Beyonce (Karaoke)');
+    fireEvent.click(screen.getByRole('button', { name: /add halo/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /halo.*already queued/i })).toBeDisabled();
+    });
+
+    view.rerender(<SongbookList api={api} roomId={roomId} queuedVideoIds={['video000000']} />);
+    view.rerender(<SongbookList api={api} roomId={roomId} queuedVideoIds={[]} />);
+
+    await waitFor(() => {
+      expect(screen.getByRole('button', { name: /add halo/i })).toBeEnabled();
+    });
+  });
+
   it('does not claim a search matched nothing when the search never ran', async () => {
     let fails = false;
     const api = {

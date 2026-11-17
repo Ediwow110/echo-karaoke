@@ -228,7 +228,7 @@ select is(
   'joining a live room creates a guest member');
 
 select throws_ok(
-  format('select public.touch_member(%L::uuid, %L::text, %L)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
+  format('select public.touch_member(%L::uuid, %L::text, %L, 50)', (select room_id from ctx), '11111111-1111-1111-1111-111111111111', repeat('z', 40)),
   '28000', 'UNAUTHORIZED',
   'heartbeat requires the correct guest token');
 

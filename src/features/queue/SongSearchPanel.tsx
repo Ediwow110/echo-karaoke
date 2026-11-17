@@ -67,7 +67,7 @@ export default function SongSearchPanel({
     resetNotice,
     clearAddError,
     retry,
-  } = useSongSearch({ roomId, initialQuery, disabled, onAdded });
+  } = useSongSearch({ roomId, initialQuery, disabled, role: variant, onAdded });
   const showLinkFallback = available === false || searchBlocked;
 
   useEffect(() => {

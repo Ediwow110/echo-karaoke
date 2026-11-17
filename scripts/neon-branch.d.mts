@@ -6,6 +6,7 @@ export type BranchOptions = {
   serviceUrl: string;
   authUrl: string;
   fetchImpl?: typeof fetch;
+  onBranchCreated?: (branchId: string) => void;
 };
 
 export type BranchUrls = {

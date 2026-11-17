@@ -5,7 +5,7 @@ import { ArrowRightIcon } from '@phosphor-icons/react/dist/csr/ArrowRight';
 import { CheckIcon } from '@phosphor-icons/react/dist/csr/Check';
 import { PlusIcon } from '@phosphor-icons/react/dist/csr/Plus';
 import { useRoomApi } from '../../app/RoomApiProvider';
-import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
+import { selectRoomTokens } from '../rooms/tokenStore';
 import { addSong, describeAddError, type QueueSong } from './queueApi';
 import { SongArtwork } from '../../ui';
 import type { SearchResult } from '../../types/search';
@@ -20,6 +20,7 @@ export type PopularSongsProps = {
   roomId: string;
   layout?: 'horizontal' | 'vertical';
   disabled?: boolean;
+  role?: 'guest' | 'host';
   queuedVideoIds?: string[];
   moreHref?: string;
   onAdded?: (song: QueueSong) => void;
@@ -29,11 +30,12 @@ export type PopularSongsProps = {
  * The live YouTube music chart, so a guest can queue a song without typing.
  * Without an API key on the server the strip stays hidden.
  */
-export default function PopularSongs({ roomId, layout = 'horizontal', disabled = false, queuedVideoIds = [], moreHref, onAdded }: PopularSongsProps) {
+export default function PopularSongs({ roomId, layout = 'horizontal', disabled = false, role = 'guest', queuedVideoIds = [], moreHref, onAdded }: PopularSongsProps) {
   const api = useRoomApi();
   const [songs, setSongs] = useState<SearchResult[]>([]);
   const [queued, setQueued] = useState<string | null>(null);
   const [added, setAdded] = useState<string[]>([]);
+  const previousQueued = useRef(new Set(queuedVideoIds));
   const [error, setError] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<'loading' | 'ready' | 'unavailable' | 'error'>('loading');
   const [canPrevious, setCanPrevious] = useState(false);
@@ -46,9 +48,7 @@ export default function PopularSongs({ roomId, layout = 'horizontal', disabled =
     let cancelled = false;
     setLoadState('loading');
     setSongs([]);
-    const guestToken = loadGuestToken(roomId);
-    const hostToken = loadHostToken(roomId);
-    const tokens = guestToken !== null ? { guestToken } : hostToken !== null ? { hostToken } : null;
+    const tokens = selectRoomTokens(roomId, role);
     if (tokens === null) {
       setLoadState('unavailable');
       return;
@@ -72,7 +72,16 @@ export default function PopularSongs({ roomId, layout = 'horizontal', disabled =
     return () => {
       cancelled = true;
     };
-  }, [api, roomId]);
+  }, [api, roomId, role]);
+
+  useEffect(() => {
+    const next = new Set(queuedVideoIds);
+    setAdded((current) => {
+      const kept = current.filter((videoId) => next.has(videoId) || !previousQueued.current.has(videoId));
+      return kept.length === current.length ? current : kept;
+    });
+    previousQueued.current = next;
+  }, [queuedVideoIds]);
 
   async function queue(videoId: string): Promise<void> {
     if (disabled || queued !== null || queuedVideoIds.includes(videoId) || added.includes(videoId)) {

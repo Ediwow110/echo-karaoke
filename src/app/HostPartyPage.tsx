@@ -516,6 +516,7 @@ export default function HostPartyPage() {
                         <PopularSongs
                           roomId={roomId}
                           layout="vertical"
+                          role="host"
                           queuedVideoIds={queue.map((song) => song.videoId)}
                           onAdded={() => { void refresh(); }}
                         />
@@ -566,6 +567,7 @@ export default function HostPartyPage() {
                         api={api}
                         roomId={roomId}
                         channels={CATALOG_CHANNEL_LABELS}
+                        queuedVideoIds={queue.map((song) => song.videoId)}
                         canSync
                         columns={1}
                         onAdded={() => { void refresh(); }}

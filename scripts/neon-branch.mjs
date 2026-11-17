@@ -94,6 +94,9 @@ export async function createBranch(options) {
   if (typeof branchId !== 'string' || branchId.length === 0) {
     throw new Error('Neon returned no branch id.');
   }
+  // Publish the id before resolving any URI: a later failure must still let
+  // the workflow's always() cleanup step delete the branch it created.
+  options.onBranchCreated?.(branchId);
 
   const scoped = { ...options, fetchImpl };
   return {
@@ -151,6 +154,7 @@ export async function main(args = process.argv.slice(2), env = process.env) {
         serviceUrl,
         authUrl,
         name,
+        onBranchCreated: (branchId) => setOutput('branch_id', branchId),
       });
       for (const uri of [branch.neonDatabaseUrl, branch.serviceDatabaseUrl, branch.authDatabaseUrl]) {
         mask(uri);

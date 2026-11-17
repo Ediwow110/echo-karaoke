@@ -1,8 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRoomApi } from '../../app/RoomApiProvider';
 import { RoomApiError } from '../../lib/edgeApi';
-import type { RoomTokens } from '../../lib/edgeApi';
-import { loadGuestToken, loadHostToken } from '../rooms/tokenStore';
+import { selectRoomTokens } from '../rooms/tokenStore';
 import { addSong, describeAddError, type QueueSong } from './queueApi';
 import { parseYouTubeVideoId } from './youtubeVideo';
 import { readCatalogPage, type CatalogSong } from '../catalog/catalogApi';
@@ -20,6 +19,7 @@ type Options = {
   roomId: string;
   initialQuery?: string;
   disabled?: boolean;
+  role?: 'guest' | 'host';
   onAdded?: (song: QueueSong) => void;
 };
 
@@ -49,7 +49,7 @@ function dedupe(songs: SearchResult[]): SearchResult[] {
   });
 }
 
-export function useSongSearch({ roomId, initialQuery = '', disabled = false, onAdded }: Options) {
+export function useSongSearch({ roomId, initialQuery = '', disabled = false, role = 'guest', onAdded }: Options) {
   const api = useRoomApi();
   const [query, setQuery] = useState(initialQuery);
   const [results, setResults] = useState<SearchResult[]>([]);
@@ -96,14 +96,8 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
       return;
     }
 
-    let tokens: RoomTokens = {};
-    const guestToken = loadGuestToken(roomId);
-    const hostToken = loadHostToken(roomId);
-    if (guestToken !== null) {
-      tokens.guestToken = guestToken;
-    } else if (hostToken !== null) {
-      tokens.hostToken = hostToken;
-    } else {
+    const tokens = selectRoomTokens(roomId, role);
+    if (tokens === null) {
       setError('This browser has no guest pass for the room.');
       setLoading(false);
       return;
@@ -162,7 +156,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, onA
         setLoading(false);
       }
     }
-  }, [api, roomId]);
+  }, [api, roomId, role]);
 
   useEffect(() => {
     const term = query.trim();

@@ -48,7 +48,7 @@ select throws_ok(
   '28000', 'UNAUTHORIZED',
   'the host heartbeat requires the host pass');
 select throws_ok(
-  format('select public.touch_member(%L::uuid, %L::text, %L)', (select room_id from hb), 'another-user', (select guest_token from hb)),
+  format('select public.touch_member(%L::uuid, %L::text, %L, 50)', (select room_id from hb), 'another-user', (select guest_token from hb)),
   '28000', 'UNAUTHORIZED',
   'the guest heartbeat remains bound to its auth user');
 
@@ -61,7 +61,7 @@ select throws_ok(
   '22023', 'ROOM_ENDED',
   'the host heartbeat rejects an ended room');
 select throws_ok(
-  format('select public.touch_member(%L::uuid, %L::text, %L)', (select room_id from hb), 'heartbeat-user-1', (select guest_token from hb)),
+  format('select public.touch_member(%L::uuid, %L::text, %L, 50)', (select room_id from hb), 'heartbeat-user-1', (select guest_token from hb)),
   '22023', 'ROOM_ENDED',
   'the guest heartbeat rejects an ended room');
 

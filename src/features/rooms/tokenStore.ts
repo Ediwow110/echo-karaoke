@@ -1,3 +1,5 @@
+import type { RoomTokens } from '../../lib/edgeApi';
+
 const GUEST_PREFIX = 'karaoke.guest.';
 const HOST_PREFIX = 'karaoke.host.';
 
@@ -98,4 +100,16 @@ export function loadHostToken(roomId: string): string | null {
 export function clearRoomTokens(roomId: string): void {
   remove(GUEST_PREFIX + roomId);
   remove(HOST_PREFIX + roomId);
+}
+
+export function selectRoomTokens(roomId: string, role: 'guest' | 'host' = 'guest'): RoomTokens | null {
+  const guestToken = loadGuestToken(roomId);
+  const hostToken = loadHostToken(roomId);
+  if (role === 'host' && hostToken !== null) {
+    return { hostToken };
+  }
+  if (guestToken !== null) {
+    return { guestToken };
+  }
+  return hostToken !== null ? { hostToken } : null;
 }

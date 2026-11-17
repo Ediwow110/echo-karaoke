@@ -104,9 +104,10 @@ into a build environment, a chat message, or a command whose output is logged.
 ## Step 1: Apply the database chain
 
 The chain runs from `0000_platform_compatibility.sql` through
-`0052_room_name_sanitizer.sql`. 0052 mirrors the server's bidi/control strip for
-direct `create_room` callers. On Neon it has already been applied to `main`. To apply it to
-another database:
+`0053_touch_member_cap.sql`. 0052 mirrors the server's bidi/control strip for
+direct `create_room` callers; 0053 re-applies the room cap when a stale guest
+heartbeat revives a member. On Neon, 0052 is already applied to `main`; apply
+0053 before deploying this tree. To apply the chain to another database:
 
 ```bash
 npx supabase@2.121.0 db push --db-url "$NEON_DATABASE_URL" --yes

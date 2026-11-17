@@ -43,7 +43,7 @@ const OPERATIONS = new Set([
 
 function isAuthFailure(error: unknown): boolean {
   if (!(error instanceof Error)) return false;
-  return /a signed-in session is required|not a JWT|unexpected algorithm|carries no subject|only an anonymous identity|unknown key|signature does not verify|has expired/i.test(error.message);
+  return /a signed-in session is required|not a JWT|unexpected algorithm|carries no subject|only an anonymous identity|unknown key|signature does not verify|has expired|issued for a different deployment/i.test(error.message);
 }
 
 export async function handleOperation(request: Request): Promise<Response> {
