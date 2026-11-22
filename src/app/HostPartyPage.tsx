@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties } from 'react';
+import { useCallback, useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type KeyboardEvent as ReactKeyboardEvent } from 'react';
 import { useSearchParams } from 'react-router-dom';
 import { ArrowCounterClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowCounterClockwise';
 import { ArrowClockwiseIcon } from '@phosphor-icons/react/dist/csr/ArrowClockwise';
@@ -22,7 +22,8 @@ import InviteCard from '../features/rooms/InviteCard';
 import { formatTime, onlineGuestCount, queueSummary } from '../lib/format';
 import { Button, Chip, ConfirmDialog, Logo, SongArtwork, TransportButton } from '../ui';
 
-type PanelTab = 'search' | 'queue' | 'songbook';
+const STAGE_TABS = ['search', 'queue', 'songbook'] as const;
+type PanelTab = (typeof STAGE_TABS)[number];
 type Density = 'grid' | 'list';
 
 // The layout is a query param on this route, not a second screen. Stage and Party
@@ -101,6 +102,31 @@ export default function HostPartyPage() {
     setParams(next, { replace: true });
   }, [params, setParams]);
   const [density, setDensity] = useState<Density>('grid');
+  const tabRefs = useRef<Record<PanelTab, HTMLButtonElement | null>>({
+    search: null,
+    queue: null,
+    songbook: null,
+  });
+
+  function onTabKeyDown(event: ReactKeyboardEvent<HTMLButtonElement>, name: PanelTab): void {
+    if (event.altKey || event.ctrlKey || event.metaKey) {
+      return;
+    }
+    const index = STAGE_TABS.indexOf(name);
+    let nextIndex: number | null = null;
+    if (event.key === 'ArrowRight') nextIndex = (index + 1) % STAGE_TABS.length;
+    if (event.key === 'ArrowLeft') nextIndex = (index - 1 + STAGE_TABS.length) % STAGE_TABS.length;
+    if (event.key === 'Home') nextIndex = 0;
+    if (event.key === 'End') nextIndex = STAGE_TABS.length - 1;
+    if (nextIndex === null) {
+      return;
+    }
+    event.preventDefault();
+    const next = STAGE_TABS[nextIndex] ?? name;
+    setTab(next);
+    tabRefs.current[next]?.focus();
+  }
+
   const [confirmEnd, setConfirmEnd] = useState(false);
   const [ending, setEnding] = useState(false);
   const [confirmClear, setConfirmClear] = useState(false);
@@ -467,12 +493,17 @@ export default function HostPartyPage() {
               />
 
               <div role="tablist" aria-label="Stage panel" className="flex items-center gap-1 rounded-media border border-line bg-surface p-1">
-                {(['search', 'queue', 'songbook'] as const).map((name) => (
+                {STAGE_TABS.map((name) => (
                   <button
                     key={name}
                     type="button"
                     role="tab"
+                    id={'stage-tab-' + name}
                     aria-selected={tab === name}
+                    aria-controls="stage-panel"
+                    tabIndex={tab === name ? 0 : -1}
+                    ref={(element) => { tabRefs.current[name] = element; }}
+                    onKeyDown={(event) => onTabKeyDown(event, name)}
                     onClick={() => setTab(name)}
                     className={[
                       'inline-flex min-h-11 flex-1 items-center justify-center rounded-media text-[0.75rem] font-semibold transition-colors',
@@ -484,7 +515,7 @@ export default function HostPartyPage() {
                 ))}
               </div>
 
-              <section className="rounded-panel border border-line bg-surface p-4" role="tabpanel" aria-label={tab + ' panel'}>
+              <section id="stage-panel" className="rounded-panel border border-line bg-surface p-4" role="tabpanel" aria-labelledby={'stage-tab-' + tab}>
                 {tab === 'search' ? (
                   <>
                     <div className="mb-3 flex items-center justify-between gap-2">

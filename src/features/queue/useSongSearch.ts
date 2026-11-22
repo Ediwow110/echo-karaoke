@@ -68,6 +68,9 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, rol
   const mounted = useRef(true);
   const addedTimers = useRef(new Map<string, number>());
   const debounceTimer = useRef<number | null>(null);
+  // Same-tick clicks run before the addingId state commits, so the state alone
+  // is not a guard against a second outbound add.
+  const addingRef = useRef(false);
 
   useEffect(() => {
     mounted.current = true;
@@ -206,6 +209,10 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, rol
       setAddError('The host turned off guest requests.');
       return false;
     }
+    if (addingRef.current) {
+      return false;
+    }
+    addingRef.current = true;
     setAddingId(videoId);
     setAddError(null);
     setNotice(null);
@@ -229,6 +236,7 @@ export function useSongSearch({ roomId, initialQuery = '', disabled = false, rol
       setAddError(describeAddError(caught));
       return false;
     } finally {
+      addingRef.current = false;
       if (mounted.current) {
         setAddingId(null);
       }

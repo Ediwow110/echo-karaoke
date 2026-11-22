@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within, act } from '@testing-library/react';
 import { createElement } from 'react';
 import SongSearchPanel from '../../src/features/queue/SongSearchPanel';
 import { RoomApiProvider } from '../../src/app/RoomApiProvider';
@@ -125,6 +125,38 @@ describe('song search panel', () => {
     await new Promise((resolve) => window.setTimeout(resolve, 480));
     expect(calls).not.toContain('youtube-search');
     expect(screen.getByLabelText(/find a song on youtube/i)).toHaveValue('');
+  });
+
+  it('sends one queue request when a link is submitted twice in one tick', async () => {
+    const calls: string[] = [];
+    let release: (() => void) | undefined;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        calls.push(name);
+        if (name === 'queue-command') {
+          await new Promise<void>((resolve) => { release = resolve; });
+          return { ...queued, position: 3 };
+        }
+        if (name === 'youtube-search') return { available: true, results: [result] };
+        if (name === 'catalog-page') return { total: 0, items: [] };
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    renderPanel(api);
+    fireEvent.change(screen.getByLabelText(/find a song on youtube/i), {
+      target: { value: 'https://youtu.be/dQw4w9WgXcQ' },
+    });
+    const form = screen.getByRole('search');
+    act(() => {
+      fireEvent.submit(form);
+      fireEvent.submit(form);
+    });
+
+    await waitFor(() => {
+      expect(calls.filter((name) => name === 'queue-command')).toHaveLength(1);
+    });
+    await act(async () => { release?.(); });
+    expect(await screen.findByText(/dancing queen added/i)).toBeInTheDocument();
   });
 
   it('searches as the singer types and adds a song', async () => {

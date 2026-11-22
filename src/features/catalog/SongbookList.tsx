@@ -69,6 +69,9 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
   // and may only write (and clear `busy`) while it is still the newest one.
   const seq = useRef(0);
   const previousQueued = useRef(new Set(queuedVideoIds));
+  // The disabled attribute follows the adding state one render later; a
+  // same-tick double press would otherwise send two queue commands.
+  const addingRef = useRef(false);
 
   useEffect(() => {
     const next = new Set(queuedVideoIds);
@@ -110,7 +113,8 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
   }, [load]);
 
   async function add(song: CatalogSong): Promise<void> {
-    if (disabled) return;
+    if (disabled || addingRef.current) return;
+    addingRef.current = true;
     setAdding(song.videoId);
     try {
       await queueCatalogSong(api, roomId, song.videoId);
@@ -119,6 +123,7 @@ export default function SongbookList({ api, roomId, channels, disabled = false, 
     } catch (caught) {
       setError(describeAddError(caught));
     } finally {
+      addingRef.current = false;
       setAdding(null);
     }
   }

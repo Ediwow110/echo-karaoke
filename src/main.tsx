@@ -47,6 +47,7 @@ function warmSessionBundle(): void {
 }
 
 const api = createEdgeApi({
+  baseUrl: import.meta.env.VITE_API_BASE_URL,
   getAccessToken: accessToken,
   getCachedAccessToken,
 });

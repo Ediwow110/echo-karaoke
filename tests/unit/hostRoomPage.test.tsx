@@ -851,7 +851,39 @@ describe('host room workspace', () => {
 
     fireEvent.click(screen.getByRole('tab', { name: /^queue$/i }));
     expect(screen.queryByRole('search')).toBeNull();
-    expect(within(screen.getByRole('tabpanel', { name: 'queue panel' })).getByText('Midnight City')).toBeInTheDocument();
+    expect(within(screen.getByRole('tabpanel', { name: /^queue$/i })).getByText('Midnight City')).toBeInTheDocument();
+  });
+
+  it('moves between stage tabs with arrow, Home and End keys', async () => {
+    const { api } = makeApi();
+    renderHost(api, '/room/' + roomId + '/host/party?layout=computer');
+
+    const search = await screen.findByRole('tab', { name: /^search$/i });
+    const queue = screen.getByRole('tab', { name: /^queue$/i });
+    const songbook = screen.getByRole('tab', { name: /^songbook$/i });
+    expect(search).toHaveAttribute('aria-selected', 'true');
+    expect(search).toHaveAttribute('tabindex', '0');
+    expect(queue).toHaveAttribute('tabindex', '-1');
+    expect(search).toHaveAttribute('aria-controls', 'stage-panel');
+    expect(screen.getByRole('tabpanel')).toHaveAttribute('id', 'stage-panel');
+
+    search.focus();
+    fireEvent.keyDown(search, { key: 'ArrowRight' });
+    expect(queue).toHaveAttribute('aria-selected', 'true');
+    expect(queue).toHaveFocus();
+
+    fireEvent.keyDown(queue, { key: 'ArrowRight' });
+    expect(songbook).toHaveAttribute('aria-selected', 'true');
+    expect(songbook).toHaveFocus();
+
+    fireEvent.keyDown(songbook, { key: 'ArrowRight' });
+    expect(search).toHaveAttribute('aria-selected', 'true');
+    expect(search).toHaveFocus();
+
+    fireEvent.keyDown(search, { key: 'End' });
+    expect(songbook).toHaveFocus();
+    fireEvent.keyDown(songbook, { key: 'Home' });
+    expect(search).toHaveFocus();
   });
 
   it('adds the search panel without leaving the stage route', async () => {

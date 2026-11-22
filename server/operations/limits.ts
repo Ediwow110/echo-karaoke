@@ -32,14 +32,16 @@ export function resolveJoinFailureLimit(
 
 /**
  * Requests per minute for one session, across every operation. The ceiling sits
- * just above the product's own worst case rather than at a comfortable average:
- * the songbook filters on a 200ms debounce, so sustained fast typing can reach
- * five requests a second, and a budget that throttled that would be a bug the
- * user experiences as a broken search box. A scripted client still meets the
+ * above the product's measured worst case rather than on top of it: the
+ * songbook filters on a 200ms debounce (five requests a second, 300 a minute),
+ * the search tab sends a YouTube and a catalog request after each 380ms pause
+ * (about 316 a minute), and the four-second room poll adds 15. At 300 those
+ * combinations throttle ordinary use, so the default is 420: seven requests a
+ * second, above that worst case, while a scripted client still meets the
  * ceiling inside a second.
  */
 export function resolveApiRequestLimit(
   env: Record<string, string | undefined> = process.env,
 ): number {
-  return readInt(env.API_REQUESTS_PER_MINUTE, 300, 30, 1200);
+  return readInt(env.API_REQUESTS_PER_MINUTE, 420, 30, 1200);
 }

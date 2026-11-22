@@ -185,6 +185,8 @@ type FetchOptions = {
   unreachable?: string[];
   failingPlaylists?: string[];
   failingNextPages?: string[];
+  transportFailures?: string[];
+  fatalFailures?: string[];
 };
 
 function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
@@ -204,6 +206,8 @@ function stubFetch(options: FetchOptions = {}): { urls: URL[] } {
       });
     }
     const playlistId = url.searchParams.get('playlistId') ?? '';
+    if (options.transportFailures?.includes(playlistId)) throw new TypeError('fetch failed');
+    if (options.fatalFailures?.includes(playlistId)) throw new Error('karaoke catalog crashed');
     if (options.failingPlaylists?.includes(playlistId)) return new Response(null, { status: 503 });
     if (options.failingNextPages?.includes(playlistId) && url.searchParams.has('pageToken')) {
       return new Response(null, { status: 503 });
@@ -295,6 +299,26 @@ describe('catalog access guards', () => {
 });
 
 describe('catalog sync orchestration', () => {
+  it('keeps the rows already synced and marks a transport-failed channel unreachable', async () => {
+    useDatabase(baseHandlers());
+    stubFetch({ rows: [row(1)], transportFailures: ['UUsingking'] });
+
+    const response = await catalogSync(syncRequest(), CALLER);
+    const body = await response.json() as { added?: number; unreachable?: string[]; message?: string };
+
+    expect(response.status).toBe(200);
+    expect(body.added).toBeGreaterThan(0);
+    expect(body.unreachable).toContain('@singking');
+    expect(body.message).toContain('could not reach: @singking');
+  });
+
+  it('still fails the refresh on an unexpected error instead of blaming the channel', async () => {
+    useDatabase(baseHandlers());
+    stubFetch({ rows: [row(1)], fatalFailures: ['UUsingking'] });
+
+    await expect(catalogSync(syncRequest(), CALLER)).rejects.toThrow('karaoke catalog crashed');
+  });
+
   it('names the daily budget, not an unreachable channel, when the recovery lookup is refused', async () => {
     // The page fetch is paid for, then a 503 sends the walk back to re-resolve
     // the handle, which needs a second unit. Falling out of that branch with no

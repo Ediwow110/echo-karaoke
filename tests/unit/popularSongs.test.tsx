@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, act } from '@testing-library/react';
 import { createElement } from 'react';
 import { MemoryRouter } from 'react-router-dom';
 import PopularSongs from '../../src/features/queue/PopularSongs';
@@ -49,6 +49,36 @@ function renderStrip(available: boolean, moreHref?: string) {
 }
 
 describe('popular songs', () => {
+  it('sends one queue request when a suggestion is pressed twice in one tick', async () => {
+    const calls: string[] = [];
+    let release: (() => void) | undefined;
+    const api: EdgeApi = {
+      invoke: (async (name: string) => {
+        calls.push(name);
+        if (name === 'youtube-popular') return { available: true, results: [song] };
+        if (name === 'queue-command') {
+          await new Promise<void>((resolve) => { release = resolve; });
+          return { songId: 's1', title: song.title, position: 1 };
+        }
+        return {};
+      }) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
+    render(createElement(RoomApiProvider, {
+      api,
+      children: createElement(MemoryRouter, null,
+        createElement(PopularSongs, { roomId, layout: 'vertical' })),
+    }));
+
+    const button = await screen.findByRole('button', { name: /^queue dancing queen$/i });
+    act(() => { button.click(); button.click(); });
+
+    await waitFor(() => {
+      expect(calls.filter((name) => name === 'queue-command')).toHaveLength(1);
+    });
+    await act(async () => { release?.(); });
+  });
+
   it('shows a useful unavailable state and songbook link for the vertical host panel', async () => {
     localStorage.setItem('karaoke.guest.' + roomId, 'guest-pass');
     const { container } = render(

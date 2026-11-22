@@ -97,12 +97,14 @@ within six hours, and stops after eight seconds with a partial result. Because t
 
 ## Tests
 
-    npm test                 # 652 unit and component tests (jsdom)
+    npm test                 # 674 unit and component tests (jsdom)
     npm run build            # typecheck and production build
     npx supabase@2.121.0 test db --db-url "$NEON_DATABASE_URL"   # pgTAP suite
     npm run test:integration # operation-path, race, and runtime-role grant tests against a Neon branch
-    npm run test:e2e:ui      # 62 CI-safe Playwright UI flows with a mocked API
+    npm run test:e2e:ui      # 63 CI-safe Playwright UI flows with a mocked API
     npm run test:e2e         # real Playwright flows; needs E2E_BASE_URL (HTTPS for remote), plus E2E_BRANCH_TARGET_CONFIRMED=1 for a loopback-resolving target
+
+`npm run verify:audit` fails on any high or critical dependency advisory unless `scripts/audit-gate.mjs` lists that advisory with a reason and an unexpired review date.
 
 `vercel dev` reads `.env.local`, whose database URLs name production Neon, so the suite no longer defaults to it: `npm run test:e2e` stops at config load unless `E2E_BASE_URL` names a target, resolves the host before launching, refuses all known production aliases and `BETTER_AUTH_URL`, and requires HTTPS for remote targets. Any address that resolves to loopback — including `nip.io`, IPv6-mapped aliases, and trailing-dot names — additionally needs `E2E_BRANCH_TARGET_CONFIRMED=1`, because nothing in a hostname says whether that port is backed by a branch or by production. Run it only against a disposable branch: repoint the server, or set `E2E_BASE_URL` to a branch-backed deployment.
 

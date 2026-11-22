@@ -43,6 +43,8 @@ export default function PopularSongs({ roomId, layout = 'horizontal', disabled =
   const [overflowing, setOverflowing] = useState(false);
   const listRef = useRef<HTMLUListElement | null>(null);
   const listId = useId();
+  // A same-tick double press runs before the queued state commits.
+  const queueingRef = useRef(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -87,6 +89,10 @@ export default function PopularSongs({ roomId, layout = 'horizontal', disabled =
     if (disabled || queued !== null || queuedVideoIds.includes(videoId) || added.includes(videoId)) {
       return;
     }
+    if (queueingRef.current) {
+      return;
+    }
+    queueingRef.current = true;
     setQueued(videoId);
     setError(null);
     try {
@@ -96,6 +102,7 @@ export default function PopularSongs({ roomId, layout = 'horizontal', disabled =
     } catch (caught) {
       setError(describeAddError(caught));
     } finally {
+      queueingRef.current = false;
       setQueued(null);
     }
   }
