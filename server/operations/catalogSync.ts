@@ -97,11 +97,21 @@ function channelUrl(handle: string, apiKey: string): string {
 type UpstreamPage =
   | { state: 'ok'; payload: unknown }
   | { state: 'http-error' }
+  | { state: 'unreachable' }
   | { state: 'stopped' };
 
 function isAbortError(error: unknown): boolean {
   const name = (error as { name?: unknown } | null)?.name;
   return name === 'AbortError' || name === 'TimeoutError';
+}
+
+// fetch rejects with TypeError when it cannot reach the provider, and a body
+// that is not JSON rejects with SyntaxError. Both are provider-side faults; a
+// programming or database error must still fail the refresh.
+function isTransportFailure(error: unknown): boolean {
+  const name = (error as { name?: unknown } | null)?.name;
+  return error instanceof TypeError || name === 'TypeError'
+    || error instanceof SyntaxError || name === 'SyntaxError';
 }
 
 async function fetchUpstream(url: string, timeoutMs: number, request: Request): Promise<UpstreamPage> {
@@ -110,11 +120,12 @@ async function fetchUpstream(url: string, timeoutMs: number, request: Request): 
     if (!response.ok) return { state: 'http-error' };
     return { state: 'ok', payload: await response.json() };
   } catch (error) {
-    if (!isAbortError(error)) throw error;
-    // The budget or the platform cancelled a slow upstream call after quota
-    // was spent. Keep the rows already synced instead of failing the request.
-    logFailure('catalog-sync', error, 500, request);
-    return { state: 'stopped' };
+    if (!isAbortError(error) && !isTransportFailure(error)) throw error;
+    // The budget or the platform cancelled a slow upstream call after quota was
+    // spent, or the provider dropped the connection. Keep the rows already
+    // synced instead of failing the whole refresh.
+    logFailure('catalog-sync', error, 502, request);
+    return { state: isAbortError(error) ? 'stopped' : 'unreachable' };
   }
 }
 
@@ -220,6 +231,7 @@ async function lookupUploadsPlaylist(
     request,
   );
   if (upstream.state === 'stopped') return { state: 'stopped' };
+  if (upstream.state === 'unreachable') return { state: 'unreachable' };
   if (upstream.state === 'http-error') return { state: 'unreachable' };
   const items = (upstream.payload as { items?: { contentDetails?: { relatedPlaylists?: { uploads?: unknown } } }[] }).items ?? [];
   const uploads = items[0]?.contentDetails?.relatedPlaylists?.uploads;
@@ -333,6 +345,12 @@ async function walkCatalog(apiKey: string, request: Request): Promise<Response> 
       if (upstream.state === 'stopped') {
         stoppedEarly = true;
         break channels;
+      }
+      if (upstream.state === 'unreachable') {
+        // A dropped connection says nothing about the channel's identity or
+        // budget; report it and let the remaining channels finish.
+        unreachable.push(handle);
+        break;
       }
       if (upstream.state === 'http-error') {
         // A cursor can outlive its channel. A renamed or deleted uploads

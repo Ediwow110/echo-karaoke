@@ -105,6 +105,33 @@ describe('songbook list', () => {
     });
   });
 
+  it('sends one queue request when an add button is pressed twice in one tick', async () => {
+    const calls: Array<{ name: string }> = [];
+    let release: (() => void) | undefined;
+    const api = {
+      invoke: (async (name: string) => {
+        calls.push({ name });
+        if (name === 'catalog-page') return catalogPage(0);
+        if (name === 'queue-command') {
+          await new Promise<void>((resolve) => { release = resolve; });
+          return { ok: true };
+        }
+        return { ok: true };
+      }) as unknown as EdgeApi['invoke'],
+    };
+    localStorage.setItem('karaoke.host.' + roomId, 'host-pass-value');
+    render(<SongbookList api={api} roomId={roomId} />);
+
+    const add = await screen.findByRole('button', { name: /add halo/i });
+    act(() => { add.click(); add.click(); });
+
+    await waitFor(() => {
+      expect(calls.filter((call) => call.name === 'queue-command')).toHaveLength(1);
+    });
+    await act(async () => { release?.(); });
+    expect(await screen.findByRole('button', { name: /halo.*already queued/i })).toBeDisabled();
+  });
+
   it('re-enables a songbook row after it leaves the queue', async () => {
     const { api } = makeApi();
     localStorage.setItem('karaoke.host.' + roomId, 'host-pass-value');

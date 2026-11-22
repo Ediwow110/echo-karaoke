@@ -9,8 +9,16 @@ vi.mock('../../server/db/client.js', async (importOriginal) => {
 
 import { enforceApiRequestLimit } from '../../server/operations/apiThrottle';
 import { HttpError } from '../../server/operations/errors';
+import { resolveApiRequestLimit } from '../../server/operations/limits';
 
 describe('the per-session api budget', () => {
+  it('keeps headroom above the measured worst case instead of sitting on it', () => {
+    // The songbook's 200ms debounce can reach 300 requests a minute and the
+    // four-second room poll adds 15. The search tab sends two requests per
+    // 380ms pause, about 316 a minute, plus the same poll.
+    expect(resolveApiRequestLimit({})).toBeGreaterThanOrEqual(331);
+  });
+
   it('allows a session under its ceiling, keyed by the session and a one-minute window', async () => {
     db.query.mockReset();
     db.query.mockResolvedValue([{ result: { allowed: true } }]);
@@ -19,7 +27,7 @@ describe('the per-session api budget', () => {
 
     const [text, params] = db.query.mock.calls[0];
     expect(String(text)).toContain('consume_rate_limit');
-    expect(params).toEqual(['user-1', 'api-minute', 300, 60]);
+    expect(params).toEqual(['user-1', 'api-minute', 420, 60]);
   });
 
   it('refuses past the ceiling with a 429 the client can show', async () => {

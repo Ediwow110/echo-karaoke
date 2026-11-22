@@ -1168,6 +1168,29 @@ test('host opens the songbook inside the party panel and queues a song', async (
   expect(adds[0]).toMatchObject({ action: 'add', videoId: 'video000000', roomId: ROOM });
 });
 
+test('stage tabs move focus with Arrow, Home and End keys', async ({ page }) => {
+  await mockApi(page);
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await openScreen(page, '/room/' + ROOM + '/host/party?layout=computer');
+
+  const search = page.getByRole('tab', { name: 'Search' });
+  const queue = page.getByRole('tab', { name: 'Queue' });
+  const songbook = page.getByRole('tab', { name: 'Songbook' });
+  await search.focus();
+  await page.keyboard.press('ArrowRight');
+  await expect(queue).toBeFocused();
+  await expect(queue).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowRight');
+  await expect(songbook).toBeFocused();
+  await page.keyboard.press('End');
+  await expect(songbook).toBeFocused();
+  await page.keyboard.press('Home');
+  await expect(search).toBeFocused();
+  await expect(search).toHaveAttribute('aria-selected', 'true');
+  await page.keyboard.press('ArrowLeft');
+  await expect(songbook).toBeFocused();
+});
+
 test('the TV stage and the computer panel both keep the invite and a scrollable vertical list', async ({ page }) => {
   const popular = Array.from({ length: 8 }, (_, index) => ({
     videoId: 'karaoke' + String(index).padStart(4, '0'),
